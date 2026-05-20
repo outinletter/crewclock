@@ -12,7 +12,6 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
 <style>
 :root{
-  /* 연한 하늘색 파스텔 테마 */
   --bg:#e8f4fd;
   --white:#f4faff;
   --blue:#3b82c4;--blue2:#2d6eac;
@@ -22,7 +21,6 @@
   --grn:#2eaa70;--red:#e0505a;--amb:#e8923a;
   --shadow:0 1px 6px rgba(59,130,196,.10),0 1px 2px rgba(0,0,0,.04);
   --shadow-md:0 4px 20px rgba(59,130,196,.16);
-  /* nav gradient */
   --nav-bg:linear-gradient(135deg,#daeefa 0%,#f0f8ff 100%);
 }
 body.dark{
@@ -311,6 +309,11 @@ body.dark .dl-inp[type=date]{color-scheme:dark}
 .dal-dis{padding:4px 8px;background:rgba(251,146,60,.12);border:1.5px solid var(--amb);
   border-radius:6px;color:var(--amb);font-size:10px;font-weight:700;cursor:pointer;flex-shrink:0}
 
+/* MISSED STATE (Dimmed) */
+.dal-item.missed { opacity: 0.5; filter: grayscale(1); border-color: var(--bdr); background: var(--bg); }
+.dal-item.missed .dal-cd { color: var(--tx3); }
+.dal-item.missed .dal-time { color: var(--tx2); }
+
 /* ── SETTINGS ── */
 .settings-section{background:var(--white);border-radius:14px;box-shadow:var(--shadow);overflow:hidden}
 .settings-row{padding:13px 16px;border-bottom:1px solid var(--bdr);display:flex;align-items:center;gap:12px}
@@ -545,10 +548,10 @@ body.dark .dl-inp[type=date]{color-scheme:dark}
     <button onclick="closeUploadSheet()" style="background:var(--blue-light);border:none;border-radius:8px;padding:5px 12px;font-size:12px;font-weight:600;color:var(--blue);cursor:pointer;font-family:Inter,sans-serif">Done</button>
   </div>
   <div class="sheet-body">
-    <!-- ICS 파일 인풋 (숨김) -->
+    <!-- Hidden file input -->
     <input type="file" accept=".ics,.ical,text/calendar" id="icsIn" onchange="handleICS(event)" style="display:none">
     
-    <!-- FIX 3: 명시적인 ICS 업로드 / 수동 입력 선택 버튼 -->
+    <!-- Upload and Manual Entry Buttons -->
     <div style="display:flex; gap:10px; margin-bottom: 12px;">
       <button onclick="document.getElementById('icsIn').click()" class="btn-az" style="flex:1; margin-top:0;">Upload ICS File</button>
       <button onclick="showManualEntryFallback()" class="btn-az btn-outline" style="flex:1; margin-top:0;">Manual Text</button>
@@ -602,6 +605,23 @@ body.dark .dl-inp[type=date]{color-scheme:dark}
 var swReg=null;
 var wakeLock=null;
 var deferredInstallPrompt=null;
+
+/* ── 백그라운드 절전 방지 무음 오디오 (Keep-Alive Hack) ── */
+var keepAliveAudio = null;
+var silentWav = "data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA";
+
+function startKeepAlive(){
+  if(keepAliveAudio) return;
+  try {
+    keepAliveAudio = new Audio(silentWav);
+    keepAliveAudio.loop = true;
+    keepAliveAudio.volume = 0.01;
+    keepAliveAudio.play().catch(function(){ keepAliveAudio = null; });
+  } catch(e) {}
+}
+// 사용자가 화면을 한 번이라도 터치하면 무음 오디오를 시작하여 백그라운드 타이머 생존 유지
+document.addEventListener('touchstart', startKeepAlive, {once:true});
+document.addEventListener('click', startKeepAlive, {once:true});
 
 function scheduleNotificationsViaSW(){
   try{
@@ -719,9 +739,26 @@ function showIOSInstallGuide(){
   el.querySelector('div').appendChild(closeBtn);
   document.body.appendChild(el);
 }
+
+/* ── 내장 서비스 워커 (Inline Service Worker) 생성 ── */
 function initSW(){
   if(!('serviceWorker' in navigator)) return;
-  navigator.serviceWorker.register('./sw.js', {scope:'./'})
+  
+  // 단일 HTML 파일에서 작동하도록 SW 코드를 Blob 객체로 생성
+  var swCode = "self.addEventListener('install', function(e){ e.waitUntil(self.skipWaiting()); });" +
+               "self.addEventListener('activate', function(e){ e.waitUntil(self.clients.claim()); });" +
+               "self.addEventListener('notificationclick', function(e){" +
+               "  e.notification.close();" +
+               "  e.waitUntil(self.clients.matchAll({type:'window', includeUncontrolled:true}).then(function(cls){" +
+               "    for(var i=0; i<cls.length; i++){ if(cls[i].focus) return cls[i].focus(); }" +
+               "    if(self.clients.openWindow) return self.clients.openWindow('/');" +
+               "  }));" +
+               "});";
+               
+  var blob = new Blob([swCode], {type: 'application/javascript'});
+  var swUrl = URL.createObjectURL(blob);
+
+  navigator.serviceWorker.register(swUrl)
     .then(function(reg){
       swReg = reg;
       if(reg.waiting) reg.waiting.postMessage({type:'SKIP_WAITING'});
@@ -732,21 +769,6 @@ function initSW(){
           if(nw.state==='installed' && navigator.serviceWorker.controller)
             nw.postMessage({type:'SKIP_WAITING'});
         });
-      });
-      navigator.serviceWorker.addEventListener('message', function(e){
-        if(!e.data) return;
-        if(e.data.type === 'ALARM_FIRED'){
-          e.data.ids.forEach(function(id){
-            var a = alms.find(function(x){ return x.id===id; });
-            if(a && !a.ring && !a.dism){
-              if(!(a.time instanceof Date)) a.time = new Date(a.time);
-              if(a.dep && !(a.dep instanceof Date)) a.dep = new Date(a.dep);
-              a.ring = true;
-              trigAlarm(a);
-            }
-          });
-          renderDirectAlarms();
-        }
       });
       setTimeout(scheduleNotificationsViaSW, 500);
     })
@@ -824,6 +846,7 @@ function saveAlarms(){
         time:a.time instanceof Date?a.time.toISOString():a.time,
         dep:a.dep instanceof Date?a.dep.toISOString():(a.dep||null),
         lbl:a.lbl,type:a.type,armed:a.armed,ring:false,dism:a.dism,
+        missed:a.missed,
         fnum:a.fnum, depApt:a.depApt, arrApt:a.arrApt
       };
     });
@@ -849,13 +872,17 @@ function loadAlarms(){
     var data=JSON.parse(raw);
     var now=new Date();
     alms=data
-      .filter(function(a){ return !a.dism || (new Date(a.time)-now>-300000); })
+      .filter(function(a){ 
+         if(a.type === 'direct') return !a.dism || a.missed; 
+         return !a.dism || (new Date(a.time)-now>-300000); 
+      })
       .map(function(a){
         return {
           id:a.id,
           time:new Date(a.time),
           dep:a.dep?new Date(a.dep):null,
           lbl:a.lbl,type:a.type,armed:a.armed,ring:false,dism:a.dism,
+          missed:a.missed,
           fnum:a.fnum, depApt:a.depApt, arrApt:a.arrApt
         };
       });
@@ -905,7 +932,7 @@ function closeUploadSheet(){
   if(detectedFlights.length) switchTab('calendar',null);
 }
 
-/* ── FIX 3: 수동 스케줄 텍스트 파서 UI ── */
+/* Manual Text Parser UI */
 function showManualEntryFallback(){
   var wrap=document.getElementById('sheetFalWrap');
   if(!wrap)return;
@@ -921,7 +948,7 @@ function showManualEntryFallback(){
     +'<button class="btn-az" onclick="parseManualEntry()" style="margin-top:10px">Parse Flights</button>'
     +'</div>';
     
-    // 자동 이번달 세팅
+    // Auto set to current month
     var dt = new Date();
     document.getElementById('manualMonth').value = dt.getFullYear() + "-" + p2(dt.getMonth() + 1);
 }
@@ -958,7 +985,7 @@ function parseManualEntry(){
   if(!flights.length){toast('No valid flights found in input','er');return;}
   detectedFlights=flights;
   initFlightToggles();
-  autoRegisterAll(); // 수동입력도 자동으로 알람 등록
+  autoRegisterAll(); 
   saveFlights();
   renderHomeFlightList();
   renderSheetFalWrap();
@@ -1021,7 +1048,6 @@ function renderDaySchedule(dk){
     return adk===dk;
   });
 
-  // 해당 날짜의 비행 정보를 헤더 옆으로 이동
   var hInfoEl = document.getElementById('dayFlightHeaderInfo');
   if(hInfoEl) {
      if(flights.length > 0) {
@@ -1052,7 +1078,6 @@ function renderDaySchedule(dk){
     rows.push({s:+(f.depTime||'0000').replace(':',''), html:h});
   });
   dayAlms.forEach(function(a){
-    // 개별 알람 목록 옆에서는 비행 정보 삭제 (헤더로 옮겼기 때문)
     var routeHtml = escQ(a.lbl);
     var h='<div class="dfr">'
       +'<div class="dfr-time">'+fmt(a.time)+'</div>'
@@ -1216,14 +1241,14 @@ function parseICS(text){
   return flights;
 }
 
-/* ── FIX 1: ICS 시간 파싱 시 UTC(Z) 오동작 수정 ── */
+/* FIX 1: ICS Time Parsing */
 function parseICSDate(s){
   if(!s)return null;
   s=s.replace(/;[^:]*:/,':').replace(/.*:/,'');
   if(s.includes('T')){
     var m=s.match(/(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})(Z?)/);
     if(m){
-      // Z가 있으면 Date.UTC를 통해 정확히 협정세계시로 인식시킴
+      // Correctly parse UTC time if Z is present
       if(m[7] === 'Z') {
          return new Date(Date.UTC(+m[1], +m[2]-1, +m[3], +m[4], +m[5], +m[6]));
       } else {
@@ -1354,7 +1379,6 @@ function togFA(idx,offId){
     flightToggles[idx][offId]=!flightToggles[idx][offId];
     rerenderFlight(idx);
     
-    // 알람 설정 즉각 업데이트
     autoRegisterAll(); 
 }
 
@@ -1372,12 +1396,12 @@ function rerenderFlight(idx){
   el.parentNode.replaceChild(tmp.firstChild,el);
 }
 
-/* 전체 편 자동 알람 등록 */
+/* Auto Register All Flights */
 function autoRegisterAll(){
   syncAllPresets();
   var now=new Date();var added=0;
   
-  // 기존 비행 관련 자동 생성된 알람들을 모두 삭제 후 재등록
+  // Remove existing auto alarms and re-register
   alms = alms.filter(function(a){ return a.type === 'direct'; });
   
   detectedFlights.forEach(function(f,idx){
@@ -1407,7 +1431,7 @@ function addDirectAlarm(){
   var at=buildDate(dv,h,m);var now=new Date();
   if(at<=now){toast('This time has already passed','er');return;}
   if(alms.find(function(a){return !a.dism&&Math.abs(a.time-at)<2000;})){toast('An alarm already exists at this time','er');return;}
-  alms.push({id:uid(),time:at,dep:null,lbl:lbl,type:'direct',armed:true,ring:false,dism:false});
+  alms.push({id:uid(),time:at,dep:null,lbl:lbl,type:'direct',armed:true,ring:false,dism:false, missed:false});
   alms.sort(function(a,b){return a.time-b.time;});
   saveAlarms();scheduleNotificationsViaSW();acquireWakeLock();
   renderDirectAlarms();renderCal();renderDaySchedule(calSelDate);
@@ -1421,8 +1445,8 @@ function addDirectAlarm(){
 
 function renderDirectAlarms(){
   var wrap=document.getElementById('dalCardWrap');if(!wrap)return;
-  // 변경: 직접 등록한 알람 외에 자동 등록된 스케줄 알람(flight)도 리스트에 모두 표시
-  var directs=alms.filter(function(a){return !a.dism;});
+  // Filter to only show direct (manual) alarms.
+  var directs=alms.filter(function(a){return a.type === 'direct' && (!a.dism || a.missed);});
   if(!directs.length){wrap.innerHTML='';return;}
   var D=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   var now=new Date();var todayMid=new Date();todayMid.setHours(0,0,0,0);
@@ -1431,35 +1455,60 @@ function renderDirectAlarms(){
     var isTod=tMid.getTime()===todayMid.getTime();
     var dateStr=p2(t.getMonth()+1)+'/'+p2(t.getDate());
     var timeStr=p2(t.getHours())+':'+p2(t.getMinutes());
-    var isRing=a.ring;var diff=t-now;var cdTxt='';
-    if(isRing)cdTxt='▶ RINGING';
+    var isRing=a.ring;
+    var isMissed=a.missed;
+    var diff=t-now;
+    var cdTxt='';
+    if(isRing) cdTxt='▶ RINGING';
+    else if(isMissed) cdTxt='MISSED';
     else if(diff>0){var s2=Math.floor(diff/1000);var hh=Math.floor(s2/3600),mm=Math.floor((s2%3600)/60),ss=s2%60;cdTxt='T-'+(hh?hh+'H ':'')+mm+'M '+ss+'S';}
     else cdTxt='PASSED';
-    var act=isRing?'<button class="dal-dis" onclick="dismissDirectAlarm(\''+a.id+'\')">DISMISS</button>':'<button class="dal-del" onclick="delDirectAlarm(\''+a.id+'\')">✕</button>';
     
-    // 비행 편명과 출도착 정보 HTML
-    var fInfo = '';
-    if(a.fnum && a.depApt) {
-        fInfo = '<span style="font-family:\'Share Tech Mono\',monospace; font-size:10px; color:var(--blue); margin-left:6px; padding-left:6px; border-left:1.5px solid var(--bdr)">'+a.fnum+' '+a.depApt+'&#8594;'+(a.arrApt||'---')+'</span>';
+    var act='';
+    if(isRing) {
+      act = '<button class="dal-dis" onclick="dismissDirectAlarm(\''+a.id+'\')">DISMISS</button>';
+    } else {
+      act = '<button class="dal-del" onclick="delDirectAlarm(\''+a.id+'\')">✕</button>';
     }
+    
+    var cls = 'dal-item' + (isRing ? ' ring-now' : '') + (isMissed ? ' missed' : '');
 
-    return '<div class="dal-item'+(isRing?' ring-now':'')+'" id="dal-'+a.id+'">'
+    return '<div class="'+cls+'" id="dal-'+a.id+'">'
       +'<div class="dal-dot"></div><div class="dal-info">'
-      +'<div class="dal-date-row"><span class="dal-dow">'+dow+'</span><span class="dal-date">'+dateStr+'</span>'+fInfo+(isTod?'<span class="dal-today" style="margin-left:4px">TODAY</span>':'')+'</div>'
+      +'<div class="dal-date-row"><span class="dal-dow">'+dow+'</span><span class="dal-date">'+dateStr+'</span>'+(isTod?'<span class="dal-today" style="margin-left:4px">TODAY</span>':'')+'</div>'
       +'<div class="dal-lbl">'+escQ(a.lbl)+'</div>'
       +'<div class="dal-cd" id="dcd-'+a.id+'">'+cdTxt+'</div></div>'
       +'<div class="dal-time">'+timeStr+'</div>'+act+'</div>';
   }).join('')+'</div>';
 }
 
-function delDirectAlarm(id){alms=alms.filter(function(a){return a.id!==id;});saveAlarms();renderDirectAlarms();renderCal();}
-function dismissDirectAlarm(id){var a=alms.find(function(x){return x.id===id;});if(a){a.dism=true;a.ring=false;}saveAlarms();if(!alms.some(function(x){return x.ring;})){stopSnd();document.getElementById('ro').classList.remove('show');}renderDirectAlarms();}
+function delDirectAlarm(id){
+  alms=alms.filter(function(a){return a.id!==id;});
+  saveAlarms();renderDirectAlarms();renderCal();
+}
+
+function dismissDirectAlarm(id){
+  alms=alms.filter(function(a){
+     if(a.id === id) {
+        // If user manually dismissed from list, completely remove direct alarm
+        if(a.type === 'direct') return false; 
+        a.dism=true; a.ring=false;
+     }
+     return true;
+  });
+  saveAlarms();
+  if(!alms.some(function(x){return x.ring;})){
+     stopSnd();document.getElementById('ro').classList.remove('show');
+  }
+  renderDirectAlarms();
+}
 
 function updateDirectCDs(){
   var now=new Date();
-  alms.filter(function(a){return !a.dism;}).forEach(function(a){
+  alms.filter(function(a){return a.type === 'direct' && (!a.dism || a.missed);}).forEach(function(a){
     var el=document.getElementById('dcd-'+a.id);if(!el)return;
     if(a.ring){el.textContent='▶ RINGING';return;}
+    if(a.missed){el.textContent='MISSED';return;}
     var diff=a.time-now;if(diff<=0){el.textContent='PASSED';return;}
     var s2=Math.floor(diff/1000);var hh=Math.floor(s2/3600),mm=Math.floor((s2%3600)/60),ss=s2%60;
     el.textContent='T-'+(hh?hh+'H ':'')+mm+'M '+ss+'S';
@@ -1473,7 +1522,6 @@ function tickClock(){
   if(badge)badge.classList.toggle('show',alms.some(function(a){return a.ring;}));
 }
 
-/* ── FIX 2: 백그라운드 유예 시간 변경 (60초 -> 5분) ── */
 function checkAlarms(){
   var now=new Date(),needRender=false;
   alms.forEach(function(a){
@@ -1481,21 +1529,35 @@ function checkAlarms(){
     if(a.dep&&!(a.dep instanceof Date)) a.dep=new Date(a.dep);
     if(a.dism||a.ring)return;
     var diff=now-a.time;
-    // 기기가 잠들어 있다가 깨어났을 때를 대비해 감지 유예 시간을 5분(300000ms)으로 넓게 잡음
+    // 5 minute grace period for wake lock
     if(diff>=0&&diff<300000){a.ring=true;needRender=true;trigAlarm(a);}
   });
+  
   alms.forEach(function(a){
-    // 5분 이상 울리면 자동 취소
+    // Auto cancel after 5 mins
     if(a.ring&&(now-a.time)>=300000){
-      a.ring=false;a.dism=true;needRender=true;
+      a.ring=false;
+      if(a.type === 'direct') {
+         a.missed=true; // Mark timeout as missed
+         a.dism=true;
+      } else {
+         a.dism=true;
+      }
+      needRender=true;
       if(!alms.some(function(x){return x.ring;})){
         stopSnd();document.getElementById('ro').classList.remove('show');
       }
     }
   });
+  
   if(needRender)renderDirectAlarms();
   var bl=alms.length;
-  alms=alms.filter(function(a){return !a.dism||(now-a.time<300000);});
+  
+  alms=alms.filter(function(a){
+    if(a.type === 'direct') return !a.dism || a.missed; 
+    return !a.dism || (now-a.time<300000);
+  });
+  
   if(alms.length!==bl){saveAlarms();renderDirectAlarms();}
 }
 
@@ -1518,7 +1580,18 @@ function trigAlarm(a){
   showNotificationIfGranted(a);
   acquireWakeLock();
 }
-function dismissOv(){alms.forEach(function(a){if(a.ring){a.dism=true;a.ring=false;}});saveAlarms();stopSnd();document.getElementById('ro').classList.remove('show');renderDirectAlarms();}
+
+function dismissOv(){
+  alms = alms.filter(function(a){
+    if(a.ring){
+      // If user manually dismissed from overlay, completely remove direct alarm
+      if(a.type === 'direct') return false; 
+      a.dism=true; a.ring=false;
+    }
+    return true;
+  });
+  saveAlarms();stopSnd();document.getElementById('ro').classList.remove('show');renderDirectAlarms();
+}
 
 /* ═══ SETTINGS ═══ */
 function clearAllData(){
