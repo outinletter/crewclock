@@ -7,7 +7,8 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="CrewClock">
-<link rel="manifest" href="data:application/json,%7B%22name%22%3A%22CREW+CLOCK%22%2C%22short_name%22%3A%22CrewClock%22%2C%22start_url%22%3A%22.%2F%22%2C%22display%22%3A%22standalone%22%2C%22background_color%22%3A%22%23e8f4fd%22%2C%22theme_color%22%3A%22%233b82c4%22%2C%22icons%22%3A%5B%7B%22src%22%3A%22data%3Aimage%2Fsvg%2Bxml%2C%3Csvg+xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27+viewBox%3D%270+0+192+192%27%3E%3Ccircle+cx%3D%2796%27+cy%3D%2796%27+r%3D%2796%27+fill%3D%27%233b82c4%27%2F%3E%3Ctext+y%3D%27128%27+x%3D%2796%27+text-anchor%3D%27middle%27+font-size%3D%27100%27+font-family%3D%27Arial%27%3E%E2%9C%88%3C%2Ftext%3E%3C%2Fsvg%3E%22%2C%22sizes%22%3A%22192x192%22%2C%22type%22%3A%22image%2Fsvg%2Bxml%22%7D%5D%7D">
+<!-- 업로드하신 비행기 시계 아이콘을 SVG 형태로 변환하여 내장했습니다. 홈 화면 추가 시 적용됩니다. -->
+<link rel="manifest" href='data:application/manifest+json,{"name":"CREW CLOCK","short_name":"CrewClock","start_url":".","display":"standalone","background_color":"#e8f4fd","theme_color":"#3b82c4","icons":[{"src":"data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 512 512%22%3E%3Crect width=%22512%22 height=%22512%22 rx=%22112%22 fill=%22%230f2038%22/%3E%3Cpath d=%22M140 180 Q140 100 200 120 L240 140 Q240 180 200 180 Z%22 fill=%22%23ffffff%22 transform=%22rotate(-20 180 150)%22/%3E%3Cpath d=%22M372 180 Q372 100 312 120 L272 140 Q272 180 312 180 Z%22 fill=%22%23ffffff%22 transform=%22rotate(20 332 150)%22/%3E%3Crect x=%22236%22 y=%2280%22 width=%2240%22 height=%2220%22 rx=%2210%22 fill=%22%23ffffff%22/%3E%3Crect x=%22246%22 y=%22100%22 width=%2220%22 height=%2240%22 fill=%22%23ffffff%22/%3E%3Ccircle cx=%22256%22 cy=%22296%22 r=%22140%22 fill=%22%23ffffff%22/%3E%3Ccircle cx=%22256%22 cy=%22296%22 r=%22120%22 fill=%22%231d4ed8%22/%3E%3Cpath d=%22M256 176 L274 276 L346 306 L346 326 L274 316 L256 386 L238 316 L166 326 L166 306 L238 276 Z%22 fill=%22%23ffffff%22/%3E%3C/svg%3E","sizes":"512x512","type":"image/svg+xml"}]}'>
 <title>CREW CLOCK</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
 <style>
@@ -105,7 +106,6 @@ body{background:var(--bg);color:var(--tx);font-family:'Inter',sans-serif;font-si
 .day-card{background:var(--white);border-radius:14px;box-shadow:var(--shadow);margin:10px 14px 0}
 .day-header{display:flex;align-items:center;justify-content:space-between;padding:12px 14px 0}
 .day-title{font-size:13px;font-weight:700;color:var(--blue)}
-.day-subtitle{font-size:10px;color:var(--tx2);margin-top:1px}
 .day-more{font-size:11px;color:var(--blue);font-weight:600;cursor:pointer}
 .day-flights{padding:8px 6px 10px}
 .dfr{display:flex;align-items:center;gap:10px;padding:8px 8px;border-radius:8px;transition:background .15s;cursor:pointer}
@@ -118,12 +118,10 @@ body{background:var(--bg);color:var(--tx);font-family:'Inter',sans-serif;font-si
 .dfr-sep{height:1px;background:var(--bdr);margin:0 14px}
 .empty-state{padding:20px;text-align:center;color:var(--tx3);font-size:12px}
 
-/* ── UPLOAD PANEL & BUTTONS ── */
-.upload-body{padding:16px}
+/* ── BUTTONS ── */
 .btn-az{width:100%;padding:12px;background:var(--blue);border:none;border-radius:10px;
   color:#fff;font-size:13px;font-weight:700;cursor:pointer;transition:all .2s;font-family:'Inter',sans-serif}
 .btn-az:hover{background:var(--blue2);box-shadow:0 4px 16px rgba(79,110,247,.35)}
-.btn-az:disabled{opacity:.5;pointer-events:none}
 .btn-outline{background:transparent; border:1.5px solid var(--blue); color:var(--blue);}
 .btn-outline:hover{background:var(--blue-light); box-shadow:none;}
 
@@ -132,8 +130,6 @@ body{background:var(--bg);color:var(--tx);font-family:'Inter',sans-serif;font-si
 .home-section-hdr{display:flex;align-items:center;justify-content:space-between;
   margin-bottom:10px;padding-top:4px}
 .home-section-hdr h2{font-size:13px;font-weight:700;color:var(--tx);letter-spacing:.2px}
-.home-section-hdr .upload-link{font-size:11px;color:var(--blue);font-weight:600;cursor:pointer;
-  display:flex;align-items:center;gap:3px}
 
 .fal-item{background:var(--white);border-radius:14px;overflow:hidden;
   border:1.5px solid var(--bdr);transition:all .2s;
@@ -155,8 +151,11 @@ body{background:var(--bg);color:var(--tx);font-family:'Inter',sans-serif;font-si
 .fal-item.future .fal-accent{background:var(--grn)}
 .fal-item.past .fal-accent{background:var(--bdr2)}
 
-.fal-info{flex:1;min-width:0}
-.fal-date-row{display:flex;align-items:center;gap:6px;margin-bottom:3px}
+.fal-content{flex:1;display:flex;flex-direction:row;align-items:center;justify-content:space-between;gap:8px;min-width:0}
+.fal-left{display:flex;align-items:center;gap:6px;flex:1;min-width:0;overflow-x:auto;scrollbar-width:none;white-space:nowrap}
+.fal-left::-webkit-scrollbar{display:none}
+.fal-right{display:flex;align-items:center;gap:6px;flex-shrink:0}
+
 .fal-dow{font-size:15px;font-weight:800;color:var(--tx);letter-spacing:.2px}
 .fal-item.today .fal-dow,.fal-item.next-flight .fal-dow{color:var(--blue)}
 .fal-date{font-family:'Share Tech Mono',monospace;font-size:12px;color:var(--tx2);font-weight:500}
@@ -164,19 +163,17 @@ body{background:var(--bg);color:var(--tx);font-family:'Inter',sans-serif;font-si
 .fal-badge.today-badge{background:var(--blue);color:#fff}
 .fal-badge.next-badge{background:rgba(79,110,247,.12);color:var(--blue);border:1px solid rgba(79,110,247,.3)}
 
-.fal-route-row{display:flex;align-items:center;gap:6px}
-.fal-fnum{font-size:11px;font-weight:700;color:var(--tx2);font-family:'Share Tech Mono',monospace}
+.fal-fnum{font-size:12px;font-weight:700;color:var(--tx2);font-family:'Share Tech Mono',monospace;margin-left:2px}
 .fal-route{font-size:12px;font-weight:600;color:var(--tx);display:flex;align-items:center;gap:4px}
 .fal-route .apt{font-family:'Share Tech Mono',monospace;font-size:13px;font-weight:700}
 .fal-route .apt.dep{color:var(--blue)}
 .fal-item.past .fal-route .apt.dep{color:var(--tx2)}
 .fal-arrow{color:var(--tx3);font-size:11px}
 
-.fal-right{display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex-shrink:0}
+.dep-lbl{font-size:11px;font-weight:600;color:var(--tx2);text-transform:uppercase;letter-spacing:.5px}
 .fal-deptime{font-family:'Share Tech Mono',monospace;font-size:22px;font-weight:700;color:var(--tx);line-height:1}
 .fal-item.today .fal-deptime,.fal-item.next-flight .fal-deptime{color:var(--blue)}
 .fal-item.past .fal-deptime{font-size:18px;color:var(--tx3)}
-.fal-controls{display:flex;align-items:center;gap:6px}
 
 .fal-drop-btn{width:26px;height:26px;border-radius:7px;border:1.5px solid var(--bdr);
   background:var(--bg);cursor:pointer;display:flex;align-items:center;justify-content:center;
@@ -200,11 +197,12 @@ body{background:var(--bg);color:var(--tx);font-family:'Inter',sans-serif;font-si
   background:var(--white);border:1px solid var(--bdr);transition:all .15s}
 .fal-atog.on-base{border-color:rgba(79,110,247,.3);background:var(--blue-light)}
 .fal-atog.on-intl{border-color:rgba(251,146,60,.3);background:rgba(251,146,60,.06)}
-.atog-lbl{flex:1;font-size:11px;color:var(--tx2);font-weight:500}
+.atog-info{flex:1;display:flex;flex-direction:column;justify-content:center;min-width:0}
+.atog-lbl-wrap{display:flex;align-items:baseline;gap:4px;flex-wrap:wrap}
+.atog-lbl{font-size:11px;color:var(--tx2);font-weight:500}
 .fal-atog.on-base .atog-lbl,.fal-atog.on-intl .atog-lbl{color:var(--tx);font-weight:600}
-.atog-right{display:flex;flex-direction:column;align-items:flex-end;gap:1px;flex-shrink:0}
-.atog-time{font-family:'Share Tech Mono',monospace;font-size:11px;font-weight:600;color:var(--tx3);line-height:1}
-.atog-offset{font-size:9px;color:var(--tx3);opacity:.8;line-height:1;white-space:nowrap}
+.atog-time{font-family:'Share Tech Mono',monospace;font-size:13px;font-weight:700;color:var(--tx3);line-height:1;padding-right:4px}
+.atog-offset{font-size:9px;color:var(--tx3);opacity:.8;white-space:nowrap}
 .fal-atog.on-base .atog-time{color:var(--blue)}
 .fal-atog.on-base .atog-offset{color:var(--blue);opacity:.7}
 .fal-atog.on-intl .atog-time{color:var(--amb)}
@@ -606,7 +604,7 @@ var swReg=null;
 var wakeLock=null;
 var deferredInstallPrompt=null;
 
-/* ── 백그라운드 절전 방지 무음 오디오 (Keep-Alive Hack) ── */
+/* ── Keep-Alive Hack for Background Audio ── */
 var keepAliveAudio = null;
 var silentWav = "data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA";
 
@@ -619,7 +617,6 @@ function startKeepAlive(){
     keepAliveAudio.play().catch(function(){ keepAliveAudio = null; });
   } catch(e) {}
 }
-// 사용자가 화면을 한 번이라도 터치하면 무음 오디오를 시작하여 백그라운드 타이머 생존 유지
 document.addEventListener('touchstart', startKeepAlive, {once:true});
 document.addEventListener('click', startKeepAlive, {once:true});
 
@@ -740,11 +737,10 @@ function showIOSInstallGuide(){
   document.body.appendChild(el);
 }
 
-/* ── 내장 서비스 워커 (Inline Service Worker) 생성 ── */
+/* ── Inline Service Worker ── */
 function initSW(){
   if(!('serviceWorker' in navigator)) return;
   
-  // 단일 HTML 파일에서 작동하도록 SW 코드를 Blob 객체로 생성
   var swCode = "self.addEventListener('install', function(e){ e.waitUntil(self.skipWaiting()); });" +
                "self.addEventListener('activate', function(e){ e.waitUntil(self.clients.claim()); });" +
                "self.addEventListener('notificationclick', function(e){" +
@@ -932,6 +928,29 @@ function closeUploadSheet(){
   if(detectedFlights.length) switchTab('calendar',null);
 }
 
+/* ── Month Replacement Logic ── */
+function replaceMonthFlights(newFlights) {
+  var targetMonths = {};
+  newFlights.forEach(function(f) {
+      var ym = f.date.substring(0, 7); 
+      targetMonths[ym] = true;
+  });
+
+  detectedFlights = detectedFlights.filter(function(f) {
+      var ym = f.date.substring(0, 7);
+      return !targetMonths[ym]; 
+  });
+
+  newFlights.forEach(function(nf) {
+      detectedFlights.push(nf);
+  });
+
+  detectedFlights.sort(function(a,b){return parseFlightDate(a)-parseFlightDate(b);});
+
+  return newFlights.length;
+}
+
+
 /* Manual Text Parser UI */
 function showManualEntryFallback(){
   var wrap=document.getElementById('sheetFalWrap');
@@ -948,9 +967,8 @@ function showManualEntryFallback(){
     +'<button class="btn-az" onclick="parseManualEntry()" style="margin-top:10px">Parse Flights</button>'
     +'</div>';
     
-    // Auto set to current month
-    var dt = new Date();
-    document.getElementById('manualMonth').value = dt.getFullYear() + "-" + p2(dt.getMonth() + 1);
+  var dt = new Date();
+  document.getElementById('manualMonth').value = dt.getFullYear() + "-" + p2(dt.getMonth() + 1);
 }
 
 function parseManualEntry(){
@@ -963,7 +981,6 @@ function parseManualEntry(){
   var flights=[];var seen={};
   raw.split('\n').forEach(function(line){
     line=line.trim();if(!line)return;
-    // Pattern: [Day] FNUM DEP HH:MM [ARR]
     var datePrefix=line.match(/^(\d{1,2})\s+/);
     var dayNum=datePrefix?parseInt(datePrefix[1]):null;
     var rest=datePrefix?line.slice(datePrefix[0].length):line;
@@ -977,22 +994,26 @@ function parseManualEntry(){
     var d=dayNum||1;
     var dateStr=yr+'-'+p2(mIdx+1)+'-'+p2(d);
     
-    var key=dateStr+fnum+dep+time;
-    if(seen[key])return;seen[key]=true;
-    flights.push({date:dateStr,flight:fnum,depApt:dep,depTime:time,arrApt:arr,type:dep===baseApt?'base':'intl'});
+    var safeId = (dateStr+'_'+fnum+'_'+dep+'_'+time).replace(/[^a-zA-Z0-9_-]/g, '_');
+    if(seen[safeId])return;seen[safeId]=true;
+    flights.push({id:safeId, date:dateStr,flight:fnum,depApt:dep,depTime:time,arrApt:arr,type:dep===baseApt?'base':'intl'});
   });
 
   if(!flights.length){toast('No valid flights found in input','er');return;}
-  detectedFlights=flights;
-  initFlightToggles();
-  autoRegisterAll(); 
-  saveFlights();
-  renderHomeFlightList();
-  renderSheetFalWrap();
-  renderCal();
-  renderDaySchedule(calSelDate);
+  
+  var addedCount = replaceMonthFlights(flights);
+  
+  if(addedCount > 0) {
+      initFlightToggles();
+      var autoAdded = autoRegisterAll(); 
+      saveFlights();
+      renderHomeFlightList();
+      renderSheetFalWrap();
+      renderCal();
+      renderDaySchedule(calSelDate);
+      toast('Schedule updated! ' + addedCount + ' flights applied', 'ok');
+  }
   closeUploadSheet();
-  toast(flights.length+' flights added','ok');
 }
 
 
@@ -1052,7 +1073,8 @@ function renderDaySchedule(dk){
   if(hInfoEl) {
      if(flights.length > 0) {
          hInfoEl.innerHTML = flights.map(function(f){
-             return f.flight + ' ' + f.depApt + '→' + (f.arrApt||'---');
+             var arrTxt = (f.arrApt && f.arrApt !== '???') ? '→' + f.arrApt : '';
+             return f.flight + ' ' + f.depApt + arrTxt;
          }).join('<br>');
          hInfoEl.style.display = 'block';
      } else {
@@ -1067,10 +1089,11 @@ function renderDaySchedule(dk){
   var rows=[];
   flights.forEach(function(f){
     var subLbl=f.type==='base'?'Home Departure':'Intl Departure';
+    var arrTxt = (f.arrApt && f.arrApt !== '???') ? ' &#8594; ' + f.arrApt : '';
     var h='<div class="dfr">'
       +'<div class="dfr-time">'+f.depTime+'</div>'
       +'<div class="dfr-info">'
-      +'<div class="dfr-route">'+f.depApt+' &#8594; '+(f.arrApt||'---')+'</div>'
+      +'<div class="dfr-route">'+f.depApt+arrTxt+'</div>'
       +'<div class="dfr-sub">'+subLbl+'</div>'
       +'</div>'
       +'<div class="dfr-fnum">'+escQ(f.flight||'')+'</div>'
@@ -1098,12 +1121,11 @@ function renderHomeFlightList(){
 
   var upcoming=[],past=[];
   sorted.forEach(function(f){
-    var idx=detectedFlights.indexOf(f);
-    if(parseFlightDate(f)<now) past.push({f:f,idx:idx});
-    else upcoming.push({f:f,idx:idx});
+    if(parseFlightDate(f)<now) past.push({f:f});
+    else upcoming.push({f:f});
   });
 
-  var nextIdx=upcoming.length>0?upcoming[0].idx:-1;
+  var nextF=upcoming.length>0?upcoming[0].f:null;
 
   var html='<div class="home-section-hdr">'
     +'<h2>Flight Schedule &nbsp;<span style="font-size:10px;font-weight:500;color:var(--tx3)">'+detectedFlights.length+' flights</span></h2>'
@@ -1111,8 +1133,8 @@ function renderHomeFlightList(){
 
   if(upcoming.length){
     html+='<div class="fal-list">'+upcoming.map(function(x){
-      var extra=x.idx===nextIdx?'next-flight':'';
-      return renderFalItem(x.f,x.idx,extra);
+      var extra=(nextF && nextF.id === x.f.id)?'next-flight':'';
+      return renderFalItem(x.f,extra);
     }).join('')+'</div>';
   }else{
     html+='<div class="empty-state" style="padding:14px">No upcoming flights</div>';
@@ -1125,7 +1147,7 @@ function renderHomeFlightList(){
       +past.length+' past flight'+(past.length>1?'s':'')
       +'</button></div>'
       +'<div id="homePastSection" style="display:none">'
-      +'<div class="fal-list">'+past.map(function(x){return renderFalItemPast(x.f,x.idx);}).join('')+'</div>'
+      +'<div class="fal-list">'+past.map(function(x){return renderFalItemPast(x.f);}).join('')+'</div>'
       +'</div>';
   }
 
@@ -1149,22 +1171,27 @@ function handleICS(e){
   var r=new FileReader();
   r.onload=function(ev){
     try{
-      var flights=parseICS(ev.target.result);
+      var newFlights=parseICS(ev.target.result);
 
-      if(!flights.length){
+      if(!newFlights.length){
         if(rw)rw.innerHTML='<div class="empty-state">No flight events found.<br>Check that the file contains flight legs.</div>';
         return;
       }
 
-      detectedFlights=flights;
-      initFlightToggles();
-      var autoAdded=autoRegisterAll();
-      saveFlights();
-      
-      renderHomeFlightList();
-      renderCal();
-      renderDaySchedule(calSelDate);
-      toast(flights.length+' flights, '+autoAdded+' alarms set','ok');
+      var addedCount = replaceMonthFlights(newFlights);
+
+      if(addedCount > 0){
+          initFlightToggles();
+          var autoAdded=autoRegisterAll();
+          saveFlights();
+          
+          renderHomeFlightList();
+          renderCal();
+          renderDaySchedule(calSelDate);
+          toast('Schedule updated! '+addedCount+' flights applied','ok');
+      } else {
+          toast('No new flights to add','in');
+      }
 
       setTimeout(function(){
         closeUploadSheet();
@@ -1227,28 +1254,55 @@ function parseICS(text){
     var dateStr=dt.getFullYear()+'-'+p2(dt.getMonth()+1)+'-'+p2(dt.getDate());
     var depTime=p2(dt.getHours())+':'+p2(dt.getMinutes());
     
+    // ICS 날짜(DATE) 타입일 경우 시간이 00:00이므로 텍스트에서 시간 추출
+    var tMatch = summary.match(/\b[A-Z]{3}\s+(\d{1,2}:\d{2})\b/);
+    if(tMatch) {
+      depTime = tMatch[1];
+    } else if(depTime === '00:00') {
+      var anyTime = summary.match(/\b(\d{1,2}:\d{2})\b/);
+      if(anyTime) depTime = anyTime[1];
+    }
+    var tp = depTime.split(':');
+    if(tp.length === 2) {
+      depTime = p2(parseInt(tp[0])) + ':' + p2(parseInt(tp[1]));
+    }
+    
     var fnum='',depApt='',arrApt='';
     var fm=summary.match(/\b([A-Z]{2}\s?\d{2,4})\b/);if(fm)fnum=fm[1].replace(/\s/,'');
-    var rm=summary.match(/\b([A-Z]{3})\s*[-→>]\s*([A-Z]{3})\b/);
-    if(rm){depApt=rm[1];arrApt=rm[2];}
+    
+    // 향상된 경로 추출 로직: "ICN 12:10 - DEL", "ICN - DEL" 패턴 모두 인식
+    var rm=summary.match(/\b([A-Z]{3})\s*(?:\d{1,2}:\d{2}\s*)?[-→>]\s*([A-Z]{3})\b/);
+    if(rm){
+      depApt=rm[1];arrApt=rm[2];
+    } else {
+      var rm2=summary.match(/\b([A-Z]{3})\s+(?:\d{1,2}:\d{2}\s+)?([A-Z]{3})\b/);
+      if(rm2 && rm2[1] !== fnum.slice(0,3)){
+        depApt=rm2[1];arrApt=rm2[2];
+      }
+    }
+    
     if(!depApt&&location){var lm=location.match(/\b([A-Z]{3})\b/g);if(lm&&lm.length>=1)depApt=lm[0];if(lm&&lm.length>=2)arrApt=lm[lm.length-1];}
-    if(!depApt){depApt=summary.slice(0,3).toUpperCase().replace(/[^A-Z]/g,'');}
+    if(!depApt){
+      var textWithoutFnum = summary.replace(fnum, '');
+      var fallbackMatch = textWithoutFnum.match(/\b([A-Z]{3})\b/);
+      if(fallbackMatch) depApt = fallbackMatch[1];
+      else depApt=summary.slice(0,3).toUpperCase().replace(/[^A-Z]/g,'');
+    }
     
     var type=depApt===baseApt?'base':(depApt?'intl':'ics');
-    flights.push({date:dateStr,flight:fnum||summary.slice(0,10),depApt:depApt||'???',depTime:depTime,arrApt:arrApt||'???',type:type,summary:summary});
+    var safeId = (dateStr+'_'+(fnum||summary.slice(0,10))+'_'+(depApt||'???')+'_'+depTime).replace(/[^a-zA-Z0-9_-]/g, '_');
+    
+    flights.push({id:safeId, date:dateStr,flight:fnum||summary.slice(0,10),depApt:depApt||'???',depTime:depTime,arrApt:arrApt||'???',type:type,summary:summary});
   });
-  flights.sort(function(a,b){return parseFlightDate(a)-parseFlightDate(b);});
   return flights;
 }
 
-/* FIX 1: ICS Time Parsing */
 function parseICSDate(s){
   if(!s)return null;
   s=s.replace(/;[^:]*:/,':').replace(/.*:/,'');
   if(s.includes('T')){
     var m=s.match(/(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})(Z?)/);
     if(m){
-      // Correctly parse UTC time if Z is present
       if(m[7] === 'Z') {
          return new Date(Date.UTC(+m[1], +m[2]-1, +m[3], +m[4], +m[5], +m[6]));
       } else {
@@ -1264,10 +1318,12 @@ function parseICSDate(s){
 
 /* ═══ FLIGHT TOGGLES ═══ */
 function initFlightToggles(){
-  detectedFlights.forEach(function(f,idx){
-    if(!flightToggles[idx])flightToggles[idx]={};
-    var offs=f.type==='intl'?intlOffs:baseOffs;
-    offs.forEach(function(o){flightToggles[idx][o.id]=true;});
+  detectedFlights.forEach(function(f){
+    if(!flightToggles[f.id]){
+        flightToggles[f.id]={};
+        var offs=f.type==='intl'?intlOffs:baseOffs;
+        offs.forEach(function(o){flightToggles[f.id][o.id]=true;});
+    }
   });
 }
 
@@ -1277,14 +1333,14 @@ function renderSheetFalWrap(){
   var now=new Date();
   detectedFlights.sort(function(a,b){return parseFlightDate(a)-parseFlightDate(b);});
   var up=[],past=[];
-  detectedFlights.forEach(function(f,idx){if(parseFlightDate(f)<now)past.push({f:f,idx:idx});else up.push({f:f,idx:idx});});
+  detectedFlights.forEach(function(f){if(parseFlightDate(f)<now)past.push({f:f});else up.push({f:f});});
   var html='<div style="margin-top:14px"><div style="font-size:11px;font-weight:700;color:var(--tx2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Detected Flights</div>';
-  html+='<div class="fal-list">'+up.map(function(x){return renderFalItem(x.f,x.idx);}).join('')+'</div>';
+  html+='<div class="fal-list">'+up.map(function(x){return renderFalItem(x.f);}).join('')+'</div>';
   html+='</div>';
   wrap.innerHTML=html;
 }
 
-function renderFalItem(f,idx,extraCls){
+function renderFalItem(f,extraCls){
   var now=new Date();var fdt=parseFlightDate(f);
   var todayMid=new Date();todayMid.setHours(0,0,0,0);
   var fdtMid=new Date(fdt);fdtMid.setHours(0,0,0,0);
@@ -1304,15 +1360,20 @@ function renderFalItem(f,idx,extraCls){
   var tl=f.type==='base'?'HOME':(f.type==='intl'?'INTL':'ICS');
   var tc=f.type==='base'?'base':(f.type==='intl'?'intl':'ics');
   var offs=f.type==='intl'?intlOffs:baseOffs;
-  var isOpen=!!openFlights[idx];
+  var isOpen=!!openFlights[f.id];
 
-  var anyOn=offs.some(function(o){return !!(flightToggles[idx]&&flightToggles[idx][o.id]);});
   var badge='';
   if(isTod) badge='<span class="fal-badge today-badge">TODAY</span>';
   else if(isNext) badge='<span class="fal-badge next-badge">NEXT</span>';
 
+  var anyOn=offs.some(function(o){return !!(flightToggles[f.id]&&flightToggles[f.id][o.id]);});
+  var masterTogCls='tog'+(anyOn?(f.type==='intl'?' on-amb':' on'):'');
+  var masterTog='<button class="'+masterTogCls+'" style="margin-left:4px;" onclick="toggleMasterAlarm(event, \''+f.id+'\')"></button>';
+
+  var arrHtml = (f.arrApt && f.arrApt !== '???') ? '<span class="fal-arrow">&#8594;</span><span class="apt">' + f.arrApt + '</span>' : '';
+
   var togsHtml=offs.map(function(o){
-    var on=!!(flightToggles[idx]&&flightToggles[idx][o.id]);
+    var on=!!(flightToggles[f.id]&&flightToggles[f.id][o.id]);
     var at=new Date(fdt.getTime()-(o.h*60+o.m)*60000);
     var ac=on?(f.type==='intl'?' on-intl':' on-base'):'';
     var togCls='tog'+(on?(f.type==='intl'?' on-amb':' on'):'');
@@ -1321,43 +1382,43 @@ function renderFalItem(f,idx,extraCls){
     else if(o.h>0)   offTxt='('+o.h+'h before)';
     else              offTxt='('+o.m+'m before)';
     return '<div class="fal-atog'+ac+'">'
-      +'<button class="'+togCls+'" onclick="togFA('+idx+',\''+o.id+'\')" ></button>'
+      +'<div class="atog-info">'
+      +'<div class="atog-lbl-wrap">'
       +'<span class="atog-lbl">'+escQ(o.lbl)+'</span>'
-      +'<div class="atog-right">'
-      +'<span class="atog-time">'+fmt(at)+'</span>'
       +'<span class="atog-offset">'+offTxt+'</span>'
       +'</div>'
+      +'</div>'
+      +'<span class="atog-time">'+fmt(at)+'</span>'
+      +'<button class="'+togCls+'" onclick="togFA(\''+f.id+'\',\''+o.id+'\')" ></button>'
       +'</div>';
   }).join('');
 
-  var dropBtn='<button class="fal-drop-btn" onclick="event.stopPropagation();toggleFlight('+idx+')">'
+  var dropBtn='<button class="fal-drop-btn" onclick="event.stopPropagation();toggleFlight(\''+f.id+'\')">'
     +'<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>'
     +'</button>';
 
-  return '<div class="'+cls+(isOpen?' open':'')+'" id="fali-'+idx+'">'
-    +'<div class="fal-header" onclick="toggleFlight('+idx+')">'
+  return '<div class="'+cls+(isOpen?' open':'')+'" id="fali-'+f.id+'">'
+    +'<div class="fal-header" onclick="toggleFlight(\''+f.id+'\')">'
     +'<div class="fal-accent"></div>'
-    +'<div class="fal-info">'
-    +'<div class="fal-date-row">'
+    +'<div class="fal-content">'
+    +'<div class="fal-left">'
     +'<span class="fal-dow">'+dow+'</span>'
     +'<span class="fal-date">'+dateStr+'</span>'
     +badge
-    +'</div>'
-    +'<div class="fal-route-row">'
     +'<span class="fal-fnum">'+escQ(f.flight||'')+'</span>'
     +'<span class="fal-route">'
     +'<span class="apt dep">'+f.depApt+'</span>'
-    +'<span class="fal-arrow">&#8594;</span>'
-    +'<span class="apt">'+( f.arrApt||'---')+'</span>'
+    +arrHtml
     +'</span>'
     +'<span class="fal-type '+tc+'">'+tl+'</span>'
     +'</div>'
-    +'</div>'
     +'<div class="fal-right">'
+    +'<span class="dep-lbl">DEPARTURE</span>'
     +'<div class="fal-deptime">'+f.depTime+'</div>'
-    +'<div class="fal-controls">'
+    +masterTog
     +dropBtn
-    +'</div></div>'
+    +'</div>'
+    +'</div>'
     +'</div>'
     +'<div class="fal-alarms">'
     +'<div class="fal-alarms-hdr">Preset Alarms</div>'
@@ -1366,33 +1427,68 @@ function renderFalItem(f,idx,extraCls){
     +'</div>';
 }
 
-function renderFalItemPast(f,idx){
+function renderFalItemPast(f){
   var fdt=parseFlightDate(f);var dp=(f.date||'').split('-');
   var D=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];var dow=D[fdt.getDay()]||'';
   var tl=f.type==='base'?'HOME':(f.type==='intl'?'INTL':'ICS');var tc=f.type==='base'?'base':(f.type==='intl'?'intl':'ics');
-  return '<div class="fal-item past" id="fali-'+idx+'"><div class="fal-header" style="cursor:default;padding:8px 12px"><div class="fal-dot"></div><div class="fal-info"><div class="fal-date-row"><span class="fal-dow" style="font-size:12px">'+dow+'</span><span class="fal-date" style="font-size:10px">'+dp[1]+'/'+dp[2]+'</span></div><div class="fal-flight">'+escQ(f.flight||'')+' &nbsp;'+f.depApt+' \u2192 '+(f.arrApt||'---')+'</div></div><div class="fal-deptime" style="font-size:15px">'+f.depTime+'</div><div class="fal-type '+tc+'">'+tl+'</div></div></div>';
+  
+  var arrHtml = (f.arrApt && f.arrApt !== '???') ? '<span class="fal-arrow">&#8594;</span><span class="apt">' + f.arrApt + '</span>' : '';
+  
+  return '<div class="fal-item past" id="fali-'+f.id+'">'
+    +'<div class="fal-header" style="cursor:default;padding:12px 14px 10px">'
+    +'<div class="fal-accent"></div>'
+    +'<div class="fal-content">'
+    +'<div class="fal-left">'
+    +'<span class="fal-dow">'+dow+'</span>'
+    +'<span class="fal-date">'+dp[1]+'/'+dp[2]+'</span>'
+    +'<span class="fal-fnum">'+escQ(f.flight||'')+'</span>'
+    +'<span class="fal-route">'
+    +'<span class="apt dep">'+f.depApt+'</span>'
+    +arrHtml
+    +'</span>'
+    +'<span class="fal-type '+tc+'">'+tl+'</span>'
+    +'</div>'
+    +'<div class="fal-right">'
+    +'<span class="dep-lbl">DEPARTURE</span>'
+    +'<div class="fal-deptime">'+f.depTime+'</div>'
+    +'</div>'
+    +'</div>'
+    +'</div>'
+    +'</div>';
 }
 
-function toggleFlight(idx){openFlights[idx]=!openFlights[idx];rerenderFlight(idx);}
-function togFA(idx,offId){
-    if(!flightToggles[idx])flightToggles[idx]={};
-    flightToggles[idx][offId]=!flightToggles[idx][offId];
-    rerenderFlight(idx);
-    
+function toggleFlight(id){openFlights[id]=!openFlights[id];rerenderFlight(id);}
+
+function toggleMasterAlarm(e, id){
+    e.stopPropagation();
+    if(!flightToggles[id])flightToggles[id]={};
+    var f=detectedFlights.find(function(df){return df.id===id;});
+    if(!f)return;
+    var offs=f.type==='intl'?intlOffs:baseOffs;
+    var anyOn=offs.some(function(o){return !!flightToggles[id][o.id];});
+    offs.forEach(function(o){flightToggles[id][o.id]=!anyOn;});
+    rerenderFlight(id);
     autoRegisterAll(); 
 }
 
-function rerenderFlight(idx){
-  var f=detectedFlights[idx];if(!f)return;
-  var el=document.getElementById('fali-'+idx);if(!el)return;
+function togFA(id,offId){
+    if(!flightToggles[id])flightToggles[id]={};
+    flightToggles[id][offId]=!flightToggles[id][offId];
+    rerenderFlight(id);
+    autoRegisterAll(); 
+}
+
+function rerenderFlight(id){
+  var f=detectedFlights.find(function(df){return df.id===id;});if(!f)return;
+  var el=document.getElementById('fali-'+id);if(!el)return;
   var now=new Date();
   var sorted=detectedFlights.slice().sort(function(a,b){return parseFlightDate(a)-parseFlightDate(b);});
   var upcoming=sorted.filter(function(ff){return parseFlightDate(ff)>=now;});
   var nextFlight=upcoming.length>0?upcoming[0]:null;
   var isPast=parseFlightDate(f)<now;
-  var isNext=!isPast&&nextFlight&&detectedFlights.indexOf(nextFlight)===idx;
+  var isNext=!isPast&&nextFlight&&nextFlight.id===id;
   var extraCls=isPast?'past':(isNext?'next-flight':'');
-  var tmp=document.createElement('div');tmp.innerHTML=renderFalItem(f,idx,extraCls);
+  var tmp=document.createElement('div');tmp.innerHTML=renderFalItem(f,extraCls);
   el.parentNode.replaceChild(tmp.firstChild,el);
 }
 
@@ -1401,22 +1497,21 @@ function autoRegisterAll(){
   syncAllPresets();
   var now=new Date();var added=0;
   
-  // Remove existing auto alarms and re-register
   alms = alms.filter(function(a){ return a.type === 'direct'; });
   
-  detectedFlights.forEach(function(f,idx){
+  detectedFlights.forEach(function(f){
     var depDt=parseFlightDate(f);
     if(depDt<now)return;
     var offs=f.type==='intl'?intlOffs:baseOffs;
     offs.forEach(function(o){
-      if(!flightToggles[idx]||!flightToggles[idx][o.id])return;
+      if(!flightToggles[f.id]||!flightToggles[f.id][o.id])return;
       var at=new Date(depDt.getTime()-(o.h*60+o.m)*60000);
       if(at<=now)return;
       if(alms.find(function(a){return !a.dism&&Math.abs(a.time-at)<2000;}))return;
       alms.push({id:uid(),time:at,dep:new Date(depDt),lbl:o.lbl,type:f.type,armed:true,ring:false,dism:false, fnum:f.flight, depApt:f.depApt, arrApt:f.arrApt});
       added++;
     });
-    registeredFlights[idx]=true;
+    registeredFlights[f.id]=true;
   });
   alms.sort(function(a,b){return a.time-b.time;});
   saveAlarms();scheduleNotificationsViaSW();acquireWakeLock();
@@ -1473,9 +1568,15 @@ function renderDirectAlarms(){
     
     var cls = 'dal-item' + (isRing ? ' ring-now' : '') + (isMissed ? ' missed' : '');
 
+    var fInfo = '';
+    if(a.fnum && a.depApt) {
+        var arrTxt = (a.arrApt && a.arrApt !== '???') ? '&#8594;'+a.arrApt : '';
+        fInfo = '<span style="font-family:\'Share Tech Mono\',monospace; font-size:10px; color:var(--blue); margin-left:6px; padding-left:6px; border-left:1.5px solid var(--bdr)">'+a.fnum+' '+a.depApt+arrTxt+'</span>';
+    }
+
     return '<div class="'+cls+'" id="dal-'+a.id+'">'
       +'<div class="dal-dot"></div><div class="dal-info">'
-      +'<div class="dal-date-row"><span class="dal-dow">'+dow+'</span><span class="dal-date">'+dateStr+'</span>'+(isTod?'<span class="dal-today" style="margin-left:4px">TODAY</span>':'')+'</div>'
+      +'<div class="dal-date-row"><span class="dal-dow">'+dow+'</span><span class="dal-date">'+dateStr+'</span>'+fInfo+(isTod?'<span class="dal-today" style="margin-left:4px">TODAY</span>':'')+'</div>'
       +'<div class="dal-lbl">'+escQ(a.lbl)+'</div>'
       +'<div class="dal-cd" id="dcd-'+a.id+'">'+cdTxt+'</div></div>'
       +'<div class="dal-time">'+timeStr+'</div>'+act+'</div>';
@@ -1490,7 +1591,6 @@ function delDirectAlarm(id){
 function dismissDirectAlarm(id){
   alms=alms.filter(function(a){
      if(a.id === id) {
-        // If user manually dismissed from list, completely remove direct alarm
         if(a.type === 'direct') return false; 
         a.dism=true; a.ring=false;
      }
@@ -1529,16 +1629,14 @@ function checkAlarms(){
     if(a.dep&&!(a.dep instanceof Date)) a.dep=new Date(a.dep);
     if(a.dism||a.ring)return;
     var diff=now-a.time;
-    // 5 minute grace period for wake lock
     if(diff>=0&&diff<300000){a.ring=true;needRender=true;trigAlarm(a);}
   });
   
   alms.forEach(function(a){
-    // Auto cancel after 5 mins
     if(a.ring&&(now-a.time)>=300000){
       a.ring=false;
       if(a.type === 'direct') {
-         a.missed=true; // Mark timeout as missed
+         a.missed=true; 
          a.dism=true;
       } else {
          a.dism=true;
@@ -1564,8 +1662,11 @@ function checkAlarms(){
 function trigAlarm(a){
   if(!(a.time instanceof Date)) a.time=new Date(a.time);
   if(a.dep&&!(a.dep instanceof Date)) a.dep=new Date(a.dep);
+  
+  var arrTxt = (a.arrApt && a.arrApt !== '???') ? '→'+a.arrApt : '';
+  
   document.getElementById('rtt').textContent=a.lbl + (a.fnum ? ' ('+a.fnum+')' : '');
-  document.getElementById('rdt').textContent=fmt(a.time)+(a.dep?' · DEP '+fmt(a.dep):'') + (a.fnum ? ' ['+a.depApt+'→'+(a.arrApt||'')+']' : '');
+  document.getElementById('rdt').textContent=fmt(a.time)+(a.dep?' · DEP '+fmt(a.dep):'') + (a.fnum ? ' ['+a.depApt+arrTxt+']' : '');
   document.getElementById('ro').classList.add('show');
 
   var ctx=getACtx();
@@ -1584,7 +1685,6 @@ function trigAlarm(a){
 function dismissOv(){
   alms = alms.filter(function(a){
     if(a.ring){
-      // If user manually dismissed from overlay, completely remove direct alarm
       if(a.type === 'direct') return false; 
       a.dism=true; a.ring=false;
     }
