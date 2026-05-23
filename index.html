@@ -846,6 +846,7 @@ function goToToday() {
   document.getElementById('dDate').value = calSelDate;
   renderCal();
   renderDaySchedule(calSelDate);
+  renderHomeFlightList();
   toast('Moved to today', 'in');
 }
 
@@ -955,7 +956,11 @@ function switchTab(name,btn){
   document.querySelectorAll('.panel').forEach(function(p){p.classList.remove('show');});
   document.getElementById('panel-'+name).classList.add('show');
   if(name==='settings'){document.getElementById('baseAptInput').value=baseApt;renderBasePresets();renderIntlPresets();}
-  if(name==='calendar'){renderDaySchedule(calSelDate);if(detectedFlights.length)renderHomeFlightList();}
+  if(name==='calendar'){
+      renderCal();
+      renderDaySchedule(calSelDate);
+      if(detectedFlights.length) renderHomeFlightList();
+  }
   if(name==='alarm'){var _n=new Date();setDrum('drumH',_n.getHours(),true);setDrum('drumM',_n.getMinutes(),true);}
 }
 
@@ -1129,6 +1134,7 @@ function calMove(d){
     if(calMonth>11){calMonth=0;calYear++;}
     if(calMonth<0){calMonth=11;calYear--;}
     renderCal();
+    renderHomeFlightList(); 
 }
 
 function renderCal(){
@@ -1162,7 +1168,13 @@ function renderCal(){
   }
   grid.innerHTML=cells;
 }
-function calSelectDay(dk){calSelDate=dk;var dp=dk.split('-');calYear=+dp[0];calMonth=+dp[1]-1;renderCal();renderDaySchedule(dk);}
+
+function calSelectDay(dk){
+    calSelDate=dk;var dp=dk.split('-');calYear=+dp[0];calMonth=+dp[1]-1;
+    renderCal();
+    renderDaySchedule(dk);
+    renderHomeFlightList();
+}
 
 function renderDaySchedule(dk){
   var D=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
@@ -1195,8 +1207,7 @@ function renderDaySchedule(dk){
   }
   var rows=[];
   flights.forEach(function(f){
-    var subLbl=f.type==='base'?'HOME':'INTL';
-    var tc=f.type==='base'?'base':'intl';
+    var subLbl=f.type==='base'?'Home Departure':'Intl Departure';
     var arrTxt = (f.arrApt && f.arrApt !== '???') ? ' &#8594; <span class="apt">' + f.arrApt + '</span>' : '';
     if(arrTxt && f.arrTime) {
         arrTxt += ' <span style="font-family:\'Share Tech Mono\',monospace; font-size:11px; color:var(--tx3); margin-left:2px;">(' + f.arrTime + ')</span>';
@@ -1206,7 +1217,6 @@ function renderDaySchedule(dk){
       +'<div class="dfr-time">'+f.depTime+'</div>'
       +'<div class="dfr-fnum" style="margin-right:4px;">'+escQ(f.flight||'')+'</div>'
       +'<div class="dfr-route" style="flex:1; display:flex; align-items:center; gap:2px;"><span class="apt dep">'+f.depApt+'</span>'+arrTxt+'</div>'
-      +'<div class="fal-type '+tc+'" style="flex-shrink:0; margin-left:auto;">'+subLbl+'</div>'
       +'</div>';
     rows.push({s:+(f.depTime||'0000').replace(':',''), html:h});
   });
@@ -1233,15 +1243,29 @@ function renderDaySchedule(dk){
     rows.push({s:+fmt(a.time).replace(':',''), html:h});
   });
   rows.sort(function(a,b){return a.s-b.s;});
-  document.getElementById('dayFlights').innerHTML=rows.map(function(r){return r.html;}).join('');
+  document.getElementById('dayFlights').innerHTML=rows.map(function(r){return r.html;}).join('<div class="dfr-sep"></div>');
 }
 
 function renderHomeFlightList(){
   var wrap=document.getElementById('homeFlightList');if(!wrap)return;
-  if(!detectedFlights.length){wrap.innerHTML='';return;}
+  
+  var targetPrefix = calYear + '-' + p2(calMonth + 1); 
+  var monthFlights = detectedFlights.filter(function(f){
+      return f.date.startsWith(targetPrefix);
+  });
+
+  var M=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  var moName = M[calMonth] + ' ' + calYear;
+
+  if(!monthFlights.length){
+    wrap.innerHTML='<div class="home-section-hdr">'
+      +'<h2>Flight Schedule &nbsp;<span style="font-size:10px;font-weight:500;color:var(--tx3)">0 flights</span></h2>'
+      +'</div><div class="empty-state" style="padding:14px; background:var(--white); border-radius:14px; border:1px dashed var(--bdr2);">No flights in '+moName+'</div>';
+    return;
+  }
 
   var now=new Date();
-  var sorted=detectedFlights.slice().sort(function(a,b){return parseFlightDate(a)-parseFlightDate(b);});
+  var sorted=monthFlights.slice().sort(function(a,b){return parseFlightDate(a)-parseFlightDate(b);});
 
   var upcoming=[],past=[];
   sorted.forEach(function(f){
@@ -1252,7 +1276,7 @@ function renderHomeFlightList(){
   var nextF=upcoming.length>0?upcoming[0].f:null;
 
   var html='<div class="home-section-hdr">'
-    +'<h2>Flight Schedule &nbsp;<span style="font-size:10px;font-weight:500;color:var(--tx3)">'+detectedFlights.length+' flights</span></h2>'
+    +'<h2>Flight Schedule &nbsp;<span style="font-size:10px;font-weight:500;color:var(--tx3)">'+monthFlights.length+' flights in '+moName+'</span></h2>'
     +'</div>';
 
   if(upcoming.length){
@@ -1261,7 +1285,7 @@ function renderHomeFlightList(){
       return renderFalItem(x.f,extra);
     }).join('')+'</div>';
   }else{
-    html+='<div class="empty-state" style="padding:14px">No upcoming flights</div>';
+    html+='<div class="empty-state" style="padding:14px; background:var(--white); border-radius:14px; border:1px dashed var(--bdr2);">No upcoming flights</div>';
   }
 
   if(past.length){
@@ -1390,7 +1414,7 @@ function parseICS(text){
 
     var dt=parseICSDate(dtstart);if(!dt)return;
     var dateStr=dt.getFullYear()+'-'+p2(dt.getMonth()+1)+'-'+p2(dt.getDate());
-    var depTime=p2(dt.getHours())+':'+p2(dt.getMinutes());
+    var depTime=p2(dt.getHours())+p2(dt.getMinutes()) === '0000' ? '00:00' : p2(dt.getHours())+':'+p2(dt.getMinutes());
     
     // ICS 날짜(DATE) 타입일 경우 시간이 00:00이므로 텍스트에서 시간 추출
     var tMatch = summary.match(/\b[A-Z]{3}\s+(\d{1,2}:\d{2})\b/);
@@ -1408,6 +1432,7 @@ function parseICS(text){
     var fnum='',depApt='',arrApt='',arrTime='';
     var fm=summary.match(/\b([A-Z]{2}\s?\d{2,4})\b/);if(fm)fnum=fm[1].replace(/\s/,'');
     
+    // 향상된 경로 추출 로직: "ICN 12:10 - DEL", "ICN - DEL" 패턴 모두 인식
     var rm=summary.match(/\b([A-Z]{3})\s*(?:\d{1,2}:\d{2}\s*)?[-→>]\s*([A-Z]{3})(?:\s*(\d{1,2}:\d{2}))?/);
     if(rm){
       depApt=rm[1];arrApt=rm[2];
@@ -1428,6 +1453,7 @@ function parseICS(text){
       else depApt=summary.slice(0,3).toUpperCase().replace(/[^A-Z]/g,'');
     }
     
+    // 도착 시간(Arrival Time) 파싱 추가
     if (!arrTime && arrApt && arrApt !== '???') {
       var atm = summary.match(new RegExp("\\b" + arrApt + "\\s*(\\d{1,2}:\\d{2})\\b"));
       if (atm) arrTime = atm[1];
@@ -1520,7 +1546,7 @@ function renderFalItem(f,extraCls){
 
   var arrHtml = (f.arrApt && f.arrApt !== '???') ? '<span class="fal-arrow">&#8594;</span><span class="apt">' + f.arrApt + '</span>' : '';
   if(arrHtml && f.arrTime) {
-      arrHtml += '<span style="font-family:\'Share Tech Mono\',monospace; font-size:11px; color:var(--tx3); margin-left:4px;">(' + f.arrTime + ')</span>';
+      arrHtml += '<span style="font-family:\'Share Tech Mono\',monospace; font-size:13px; color:var(--blue); font-weight:700; margin-left:4px;">(' + f.arrTime + ')</span>';
   }
 
   var togsHtml=offs.map(function(o){
