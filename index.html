@@ -7,7 +7,6 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="CrewClock">
-<!-- 업로드하신 비행기 시계 아이콘을 SVG 형태로 변환하여 내장했습니다. 홈 화면 추가 시 적용됩니다. -->
 <link rel="manifest" href='data:application/manifest+json,{"name":"CREW CLOCK","short_name":"CrewClock","start_url":".","display":"standalone","background_color":"#e8f4fd","theme_color":"#3b82c4","icons":[{"src":"data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 512 512%22%3E%3Crect width=%22512%22 height=%22512%22 rx=%22112%22 fill=%22%230f2038%22/%3E%3Cpath d=%22M140 180 Q140 100 200 120 L240 140 Q240 180 200 180 Z%22 fill=%22%23ffffff%22 transform=%22rotate(-20 180 150)%22/%3E%3Cpath d=%22M372 180 Q372 100 312 120 L272 140 Q272 180 312 180 Z%22 fill=%22%23ffffff%22 transform=%22rotate(20 332 150)%22/%3E%3Crect x=%22236%22 y=%2280%22 width=%2240%22 height=%2220%22 rx=%2210%22 fill=%22%23ffffff%22/%3E%3Crect x=%22246%22 y=%22100%22 width=%2220%22 height=%2240%22 fill=%22%23ffffff%22/%3E%3Ccircle cx=%22256%22 cy=%22296%22 r=%22140%22 fill=%22%23ffffff%22/%3E%3Ccircle cx=%22256%22 cy=%22296%22 r=%22120%22 fill=%22%231d4ed8%22/%3E%3Cpath d=%22M256 176 L274 276 L346 306 L346 326 L274 316 L256 386 L238 316 L166 326 L166 306 L238 276 Z%22 fill=%22%23ffffff%22/%3E%3C/svg%3E","sizes":"512x512","type":"image/svg+xml"}]}'>
 <title>CREW CLOCK</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
@@ -77,7 +76,7 @@ body{background:var(--bg);color:var(--tx);font-family:'Inter',sans-serif;font-si
 .sec{padding:14px 14px 0}
 
 /* ── CALENDAR ── */
-.cal-card{background:var(--white);border-radius:14px;box-shadow:var(--shadow);margin:12px 14px 0;overflow:hidden}
+.cal-card{background:var(--white);border-radius:14px;box-shadow:var(--shadow);margin:12px 14px 0;overflow:hidden; touch-action: pan-y;}
 .cal-nav{display:flex;align-items:center;justify-content:space-between;padding:14px 16px 6px}
 .cal-nav-btn{width:30px;height:30px;border:none;background:var(--blue-light);border-radius:8px;
   color:var(--blue);font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .2s}
@@ -808,6 +807,27 @@ var _now=new Date(),drumH_val=_now.getHours(),drumM_val=_now.getMinutes();
 var calYear,calMonth,calSelDate;
 var ITEM_H=26;
 
+/* ═══ CALENDAR SWIPE LOGIC ═══ */
+var calTouchStartX = 0;
+var calTouchEndX = 0;
+
+function handleCalSwipe() {
+  if (calTouchEndX < calTouchStartX - 40) calMove(1); // Swipe left -> Next Month
+  if (calTouchEndX > calTouchStartX + 40) calMove(-1); // Swipe right -> Previous Month
+}
+
+function initCalSwipe() {
+  var calEl = document.querySelector('.cal-card');
+  if(!calEl) return;
+  calEl.addEventListener('touchstart', function(e) {
+    calTouchStartX = e.changedTouches[0].screenX;
+  }, {passive: true});
+  calEl.addEventListener('touchend', function(e) {
+    calTouchEndX = e.changedTouches[0].screenX;
+    handleCalSwipe();
+  }, {passive: true});
+}
+
 /* ═══ UTILS ═══ */
 function p2(n){return String(n).padStart(2,'0');}
 function fmt(dt){return p2(dt.getHours())+':'+p2(dt.getMinutes());}
@@ -900,6 +920,7 @@ function init(){
   loadAlarms();
   renderCal();renderBasePresets();renderIntlPresets();initDrums();
   initSW();initNotifications();
+  initCalSwipe(); // 스와이프 이벤트 초기화
   
   if(detectedFlights.length){ renderHomeFlightList(); }
   if(alms.length){ renderDirectAlarms(); }
@@ -930,24 +951,44 @@ function closeUploadSheet(){
 
 /* ── Month Replacement Logic ── */
 function replaceMonthFlights(newFlights) {
-  var targetMonths = {};
+  var monthCounts = {};
   newFlights.forEach(function(f) {
       var ym = f.date.substring(0, 7); 
-      targetMonths[ym] = true;
+      monthCounts[ym] = (monthCounts[ym] || 0) + 1;
   });
+
+  var targetMonths = {};
+  var maxM = null, maxC = 0;
+  for(var ym in monthCounts) {
+      if(monthCounts[ym] >= 3) {
+          targetMonths[ym] = true;
+      }
+      if(monthCounts[ym] > maxC) { maxC = monthCounts[ym]; maxM = ym; }
+  }
+  if(Object.keys(targetMonths).length === 0 && maxM) {
+      targetMonths[maxM] = true;
+  }
 
   detectedFlights = detectedFlights.filter(function(f) {
       var ym = f.date.substring(0, 7);
       return !targetMonths[ym]; 
   });
 
+  var seenIds = {};
+  detectedFlights.forEach(function(f){ seenIds[f.id] = true; });
+  
+  var actuallyAdded = 0;
   newFlights.forEach(function(nf) {
-      detectedFlights.push(nf);
+      if(!seenIds[nf.id]) {
+          seenIds[nf.id] = true;
+          detectedFlights.push(nf);
+          actuallyAdded++;
+      }
   });
 
   detectedFlights.sort(function(a,b){return parseFlightDate(a)-parseFlightDate(b);});
 
-  return newFlights.length;
+  return actuallyAdded; 
 }
 
 
@@ -1007,6 +1048,21 @@ function parseManualEntry(){
       initFlightToggles();
       var autoAdded = autoRegisterAll(); 
       saveFlights();
+      
+      var maxM = null, maxC = 0, counts = {};
+      flights.forEach(function(f){
+          var ym = f.date.substring(0,7);
+          counts[ym] = (counts[ym]||0)+1;
+          if(counts[ym] > maxC) { maxC = counts[ym]; maxM = ym; }
+      });
+      if(maxM) {
+          var pts = maxM.split('-');
+          calYear = parseInt(pts[0], 10);
+          calMonth = parseInt(pts[1], 10) - 1;
+          var firstFlight = flights.find(function(f){ return f.date.startsWith(maxM); });
+          calSelDate = firstFlight ? firstFlight.date : (maxM + '-01');
+      }
+
       renderHomeFlightList();
       renderSheetFalWrap();
       renderCal();
@@ -1180,15 +1236,29 @@ function handleICS(e){
 
       var addedCount = replaceMonthFlights(newFlights);
 
-      if(addedCount > 0){
+      if(newFlights.length > 0){
           initFlightToggles();
           var autoAdded=autoRegisterAll();
           saveFlights();
           
+          var maxM = null, maxC = 0, counts = {};
+          newFlights.forEach(function(fl){
+              var ym = fl.date.substring(0,7);
+              counts[ym] = (counts[ym]||0)+1;
+              if(counts[ym] > maxC) { maxC = counts[ym]; maxM = ym; }
+          });
+          if(maxM) {
+              var pts = maxM.split('-');
+              calYear = parseInt(pts[0], 10);
+              calMonth = parseInt(pts[1], 10) - 1;
+              var firstFlight = newFlights.find(function(fl){ return fl.date.startsWith(maxM); });
+              calSelDate = firstFlight ? firstFlight.date : (maxM + '-01');
+          }
+          
           renderHomeFlightList();
           renderCal();
           renderDaySchedule(calSelDate);
-          toast('Schedule updated! '+addedCount+' flights applied','ok');
+          toast('Schedule updated! '+newFlights.length+' flights applied','ok');
       } else {
           toast('No new flights to add','in');
       }
