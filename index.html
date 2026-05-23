@@ -964,27 +964,34 @@ function closeUploadSheet(){
 
 /* ── Month Replacement Logic ── */
 function replaceMonthFlights(newFlights) {
+  if(!newFlights || newFlights.length === 0) return 0;
+  
   var monthCounts = {};
   newFlights.forEach(function(f) {
       var ym = f.date.substring(0, 7); 
       monthCounts[ym] = (monthCounts[ym] || 0) + 1;
   });
 
-  var targetMonths = {};
-  var maxM = null, maxC = 0;
+  var targetMonth = null, maxC = 0;
   for(var ym in monthCounts) {
-      if(monthCounts[ym] >= 3) {
-          targetMonths[ym] = true;
+      if(monthCounts[ym] > maxC) { maxC = monthCounts[ym]; targetMonth = ym; }
+  }
+
+  var crossoverMap = {};
+  newFlights.forEach(function(f) {
+      var ym = f.date.substring(0, 7);
+      if(ym !== targetMonth) {
+          crossoverMap[f.date + "_" + f.flight] = true;
       }
-      if(monthCounts[ym] > maxC) { maxC = monthCounts[ym]; maxM = ym; }
-  }
-  if(Object.keys(targetMonths).length === 0 && maxM) {
-      targetMonths[maxM] = true;
-  }
+  });
 
   detectedFlights = detectedFlights.filter(function(f) {
       var ym = f.date.substring(0, 7);
-      return !targetMonths[ym]; 
+      // 1. 해당 월(메인 달)의 스케줄은 전체 초기화 (덮어쓰기)
+      if (ym === targetMonth) return false;
+      // 2. 다른 달로 넘어간 스케줄은 정확히 편명과 날짜가 일치하는 것만 삭제 (부분 업데이트)
+      if (crossoverMap[f.date + "_" + f.flight]) return false;
+      return true; 
   });
 
   var seenIds = {};
@@ -1002,6 +1009,24 @@ function replaceMonthFlights(newFlights) {
   detectedFlights.sort(function(a,b){return parseFlightDate(a)-parseFlightDate(b);});
 
   return actuallyAdded; 
+}
+
+function mergeManualFlights(newFlights) {
+    var map = {};
+    newFlights.forEach(function(f){ map[f.date + "_" + f.flight] = true; });
+    
+    // Remove existing flights that match the newly entered Date+Flight
+    detectedFlights = detectedFlights.filter(function(f) {
+        return !map[f.date + "_" + f.flight];
+    });
+
+    var actuallyAdded = 0;
+    newFlights.forEach(function(nf) {
+        detectedFlights.push(nf);
+        actuallyAdded++;
+    });
+    detectedFlights.sort(function(a,b){return parseFlightDate(a)-parseFlightDate(b);});
+    return actuallyAdded;
 }
 
 
@@ -1055,7 +1080,7 @@ function parseManualEntry(){
 
   if(!flights.length){toast('No valid flights found in input','er');return;}
   
-  var addedCount = replaceMonthFlights(flights);
+  var addedCount = mergeManualFlights(flights);
   
   if(addedCount > 0) {
       initFlightToggles();
@@ -1080,7 +1105,7 @@ function parseManualEntry(){
       renderSheetFalWrap();
       renderCal();
       renderDaySchedule(calSelDate);
-      toast('Schedule updated! ' + addedCount + ' flights applied', 'ok');
+      toast('Manual entry saved! ' + addedCount + ' flights updated', 'ok');
   }
   closeUploadSheet();
 }
@@ -1171,6 +1196,21 @@ function renderDaySchedule(dk){
   });
   dayAlms.forEach(function(a){
     var routeHtml = escQ(a.lbl);
+    
+    // 알람 시간과 비행 출발 시간을 비교하여 몇 시간 전인지 계산
+    if(a.dep && a.time) {
+        var diff = Math.round((a.dep.getTime() - a.time.getTime()) / 60000);
+        if(diff > 0) {
+            var h = Math.floor(diff / 60);
+            var m = diff % 60;
+            var offTxt = '';
+            if(h > 0 && m > 0) offTxt = '('+h+'h '+m+'m before)';
+            else if(h > 0) offTxt = '('+h+'h before)';
+            else offTxt = '('+m+'m before)';
+            routeHtml += ' <span style="font-size:10px; color:var(--tx3); font-weight:500; margin-left:4px;">'+offTxt+'</span>';
+        }
+    }
+
     var h='<div class="dfr">'
       +'<div class="dfr-time">'+fmt(a.time)+'</div>'
       +'<div class="dfr-info"><div class="dfr-route">'+routeHtml+'</div></div>'
