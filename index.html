@@ -114,7 +114,7 @@ body{background:var(--bg);color:var(--tx);font-family:'Inter',sans-serif;font-si
 .day-more{font-size:11px;color:var(--blue);font-weight:600;cursor:pointer}
 .day-flights{padding:8px 6px 10px}
 
-/* One-liner layout for day card alarms */
+/* One-liner layout for day card flights */
 .dfr{display:flex;align-items:center;gap:8px;padding:10px 12px;border-radius:10px;transition:background .15s;cursor:pointer; border:1px solid var(--bdr); background:var(--white); margin-bottom:6px;}
 .dfr:hover{background:var(--blue-light); border-color:var(--blue);}
 .dfr-time{font-size:15px;font-weight:700;color:var(--blue);flex-shrink:0;font-family:'Share Tech Mono',monospace;}
@@ -122,6 +122,8 @@ body{background:var(--bg);color:var(--tx);font-family:'Inter',sans-serif;font-si
 .dfr-info{flex:1;min-width:0;display:flex;align-items:center;gap:6px;overflow-x:auto;white-space:nowrap;scrollbar-width:none;}
 .dfr-info::-webkit-scrollbar{display:none}
 .dfr-route{font-size:13px;font-weight:600;color:var(--tx);display:flex;align-items:center;}
+.dfr-route .apt{font-family:'Share Tech Mono',monospace;font-size:13px;font-weight:700}
+.dfr-route .apt.dep{color:var(--blue)}
 .empty-state{padding:20px;text-align:center;color:var(--tx3);font-size:12px}
 
 /* ── BUTTONS ── */
@@ -319,8 +321,7 @@ body.dark .dl-inp[type=date]{color-scheme:dark}
 @keyframes blk2{50%{opacity:0}}
 .dal-info{flex:1;min-width:0}
 .dal-date-row{display:flex;align-items:center;gap:4px;margin-bottom:1px}
-.dal-dow{font-size:13px;font-weight:700;color:var(--tx)}
-.dal-date{font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--tx2)}
+.dal-date{font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--tx2);font-weight:600}
 .dal-today{background:var(--blue);color:#fff;font-size:8px;font-weight:700;padding:1px 5px;border-radius:3px}
 .dal-lbl{font-size:10px;color:var(--tx2);font-weight:500}
 .dal-cd{font-size:9px;color:var(--blue);margin-top:1px;font-family:'Share Tech Mono',monospace;font-weight:600}
@@ -460,9 +461,9 @@ body.dark .dl-inp[type=date]{color-scheme:dark}
 <div class="panel show" id="panel-calendar">
   <div class="cal-card">
     <div class="cal-nav">
-      <button class="cal-nav-btn" onclick="calMove(-1)">&#8249;</button>
+      <button class="cal-nav-btn" onclick="doCalMove(-1)">&#8249;</button>
       <div class="cal-month" id="calMonthLbl" onclick="goToToday()" title="Go to Today">May 2026</div>
-      <button class="cal-nav-btn" onclick="calMove(1)">&#8250;</button>
+      <button class="cal-nav-btn" onclick="doCalMove(1)">&#8250;</button>
     </div>
     <div class="cal-dow-row">
       <div class="cal-dow-cell">S</div><div class="cal-dow-cell">M</div><div class="cal-dow-cell">T</div>
@@ -837,35 +838,124 @@ var ITEM_H=26;
 
 /* ═══ CALENDAR SWIPE LOGIC ═══ */
 var calTouchStartX = 0;
+var calTouchStartY = 0;
 var calTouchEndX = 0;
+var isCalSwiping = false;
+var isHorizontalSwipe = null;
+var isAnimating = false;
+var calAnimDir = 0;
 
-function handleCalSwipe() {
-  if (calTouchEndX < calTouchStartX - 40) calMove(1); // Swipe left -> Next Month
-  if (calTouchEndX > calTouchStartX + 40) calMove(-1); // Swipe right -> Previous Month
+function doCalMove(d) {
+    if(isAnimating) return;
+    isAnimating = true;
+    var grid = document.getElementById('calGrid');
+    grid.style.transition = 'transform 0.2s ease, opacity 0.2s ease';
+    grid.style.transform = 'translateX(' + (d > 0 ? '-100%' : '100%') + ')';
+    grid.style.opacity = '0';
+    setTimeout(function() {
+        calMove(d);
+        isAnimating = false;
+    }, 200);
 }
 
 function initCalSwipe() {
   var calEl = document.querySelector('.cal-card');
   if(!calEl) return;
+  var grid = document.getElementById('calGrid');
+
   calEl.addEventListener('touchstart', function(e) {
+    if(isAnimating) return;
     calTouchStartX = e.changedTouches[0].screenX;
+    calTouchStartY = e.changedTouches[0].screenY;
+    isCalSwiping = true;
+    isHorizontalSwipe = null;
+    grid.style.transition = 'none';
   }, {passive: true});
+
+  calEl.addEventListener('touchmove', function(e) {
+    if(!isCalSwiping || isAnimating) return;
+    var touchX = e.changedTouches[0].screenX;
+    var touchY = e.changedTouches[0].screenY;
+    var dx = touchX - calTouchStartX;
+    var dy = touchY - calTouchStartY;
+
+    if (isHorizontalSwipe === null) {
+        if (Math.abs(dx) > 5 || Math.abs(dy) > 5) {
+            isHorizontalSwipe = Math.abs(dx) > Math.abs(dy);
+        }
+    }
+
+    if (isHorizontalSwipe) {
+        grid.style.transform = 'translateX(' + dx + 'px)';
+    }
+  }, {passive: true});
+
   calEl.addEventListener('touchend', function(e) {
+    if(!isCalSwiping || isAnimating) return;
+    isCalSwiping = false;
+    if (!isHorizontalSwipe) {
+        grid.style.transition = 'transform 0.2s ease';
+        grid.style.transform = 'translateX(0)';
+        return;
+    }
+
     calTouchEndX = e.changedTouches[0].screenX;
-    handleCalSwipe();
+    var dx = calTouchEndX - calTouchStartX;
+
+    if (dx < -40) {
+      isAnimating = true;
+      grid.style.transition = 'transform 0.2s ease, opacity 0.2s ease';
+      grid.style.transform = 'translateX(-100%)';
+      grid.style.opacity = '0';
+      setTimeout(function() { calMove(1); isAnimating = false; }, 200);
+    } else if (dx > 40) {
+      isAnimating = true;
+      grid.style.transition = 'transform 0.2s ease, opacity 0.2s ease';
+      grid.style.transform = 'translateX(100%)';
+      grid.style.opacity = '0';
+      setTimeout(function() { calMove(-1); isAnimating = false; }, 200);
+    } else {
+      grid.style.transition = 'transform 0.2s ease, opacity 0.2s ease';
+      grid.style.transform = 'translateX(0)';
+      grid.style.opacity = '1';
+    }
   }, {passive: true});
 }
 
 function goToToday() {
   var now = new Date();
-  calYear = now.getFullYear();
-  calMonth = now.getMonth();
-  calSelDate = todayStr();
-  document.getElementById('dDate').value = calSelDate;
-  renderCal();
-  renderDaySchedule(calSelDate);
-  renderHomeFlightList();
-  toast('Moved to today', 'in');
+  var ty = now.getFullYear();
+  var tm = now.getMonth();
+  if(calYear===ty && calMonth===tm) {
+      calSelDate = todayStr();
+      document.getElementById('dDate').value = calSelDate;
+      renderCal();
+      renderDaySchedule(calSelDate);
+      renderHomeFlightList();
+      toast('Moved to today', 'in');
+      return;
+  }
+  var d = (ty > calYear || (ty === calYear && tm > calMonth)) ? 1 : -1;
+  
+  if(isAnimating) return;
+  isAnimating = true;
+  var grid = document.getElementById('calGrid');
+  grid.style.transition = 'transform 0.2s ease, opacity 0.2s ease';
+  grid.style.transform = 'translateX(' + (d > 0 ? '-100%' : '100%') + ')';
+  grid.style.opacity = '0';
+  
+  setTimeout(function(){
+      calAnimDir = d;
+      calYear = ty;
+      calMonth = tm;
+      calSelDate = todayStr();
+      document.getElementById('dDate').value = calSelDate;
+      renderCal();
+      renderDaySchedule(calSelDate);
+      renderHomeFlightList();
+      toast('Moved to today', 'in');
+      isAnimating = false;
+  }, 200);
 }
 
 /* ═══ UTILS ═══ */
@@ -932,22 +1022,21 @@ function loadAlarms(){
     var raw=localStorage.getItem('crewclock_alarms');
     if(!raw) return;
     var data=JSON.parse(raw);
-    var now=new Date();
-    alms=data
-      .filter(function(a){ 
-         if(a.type === 'direct') return !a.dism || a.missed; 
-         return !a.dism || (new Date(a.time)-now>-300000); 
-      })
-      .map(function(a){
-        return {
-          id:a.id,
-          time:new Date(a.time),
-          dep:a.dep?new Date(a.dep):null,
-          lbl:a.lbl,type:a.type,armed:a.armed,ring:false,dism:a.dism,
-          missed:a.missed,
-          fnum:a.fnum, depApt:a.depApt, arrApt:a.arrApt, arrTime:a.arrTime
-        };
-      });
+    var tString = todayStr();
+    alms=data.filter(function(a){ 
+        var dt = a.dep ? new Date(a.dep) : new Date(a.time);
+        var dStr = dt.getFullYear() + '-' + p2(dt.getMonth()+1) + '-' + p2(dt.getDate());
+        return dStr >= tString;
+    }).map(function(a){
+      return {
+        id:a.id,
+        time:new Date(a.time),
+        dep:a.dep?new Date(a.dep):null,
+        lbl:a.lbl,type:a.type,armed:a.armed,ring:false,dism:a.dism,
+        missed:a.missed,
+        fnum:a.fnum, depApt:a.depApt, arrApt:a.arrApt, arrTime:a.arrTime
+      };
+    });
   }catch(e){console.warn('[load alarms]',e);}
 }
 
@@ -1175,6 +1264,7 @@ function parseManualEntry(){
 
 /* ═══ CALENDAR ═══ */
 function calMove(d){
+    calAnimDir = d;
     calMonth+=d;
     if(calMonth>11){calMonth=0;calYear++;}
     if(calMonth<0){calMonth=11;calYear--;}
@@ -1226,6 +1316,21 @@ function renderCal(){
       +(dots?'<div class="cal-dots">'+dots+'</div>':'')+'</div>';
   }
   grid.innerHTML=cells;
+
+  if (calAnimDir !== 0) {
+      grid.style.transition = 'none';
+      grid.style.transform = 'translateX(' + (calAnimDir > 0 ? '100%' : '-100%') + ')';
+      grid.style.opacity = '0';
+      void grid.offsetWidth; // Force Reflow
+      grid.style.transition = 'transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94), opacity 0.3s ease';
+      grid.style.transform = 'translateX(0)';
+      grid.style.opacity = '1';
+      calAnimDir = 0;
+  } else {
+      grid.style.transition = 'none';
+      grid.style.transform = 'translateX(0)';
+      grid.style.opacity = '1';
+  }
 }
 
 function calSelectDay(dk){
@@ -1477,15 +1582,12 @@ function parseICS(text){
         var dIdx = summary.search(/[-→>]/);
         
         if (dIdx !== -1 && tIdx > dIdx) {
-            // Time is after the dash
             var textBefore = summary.substring(0, dIdx).replace(new RegExp("\\b"+fnum+"\\b", 'gi'), '');
             var hasDepApt = /\b[A-Z]{3}\b/.test(textBefore);
             
             if (!hasDepApt) {
-                // e.g., "-> DEL 17:10"
                 arrTime = times[0];
             } else {
-                // e.g., "ICN -> DEL 17:10"
                 if (/\bARR\b/i.test(summary)) {
                     arrTime = times[0];
                 } else if (dtTime) {
@@ -1504,7 +1606,6 @@ function parseICS(text){
         depTime = dtTime || '00:00';
     }
 
-    // Clean up format
     if (depTime) depTime = p2(parseInt(depTime.split(':')[0])) + ':' + p2(parseInt(depTime.split(':')[1]));
     if (arrTime) arrTime = p2(parseInt(arrTime.split(':')[0])) + ':' + p2(parseInt(arrTime.split(':')[1]));
 
@@ -1770,24 +1871,42 @@ function rerenderFlight(id){
 /* Auto Register All Flights */
 function autoRegisterAll(){
   syncAllPresets();
-  var now=new Date();var added=0;
-  
-  alms = alms.filter(function(a){ return a.type === 'direct'; });
-  
+  var added=0;
+  var validAutoAlarmIds = {};
+
   detectedFlights.forEach(function(f){
     var depDt=parseFlightDate(f);
-    if(depDt<now)return;
+    if(f.date < todayStr()) return;
+    
     var offs=f.type==='intl'?intlOffs:baseOffs;
     offs.forEach(function(o){
       if(!flightToggles[f.id]||!flightToggles[f.id][o.id])return;
       var at=new Date(depDt.getTime()-(o.h*60+o.m)*60000);
-      if(at<=now)return;
-      if(alms.find(function(a){return !a.dism&&Math.abs(a.time-at)<2000;}))return;
-      alms.push({id:uid(),time:at,dep:new Date(depDt),lbl:o.lbl,type:f.type,armed:true,ring:false,dism:false, fnum:f.flight, depApt:f.depApt, arrApt:f.arrApt, arrTime:f.arrTime});
-      added++;
+      
+      var autoId = f.id + '_' + o.id;
+      validAutoAlarmIds[autoId] = true;
+
+      var existing = alms.find(function(a){ return a.id === autoId; });
+      if(existing) {
+          if (existing.time.getTime() !== at.getTime()) {
+              existing.time = at;
+              existing.dism = false;
+              existing.missed = false;
+          }
+          existing.lbl = o.lbl;
+      } else {
+          alms.push({id:autoId, time:at, dep:new Date(depDt), lbl:o.lbl, type:f.type, armed:true, ring:false, dism:false, missed:false, fnum:f.flight, depApt:f.depApt, arrApt:f.arrApt, arrTime:f.arrTime});
+          added++;
+      }
     });
     registeredFlights[f.id]=true;
   });
+  
+  alms = alms.filter(function(a) {
+      if (a.type === 'direct') return true;
+      return validAutoAlarmIds[a.id];
+  });
+
   alms.sort(function(a,b){return a.time-b.time;});
   saveAlarms();scheduleNotificationsViaSW();acquireWakeLock();
   return added;
@@ -1815,43 +1934,51 @@ function addDirectAlarm(){
 
 function renderDirectAlarms(){
   var wrap=document.getElementById('dalCardWrap');if(!wrap)return;
-  var directs=alms.filter(function(a){return a.type === 'direct' && (!a.dism || a.missed);});
+  var tString = todayStr();
+  var directs=alms.filter(function(a){
+      var dt = a.dep ? new Date(a.dep) : new Date(a.time);
+      var dStr = dt.getFullYear() + '-' + p2(dt.getMonth()+1) + '-' + p2(dt.getDate());
+      return dStr >= tString;
+  });
   if(!directs.length){wrap.innerHTML='';return;}
   var D=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   var now=new Date();var todayMid=new Date();todayMid.setHours(0,0,0,0);
   wrap.innerHTML='<div class="dal-wrap">'+directs.map(function(a){
     var t=a.time;var dow=D[t.getDay()];var tMid=new Date(t);tMid.setHours(0,0,0,0);
     var isTod=tMid.getTime()===todayMid.getTime();
-    var dateStr=p2(t.getMonth()+1)+'/'+p2(t.getDate());
+    var dateStr=t.getFullYear()+'-'+p2(t.getMonth()+1)+'-'+p2(t.getDate())+'('+dow+')';
     var timeStr=p2(t.getHours())+':'+p2(t.getMinutes());
     var isRing=a.ring;
     var isMissed=a.missed;
+    var isDism=a.dism && !isRing && !isMissed;
     var diff=t-now;
     var cdTxt='';
+    
     if(isRing) cdTxt='▶ RINGING';
     else if(isMissed) cdTxt='MISSED';
+    else if(isDism) cdTxt='DISMISSED';
     else if(diff>0){var s2=Math.floor(diff/1000);var hh=Math.floor(s2/3600),mm=Math.floor((s2%3600)/60),ss=s2%60;cdTxt='T-'+(hh?hh+'H ':'')+mm+'M '+ss+'S';}
     else cdTxt='PASSED';
     
     var act='';
     if(isRing) {
       act = '<button class="dal-dis" onclick="dismissDirectAlarm(\''+a.id+'\')">DISMISS</button>';
-    } else {
+    } else if (a.type === 'direct') {
       act = '<button class="dal-del" onclick="delDirectAlarm(\''+a.id+'\')">✕</button>';
     }
     
-    var cls = 'dal-item' + (isRing ? ' ring-now' : '') + (isMissed ? ' missed' : '');
+    var cls = 'dal-item' + (isRing ? ' ring-now' : '') + ((isMissed||isDism||diff<=0) ? ' missed' : '');
 
     var fInfo = '';
     if(a.fnum && a.depApt) {
-        var arrTxt = (a.arrApt && a.arrApt !== '???') ? '&#8594;'+a.arrApt : '';
+        var arrTxt = (a.arrApt && a.arrApt !== '???') ? '→'+a.arrApt : '';
         if (arrTxt && a.arrTime) arrTxt += ' ('+a.arrTime+')';
-        fInfo = '<span style="font-family:\'Share Tech Mono\',monospace; font-size:10px; color:var(--blue); margin-left:6px; padding-left:6px; border-left:1.5px solid var(--bdr)">'+a.fnum+' '+a.depApt+arrTxt+'</span>';
+        fInfo = '<span style="font-family:\'Share Tech Mono\',monospace; font-size:11px; color:var(--blue); font-weight:700; margin-left:6px; padding-left:6px; border-left:1.5px solid var(--bdr)">'+a.fnum+' '+a.depApt+arrTxt+'</span>';
     }
 
     return '<div class="'+cls+'" id="dal-'+a.id+'">'
       +'<div class="dal-dot"></div><div class="dal-info">'
-      +'<div class="dal-date-row"><span class="dal-dow">'+dow+'</span><span class="dal-date">'+dateStr+'</span>'+fInfo+(isTod?'<span class="dal-today" style="margin-left:4px">TODAY</span>':'')+'</div>'
+      +'<div class="dal-date-row"><span class="dal-date">'+dateStr+'</span>'+fInfo+(isTod?'<span class="dal-today" style="margin-left:4px">TODAY</span>':'')+'</div>'
       +'<div class="dal-lbl">'+escQ(a.lbl)+'</div>'
       +'<div class="dal-cd" id="dcd-'+a.id+'">'+cdTxt+'</div></div>'
       +'<div class="dal-time">'+timeStr+'</div>'+act+'</div>';
@@ -1864,12 +1991,10 @@ function delDirectAlarm(id){
 }
 
 function dismissDirectAlarm(id){
-  alms=alms.filter(function(a){
+  alms.forEach(function(a){
      if(a.id === id) {
-        if(a.type === 'direct') return false; 
         a.dism=true; a.ring=false;
      }
-     return true;
   });
   saveAlarms();
   if(!alms.some(function(x){return x.ring;})){
@@ -1880,10 +2005,11 @@ function dismissDirectAlarm(id){
 
 function updateDirectCDs(){
   var now=new Date();
-  alms.filter(function(a){return a.type === 'direct' && (!a.dism || a.missed);}).forEach(function(a){
+  alms.forEach(function(a){
     var el=document.getElementById('dcd-'+a.id);if(!el)return;
     if(a.ring){el.textContent='▶ RINGING';return;}
     if(a.missed){el.textContent='MISSED';return;}
+    if(a.dism){el.textContent='DISMISSED';return;}
     var diff=a.time-now;if(diff<=0){el.textContent='PASSED';return;}
     var s2=Math.floor(diff/1000);var hh=Math.floor(s2/3600),mm=Math.floor((s2%3600)/60),ss=s2%60;
     el.textContent='T-'+(hh?hh+'H ':'')+mm+'M '+ss+'S';
@@ -1902,7 +2028,7 @@ function checkAlarms(){
   alms.forEach(function(a){
     if(!(a.time instanceof Date)) a.time=new Date(a.time);
     if(a.dep&&!(a.dep instanceof Date)) a.dep=new Date(a.dep);
-    if(a.dism||a.ring)return;
+    if(a.dism||a.ring||a.missed)return;
     var diff=now-a.time;
     if(diff>=0&&diff<300000){a.ring=true;needRender=true;trigAlarm(a);}
   });
@@ -1910,12 +2036,7 @@ function checkAlarms(){
   alms.forEach(function(a){
     if(a.ring&&(now-a.time)>=300000){
       a.ring=false;
-      if(a.type === 'direct') {
-         a.missed=true; 
-         a.dism=true;
-      } else {
-         a.dism=true;
-      }
+      a.missed=true; 
       needRender=true;
       if(!alms.some(function(x){return x.ring;})){
         stopSnd();document.getElementById('ro').classList.remove('show');
@@ -1926,9 +2047,11 @@ function checkAlarms(){
   if(needRender)renderDirectAlarms();
   var bl=alms.length;
   
+  var tString = todayStr();
   alms=alms.filter(function(a){
-    if(a.type === 'direct') return !a.dism || a.missed; 
-    return !a.dism || (now-a.time<300000);
+      var dt = a.dep ? new Date(a.dep) : new Date(a.time);
+      var dStr = dt.getFullYear() + '-' + p2(dt.getMonth()+1) + '-' + p2(dt.getDate());
+      return dStr >= tString;
   });
   
   if(alms.length!==bl){saveAlarms();renderDirectAlarms();}
@@ -1959,12 +2082,10 @@ function trigAlarm(a){
 }
 
 function dismissOv(){
-  alms = alms.filter(function(a){
+  alms.forEach(function(a){
     if(a.ring){
-      if(a.type === 'direct') return false; 
       a.dism=true; a.ring=false;
     }
-    return true;
   });
   saveAlarms();stopSnd();document.getElementById('ro').classList.remove('show');renderDirectAlarms();
 }
