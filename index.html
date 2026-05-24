@@ -1936,6 +1936,7 @@ function renderDirectAlarms(){
   var wrap=document.getElementById('dalCardWrap');if(!wrap)return;
   var tString = todayStr();
   var directs=alms.filter(function(a){
+      if(a.type !== 'direct') return false; // 수동으로 추가한 알람만 표시
       var dt = a.dep ? new Date(a.dep) : new Date(a.time);
       var dStr = dt.getFullYear() + '-' + p2(dt.getMonth()+1) + '-' + p2(dt.getDate());
       return dStr >= tString;
