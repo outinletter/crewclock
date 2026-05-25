@@ -1705,9 +1705,10 @@ function initFlightToggles(){
         flightToggles[f.id]={};
     }
     var offs=f.type==='intl'?intlOffs:baseOffs;
+    var ons=f.type==='intl'?intlOn:baseOn;
     offs.forEach(function(o){
         if(flightToggles[f.id][o.id] === undefined) {
-            flightToggles[f.id][o.id]=true;
+            flightToggles[f.id][o.id] = (ons[o.id] !== false);
         }
     });
   });
@@ -2191,12 +2192,29 @@ function presetRow(o,on,px,type){
 function renderBasePresets(){var c=document.getElementById('basePresets');c.innerHTML=baseOffs.map(function(o){return presetRow(o,!!baseOn[o.id],'b','base');}).join('')+'<button class="add-btn" onclick="addBaseOff()">+ Add BASE Alarm</button>';}
 function renderIntlPresets(){var c=document.getElementById('intlPresets');c.innerHTML=intlOffs.map(function(o){return presetRow(o,!!intlOn[o.id],'i','intl');}).join('')+'<button class="add-btn amb" onclick="addIntlOff()">+ Add INTL Alarm</button>';}
 function togPre(px,id,btn){
+    var isOn;
     if(px==='b'){
         baseOn[id]=!baseOn[id];
+        isOn = baseOn[id];
         btn.className='tog'+(baseOn[id]?' on':'');
     }else{
         intlOn[id]=!intlOn[id];
+        isOn = intlOn[id];
         btn.className='tog'+(intlOn[id]?' on-amb':'');
+    }
+    
+    // 기존 비행 스케줄에도 변경된 알람 켜기/끄기 상태 일괄 동기화
+    detectedFlights.forEach(function(f){
+        if(!flightToggles[f.id]) flightToggles[f.id]={};
+        if((px==='b' && f.type==='base') || (px==='i' && f.type==='intl')) {
+            flightToggles[f.id][id] = isOn;
+        }
+    });
+    
+    saveSettings();
+    saveFlights();
+    if(detectedFlights.length){
+        autoRegisterAll();
     }
 }
 function syncPR(px,id){
@@ -2220,9 +2238,17 @@ function delPre(px,id){
         delete intlOn[id];
         renderIntlPresets();
     }
+    
+    // 삭제된 알람 프리셋을 기존 비행 스케줄에서도 완전히 제거
+    detectedFlights.forEach(function(f){
+        if(flightToggles[f.id]) {
+            delete flightToggles[f.id][id];
+        }
+    });
+    
     saveSettings();
+    saveFlights();
     if(detectedFlights.length){
-        initFlightToggles();
         autoRegisterAll();
     }
 }
@@ -2231,11 +2257,18 @@ function addBaseOff(){
   var id='b'+(bOc++);
   baseOffs.push({id:id,h:1,m:0,lbl:'Alarm'});
   baseOn[id]=true;
+  
+  // 새로 추가된 알람을 기존 비행 스케줄에 일괄 활성화
+  detectedFlights.forEach(function(f){
+      if(!flightToggles[f.id]) flightToggles[f.id]={};
+      if(f.type==='base') flightToggles[f.id][id] = true;
+  });
+  
   baseOffs.sort(function(a,b){return (b.h*60+b.m)-(a.h*60+a.m);});
   renderBasePresets();
   saveSettings();
+  saveFlights();
   if(detectedFlights.length) {
-      initFlightToggles();
       autoRegisterAll();
   }
 }
@@ -2244,11 +2277,18 @@ function addIntlOff(){
   var id='i'+(iOc++);
   intlOffs.push({id:id,h:1,m:0,lbl:'Alarm'});
   intlOn[id]=true;
+  
+  // 새로 추가된 알람을 기존 비행 스케줄에 일괄 활성화
+  detectedFlights.forEach(function(f){
+      if(!flightToggles[f.id]) flightToggles[f.id]={};
+      if(f.type==='intl') flightToggles[f.id][id] = true;
+  });
+  
   intlOffs.sort(function(a,b){return (b.h*60+b.m)-(a.h*60+a.m);});
   renderIntlPresets();
   saveSettings();
+  saveFlights();
   if(detectedFlights.length) {
-      initFlightToggles();
       autoRegisterAll();
   }
 }
