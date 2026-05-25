@@ -1386,8 +1386,9 @@ function renderDaySchedule(dk){
              var isArrivalDay = (f.arrDate === dk && f.date !== dk);
              var arrTxt = (f.arrApt && f.arrApt !== '???') ? '→' + f.arrApt : '';
              if (arrTxt && f.arrTime) arrTxt += ' ' + f.arrTime;
-             var tTxt = isArrivalDay ? (f.arrTime ? 'ARR ' + f.arrTime : 'ARR') : (f.depTime || '00:00');
-             return tTxt + ' ' + f.flight + ' ' + f.depApt + arrTxt;
+             var tTxt = isArrivalDay ? (f.arrTime ? f.arrTime : '') : (f.depTime || '00:00');
+             var prefix = tTxt ? tTxt + ' ' : '';
+             return prefix + f.flight + ' ' + f.depApt + arrTxt;
          }).join('<br>');
          hInfoEl.style.display = 'block';
      } else {
