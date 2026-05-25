@@ -1722,6 +1722,8 @@ function parseICS(text){
     var isDomRoute = KR_DOM.indexOf(depApt) >= 0 && KR_DOM.indexOf(arrApt) >= 0;
     var type = depApt === baseApt ? (isDomRoute ? 'dom' : 'base') : (depApt !== '???' ? 'intl' : 'ics');
     
+    var safeId = (dateStr+'_'+(fnum||summary.slice(0,10))+'_'+(depApt||'???')+'_'+depTime).replace(/[^a-zA-Z0-9_-]/g, '_');
+    
     parsedFlights.push({
         id: safeId, date: dateStr, arrDate: dateStr, flight: fnum,
         depApt: depApt, depTime: depTime, arrApt: arrApt, arrTime: arrTime,
