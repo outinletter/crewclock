@@ -114,7 +114,7 @@ body{background:var(--bg);color:var(--tx);font-family:'Inter',sans-serif;font-si
 .day-more{font-size:11px;color:var(--blue);font-weight:600;cursor:pointer}
 .day-flights{padding:8px 6px 10px}
 
-/* One-liner layout for day card alarms */
+/* One-liner layout for day card flights */
 .dfr{display:flex;align-items:center;gap:8px;padding:10px 12px;border-radius:10px;transition:background .15s;cursor:pointer; border:1px solid var(--bdr); background:var(--white); margin-bottom:6px;}
 .dfr:hover{background:var(--blue-light); border-color:var(--blue);}
 .dfr-time{font-size:15px;font-weight:700;color:var(--blue);flex-shrink:0;font-family:'Share Tech Mono',monospace;}
@@ -986,10 +986,18 @@ function loadFlights(){
   try{
     var f=localStorage.getItem('crewclock_flights');
     if(f) {
-        detectedFlights = JSON.parse(f);
-        detectedFlights.forEach(function(fl){
-            if (!fl.arrDate) fl.arrDate = fl.date;
-        });
+        var parsed = JSON.parse(f);
+        var hasOldLogic = parsed.some(function(fl){ return typeof fl.isCont !== 'undefined' || typeof fl.isArrivalOnly !== 'undefined'; });
+        if(hasOldLogic) {
+            detectedFlights = [];
+            localStorage.removeItem('crewclock_flights');
+            setTimeout(function() { toast('데이터 포맷 업데이트로 일정이 초기화되었습니다. ICS 파일을 다시 업로드해주세요.', 'er'); }, 1500);
+        } else {
+            detectedFlights = parsed;
+            detectedFlights.forEach(function(fl){
+                if (!fl.arrDate) fl.arrDate = fl.date;
+            });
+        }
     }
     
     var t=localStorage.getItem('crewclock_toggles');
@@ -1341,8 +1349,8 @@ function renderDaySchedule(dk){
          hInfoEl.innerHTML = flights.map(function(f){
              var isArrivalDay = (f.arrDate === dk && f.date !== dk);
              var arrTxt = (f.arrApt && f.arrApt !== '???') ? '→' + f.arrApt : '';
-             if (arrTxt && f.arrTime) arrTxt += '(' + f.arrTime + ')';
-             var tTxt = isArrivalDay ? (f.arrTime ? 'ARR ' + f.arrTime : 'ARR') : f.depTime;
+             if (arrTxt && f.arrTime) arrTxt += ' ' + f.arrTime;
+             var tTxt = isArrivalDay ? (f.arrTime ? 'ARR ' + f.arrTime : 'ARR') : (f.depTime || '00:00');
              return tTxt + ' ' + f.flight + ' ' + f.depApt + arrTxt;
          }).join('<br>');
          hInfoEl.style.display = 'block';
@@ -1351,7 +1359,7 @@ function renderDaySchedule(dk){
      }
   }
 
-  if(!flights.length&&!dayAlms.length){
+  if(!dayAlms.length){
     document.getElementById('dayFlights').innerHTML='';
     return;
   }
@@ -1384,31 +1392,6 @@ function renderDaySchedule(dk){
       +'</div>';
     rows.push({s:+(fmt(a.time).replace(':','')), html:h});
   });
-  
-  flights.forEach(function(f){
-    var isArrivalDay = (f.arrDate === dk && f.date !== dk);
-    var subLbl = f.type==='base' ? 'HOME' : 'INTL';
-    if (isArrivalDay) subLbl = 'ARRIVAL';
-    var tc = f.type==='base' ? 'base' : 'intl';
-    if (isArrivalDay) tc = 'ics'; 
-    var arrTxt = (f.arrApt && f.arrApt !== '???') ? ' &#8594; <span class="apt">' + f.arrApt + '</span>' : '';
-    if(arrTxt && f.arrTime) {
-        arrTxt += ' <span style="font-family:\'Share Tech Mono\',monospace; font-size:11px; color:var(--tx3); margin-left:2px;">(' + f.arrTime + ')</span>';
-    }
-    var displayTime = isArrivalDay ? (f.arrTime || '--:--') : f.depTime;
-    var routeDisplay = '<span class="apt dep">' + f.depApt + '</span>' + arrTxt;
-    if (isArrivalDay) {
-        routeDisplay = '<span class="apt">' + f.depApt + '</span> &#8594; <span class="apt dep">' + f.arrApt + '</span>';
-    }
-
-    var h='<div class="dfr">'
-      +'<div class="dfr-time">'+displayTime+'</div>'
-      +'<div class="dfr-fnum" style="margin-right:4px;">'+escQ(f.flight||'')+'</div>'
-      +'<div class="dfr-route" style="flex:1; display:flex; align-items:center; gap:2px;">'+routeDisplay+'</div>'
-      +'<div class="fal-type '+tc+'" style="flex-shrink:0; margin-left:auto;">'+subLbl+'</div>'
-      +'</div>';
-    rows.push({s:+(displayTime||'0000').replace(':',''), html:h});
-  });
 
   rows.sort(function(a,b){return a.s-b.s;});
   document.getElementById('dayFlights').innerHTML=rows.length ? rows.map(function(r){return r.html;}).join('<div class="dfr-sep"></div>') : '';
@@ -1433,6 +1416,7 @@ function renderHomeFlightList(){
   }
 
   var now=new Date();
+  var todayString=todayStr();
   var sorted=monthFlights.slice().sort(function(a,b){return parseFlightDate(a)-parseFlightDate(b);});
 
   var upcoming=[],past=[];
@@ -1570,6 +1554,7 @@ function parseICS(text){
     if(['RESERVE','DO','OFF','STANDBY','SICK'].some(function(k){ return summary.includes(k); })) return;
     
     var dtstart=ev.raw['DTSTART']||ev.raw['DTSTART;TZID']||'';
+    var dtend=ev.raw['DTEND']||ev.raw['DTEND;TZID']||'';
     var dt=parseICSDate(dtstart);
     if(!dt) return;
     var dateStr=dt.getFullYear()+'-'+p2(dt.getMonth()+1)+'-'+p2(dt.getDate());
@@ -1581,7 +1566,10 @@ function parseICS(text){
     var times = summary.match(/\b\d{1,2}:\d{2}\b/g) || [];
     var depTime = '', arrTime = '';
     var dtTime = '';
-    if (dt && (dt.getHours() > 0 || dt.getMinutes() > 0)) {
+    if (dtstart.includes('T')) {
+        var sm = dtstart.match(/T(\d{2})(\d{2})/);
+        if (sm) dtTime = sm[1] + ':' + sm[2];
+    } else if (dt && (dt.getHours() > 0 || dt.getMinutes() > 0)) {
         dtTime = p2(dt.getHours()) + ':' + p2(dt.getMinutes());
     }
 
@@ -1606,6 +1594,12 @@ function parseICS(text){
     }
 
     if (!depTime) depTime = dtTime || '00:00';
+    
+    if (!arrTime && dtend.includes('T')) {
+        var em = dtend.match(/T(\d{2})(\d{2})/);
+        if (em) arrTime = em[1] + ':' + em[2];
+    }
+
     if (depTime) depTime = p2(parseInt(depTime.split(':')[0])) + ':' + p2(parseInt(depTime.split(':')[1]));
     if (arrTime) arrTime = p2(parseInt(arrTime.split(':')[0])) + ':' + p2(parseInt(arrTime.split(':')[1]));
 
@@ -1732,7 +1726,7 @@ function renderFalItem(f,extraCls){
 
   var arrHtml = (f.arrApt && f.arrApt !== '???') ? '<span class="fal-arrow">&#8594;</span><span class="apt">' + f.arrApt + '</span>' : '';
   if(arrHtml && f.arrTime) {
-      arrHtml += '<span style="font-family:\'Share Tech Mono\',monospace; font-size:13px; color:var(--blue); font-weight:700; margin-left:4px;">(' + f.arrTime + ')</span>';
+      arrHtml += '<span style="font-family:\'Share Tech Mono\',monospace; font-size:13px; color:var(--blue); font-weight:700; margin-left:4px;">' + f.arrTime + '</span>';
   }
 
   var togsHtml=offs.map(function(o){
@@ -1797,7 +1791,7 @@ function renderFalItemPast(f){
   
   var arrHtml = (f.arrApt && f.arrApt !== '???') ? '<span class="fal-arrow">&#8594;</span><span class="apt">' + f.arrApt + '</span>' : '';
   if(arrHtml && f.arrTime) {
-      arrHtml += '<span style="font-family:\'Share Tech Mono\',monospace; font-size:11px; color:var(--tx3); margin-left:4px;">(' + f.arrTime + ')</span>';
+      arrHtml += '<span style="font-family:\'Share Tech Mono\',monospace; font-size:11px; color:var(--tx3); margin-left:4px;">' + f.arrTime + '</span>';
   }
   
   return '<div class="fal-item past" id="fali-'+f.id+'" style="width:100%; box-sizing:border-box;">'
@@ -1971,7 +1965,7 @@ function renderDirectAlarms(){
     var fInfo = '';
     if(a.fnum && a.depApt) {
         var arrTxt = (a.arrApt && a.arrApt !== '???') ? '→'+a.arrApt : '';
-        if (arrTxt && a.arrTime) arrTxt += ' ('+a.arrTime+')';
+        if (arrTxt && a.arrTime) arrTxt += ' ' + a.arrTime;
         fInfo = '<span style="font-family:\'Share Tech Mono\',monospace; font-size:11px; color:var(--blue); font-weight:700; margin-left:6px; padding-left:6px; border-left:1.5px solid var(--bdr)">'+a.fnum+' '+a.depApt+arrTxt+'</span>';
     }
 
@@ -2062,7 +2056,7 @@ function trigAlarm(a){
   if(a.dep&&!(a.dep instanceof Date)) a.dep=new Date(a.dep);
   
   var arrTxt = (a.arrApt && a.arrApt !== '???') ? '→'+a.arrApt : '';
-  if (arrTxt && a.arrTime) arrTxt += ' ('+a.arrTime+')';
+  if (arrTxt && a.arrTime) arrTxt += ' ' + a.arrTime;
   
   document.getElementById('rtt').textContent=a.lbl + (a.fnum ? ' ('+a.fnum+')' : '');
   document.getElementById('rdt').textContent=fmt(a.time)+(a.dep?' · DEP '+fmt(a.dep):'') + (a.fnum ? ' ['+a.depApt+arrTxt+']' : '');
