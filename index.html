@@ -115,7 +115,7 @@ body{background:var(--bg);color:var(--tx);font-family:'Inter',sans-serif;font-si
 .day-more{font-size:11px;color:var(--blue);font-weight:600;cursor:pointer}
 .day-flights{padding:8px 6px 10px}
 
-/* One-liner layout for day card flights */
+/* One-liner layout for day card alarms */
 .dfr{display:flex;align-items:center;gap:8px;padding:10px 12px;border-radius:10px;transition:background .15s;cursor:pointer; border:1px solid var(--bdr); background:var(--white); margin-bottom:6px;}
 .dfr:hover{background:var(--blue-light); border-color:var(--blue);}
 .dfr-time{font-size:15px;font-weight:700;color:var(--blue);flex-shrink:0;font-family:'Share Tech Mono',monospace;}
@@ -1048,8 +1048,28 @@ function init(){
 
 /* ═══ TABS ═══ */
 function switchTab(name,btn){
+  var settingsPanel = document.getElementById('panel-settings');
+  if (settingsPanel && settingsPanel.classList.contains('show') && name !== 'settings') {
+      var v=(document.getElementById('baseAptInput').value||'').trim().toUpperCase().slice(0,3);
+      if(v.length >= 2) baseApt=v;
+      syncAllPresets();
+      baseOffs.sort(function(a,b){return (b.h*60+b.m)-(a.h*60+a.m);});
+      intlOffs.sort(function(a,b){return (b.h*60+b.m)-(a.h*60+a.m);});
+      saveSettings();
+      if (detectedFlights.length) {
+          initFlightToggles();
+          autoRegisterAll();
+      }
+  }
+
   document.querySelectorAll('.ptab').forEach(function(b){b.classList.remove('active');});
-  var pt=document.getElementById('ptab-'+name);if(pt)pt.classList.add('active');
+  if(btn) {
+      btn.classList.add('active');
+  } else {
+      var pt = document.getElementById('ptab-'+name);
+      if(pt) pt.classList.add('active');
+  }
+
   document.querySelectorAll('.panel').forEach(function(p){p.classList.remove('show');});
   document.getElementById('panel-'+name).classList.add('show');
   
@@ -1059,15 +1079,6 @@ function switchTab(name,btn){
       renderIntlPresets();
   }
   if(name==='calendar'){
-      if(detectedFlights.length) {
-          syncAllPresets();
-          baseApt=(document.getElementById('baseAptInput').value||'').trim().toUpperCase().slice(0,3) || baseApt;
-          baseOffs.sort(function(a,b){return (b.h*60+b.m)-(a.h*60+a.m);});
-          intlOffs.sort(function(a,b){return (b.h*60+b.m)-(a.h*60+a.m);});
-          saveSettings();
-          initFlightToggles();
-          autoRegisterAll();
-      }
       renderCal();
       renderDaySchedule(calSelDate);
       if(detectedFlights.length) renderHomeFlightList();
@@ -1900,6 +1911,7 @@ function autoRegisterAll(){
 
   detectedFlights.forEach(function(f){
     var depDt=parseFlightDate(f);
+    if(f.date < todayStr()) return;
     
     var offs=f.type==='intl'?intlOffs:baseOffs;
     offs.forEach(function(o){
@@ -2185,21 +2197,54 @@ function presetRow(o,on,px,type){
 }
 function renderBasePresets(){var c=document.getElementById('basePresets');c.innerHTML=baseOffs.map(function(o){return presetRow(o,!!baseOn[o.id],'b','base');}).join('')+'<button class="add-btn" onclick="addBaseOff()">+ Add BASE Alarm</button>';}
 function renderIntlPresets(){var c=document.getElementById('intlPresets');c.innerHTML=intlOffs.map(function(o){return presetRow(o,!!intlOn[o.id],'i','intl');}).join('')+'<button class="add-btn amb" onclick="addIntlOff()">+ Add INTL Alarm</button>';}
-function togPre(px,id,btn){if(px==='b'){baseOn[id]=!baseOn[id];btn.className='tog'+(baseOn[id]?' on':'');}else{intlOn[id]=!intlOn[id];btn.className='tog'+(intlOn[id]?' on-amb':'');}}
-function syncPR(px,id){var arr=px==='b'?baseOffs:intlOffs;var o=arr.find(function(x){return x.id===id;});if(!o)return;var h=document.getElementById(px+'oh-'+id),m=document.getElementById(px+'om-'+id),l=document.getElementById(px+'olbl-'+id);if(h)o.h=Math.max(0,+h.value||0);if(m)o.m=Math.max(0,Math.min(59,+m.value||0));if(l)o.lbl=l.value||'Alarm';var s=document.getElementById(px+'os-'+id);if(s)s.textContent=o.h+'H '+o.m+'M before dep.';}
-function delPre(px,id){if(px==='b'){baseOffs=baseOffs.filter(function(x){return x.id!==id;});delete baseOn[id];renderBasePresets();}else{intlOffs=intlOffs.filter(function(x){return x.id!==id;});delete intlOn[id];renderIntlPresets();}}
+function togPre(px,id,btn){
+    if(px==='b'){
+        baseOn[id]=!baseOn[id];
+        btn.className='tog'+(baseOn[id]?' on':'');
+    }else{
+        intlOn[id]=!intlOn[id];
+        btn.className='tog'+(intlOn[id]?' on-amb':'');
+    }
+}
+function syncPR(px,id){
+    var arr=px==='b'?baseOffs:intlOffs;
+    var o=arr.find(function(x){return x.id===id;});
+    if(!o)return;
+    var h=document.getElementById(px+'oh-'+id),m=document.getElementById(px+'om-'+id),l=document.getElementById(px+'olbl-'+id);
+    if(h)o.h=Math.max(0,+h.value||0);
+    if(m)o.m=Math.max(0,Math.min(59,+m.value||0));
+    if(l)o.lbl=l.value||'Alarm';
+    var s=document.getElementById(px+'os-'+id);
+    if(s)s.textContent=o.h+'H '+o.m+'M before dep.';
+}
+function delPre(px,id){
+    if(px==='b'){
+        baseOffs=baseOffs.filter(function(x){return x.id!==id;});
+        delete baseOn[id];
+        renderBasePresets();
+    }else{
+        intlOffs=intlOffs.filter(function(x){return x.id!==id;});
+        delete intlOn[id];
+        renderIntlPresets();
+    }
+    saveSettings();
+    if(detectedFlights.length){
+        initFlightToggles();
+        autoRegisterAll();
+    }
+}
 function addBaseOff(){
   syncAllPresets();
   var id='b'+(bOc++);
   baseOffs.push({id:id,h:1,m:0,lbl:'Alarm'});
   baseOn[id]=true;
   baseOffs.sort(function(a,b){return (b.h*60+b.m)-(a.h*60+a.m);});
-  initFlightToggles();
   renderBasePresets();
-  saveFlights();
-  autoRegisterAll();
-  if(calSelDate) renderDaySchedule(calSelDate);
-  renderHomeFlightList();
+  saveSettings();
+  if(detectedFlights.length) {
+      initFlightToggles();
+      autoRegisterAll();
+  }
 }
 function addIntlOff(){
   syncAllPresets();
@@ -2207,12 +2252,12 @@ function addIntlOff(){
   intlOffs.push({id:id,h:1,m:0,lbl:'Alarm'});
   intlOn[id]=true;
   intlOffs.sort(function(a,b){return (b.h*60+b.m)-(a.h*60+a.m);});
-  initFlightToggles();
   renderIntlPresets();
-  saveFlights();
-  autoRegisterAll();
-  if(calSelDate) renderDaySchedule(calSelDate);
-  renderHomeFlightList();
+  saveSettings();
+  if(detectedFlights.length) {
+      initFlightToggles();
+      autoRegisterAll();
+  }
 }
 
 /* ═══ DRUM ═══ */
