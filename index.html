@@ -1009,9 +1009,12 @@ function loadAlarms(){
     var data=JSON.parse(raw);
     var tString = todayStr();
     alms=data.filter(function(a){ 
-        var dt = a.dep ? new Date(a.dep) : new Date(a.time);
-        var dStr = dt.getFullYear() + '-' + p2(dt.getMonth()+1) + '-' + p2(dt.getDate());
-        return dStr >= tString;
+        if (a.type === 'direct') {
+            var dt = a.dep ? new Date(a.dep) : new Date(a.time);
+            var dStr = dt.getFullYear() + '-' + p2(dt.getMonth()+1) + '-' + p2(dt.getDate());
+            return dStr >= tString;
+        }
+        return true;
     }).map(function(a){
       return {
         id:a.id,
@@ -1368,6 +1371,10 @@ function renderDaySchedule(dk){
   
   var flights=detectedFlights.filter(function(f){return f.date === dk || f.arrDate === dk;});
   var dayAlms=alms.filter(function(a){
+    if(a.type !== 'direct' && a.dep) {
+        var fdk=a.dep.getFullYear()+'-'+p2(a.dep.getMonth()+1)+'-'+p2(a.dep.getDate());
+        return fdk === dk;
+    }
     var adk=a.time.getFullYear()+'-'+p2(a.time.getMonth()+1)+'-'+p2(a.time.getDate());
     return adk===dk;
   });
@@ -1897,7 +1904,6 @@ function autoRegisterAll(){
 
   detectedFlights.forEach(function(f){
     var depDt=parseFlightDate(f);
-    if(f.date < todayStr()) return;
     
     var offs=f.type==='intl'?intlOffs:baseOffs;
     offs.forEach(function(o){
@@ -2080,9 +2086,12 @@ function checkAlarms(){
   
   var tString = todayStr();
   alms=alms.filter(function(a){
-      var dt = a.dep ? new Date(a.dep) : new Date(a.time);
-      var dStr = dt.getFullYear() + '-' + p2(dt.getMonth()+1) + '-' + p2(dt.getDate());
-      return dStr >= tString;
+      if (a.type === 'direct') {
+          var dt = a.dep ? new Date(a.dep) : new Date(a.time);
+          var dStr = dt.getFullYear() + '-' + p2(dt.getMonth()+1) + '-' + p2(dt.getDate());
+          return dStr >= tString;
+      }
+      return true;
   });
   
   if(alms.length!==bl){saveAlarms();renderDirectAlarms();}
