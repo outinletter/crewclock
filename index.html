@@ -7,6 +7,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="CrewClock">
+<link rel="manifest" href="./manifest.webmanifest">
 
 
 
@@ -817,21 +818,9 @@ function showIOSInstallGuide(){
 
 function initSW(){
   if(!('serviceWorker' in navigator)) return;
+  if(location.protocol!=='https:'&&location.hostname!=='localhost') return;
   try {
-    var swCode = "self.addEventListener('install', function(e){ e.waitUntil(self.skipWaiting()); });" +
-                 "self.addEventListener('activate', function(e){ e.waitUntil(self.clients.claim()); });" +
-                 "self.addEventListener('notificationclick', function(e){" +
-                 "  e.notification.close();" +
-                 "  e.waitUntil(self.clients.matchAll({type:'window', includeUncontrolled:true}).then(function(cls){" +
-                 "    for(var i=0; i<cls.length; i++){ if(cls[i].focus) return cls[i].focus(); }" +
-                 "    if(self.clients.openWindow) return self.clients.openWindow('/');" +
-                 "  }));" +
-                 "});";
-
-    var blob = new Blob([swCode], {type: 'application/javascript'});
-    var swUrl = URL.createObjectURL(blob);
-
-    navigator.serviceWorker.register(swUrl)
+    navigator.serviceWorker.register('./sw.js',{scope:'./',updateViaCache:'none'})
       .then(function(reg){
         swReg = reg;
         if(reg.waiting) reg.waiting.postMessage({type:'SKIP_WAITING'});
