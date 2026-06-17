@@ -1,0 +1,11 @@
+{
+  "name": "CrewClock",
+  "short_name": "CrewClock",
+  "description": "Flight alarm and crew schedule management",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#e8f4fd",
+  "theme_color": "#3b82c4"
+}
