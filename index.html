@@ -1084,6 +1084,7 @@ function loadAlarms(){
         fnum:a.fnum, depApt:a.depApt, arrApt:a.arrApt, arrTime:a.arrTime
       };
     });
+    dedupeAutoAlarms();
   }catch(e){console.warn('[load alarms]',e);}
 }
 
@@ -1443,8 +1444,31 @@ function dayKeyFromDate(dt){
   return dt.getFullYear()+'-'+p2(dt.getMonth()+1)+'-'+p2(dt.getDate());
 }
 
+function normKey(v){
+  return String(v||'').trim().toUpperCase();
+}
+
+function alarmDepDay(a){
+  if(!a||!a.dep)return '';
+  return dayKeyFromDate(a.dep);
+}
+
 function sameFlightAlarm(f,a){
-  return !!(a&&f&&a.fnum===f.flight&&a.depApt===f.depApt);
+  if(!a||!f||a.fnum!==f.flight||a.depApt!==f.depApt)return false;
+  if(a.id&&String(a.id).indexOf(f.id+'_')===0)return true;
+  var depDay=alarmDepDay(a);
+  return !depDay||depDay===f.date;
+}
+
+function autoAlarmSemanticKey(f,o){
+  return [normKey(f&&f.date),normKey(f&&f.flight),normKey(f&&f.depApt),normKey(o&&o.lbl)].join('|');
+}
+
+function alarmSemanticKey(a,flights){
+  if(!a||a.type==='direct')return '';
+  var f=findFlightForAlarm(a,flights);
+  var date=f&&f.date?f.date:(a.dep?dayKeyFromDate(a.dep):'');
+  return [normKey(date),normKey(a.fnum),normKey(a.depApt),normKey(a.lbl)].join('|');
 }
 
 function findFlightForAlarm(a,flights){
@@ -1454,9 +1478,11 @@ function findFlightForAlarm(a,flights){
 }
 
 function getOffsetForAutoAlarm(a,f){
-  if(!a||!f||!a.id)return null;
+  if(!a||!f)return null;
   var offs=getOffsetsForFlight(f);
-  return offs.find(function(o){return a.id===f.id+'_'+o.id;})||null;
+  return offs.find(function(o){
+    return a.id===f.id+'_'+o.id || normKey(a.lbl)===normKey(o.lbl);
+  })||null;
 }
 
 function getLocalAlarmDisplayTime(a,flights){
@@ -1496,8 +1522,11 @@ function buildDisplayedDayAlarms(dk,flights){
       var localDep=getLocalAlarmDepTime(a,flights);
       if(localTime)a.__displayTime=localTime;
       if(localDep)a.__displayDep=localDep;
+      var semanticKey=alarmSemanticKey(a,flights);
+      if(semanticKey&&seen[semanticKey])return;
       rows.push(a);
       if(a.id)seen[a.id]=true;
+      if(semanticKey)seen[semanticKey]=true;
     }
   });
 
@@ -1508,7 +1537,8 @@ function buildDisplayedDayAlarms(dk,flights){
     offs.forEach(function(o){
       if(!flightToggles[f.id][o.id])return;
       var autoId=f.id+'_'+o.id;
-      if(seen[autoId])return;
+      var semanticKey=autoAlarmSemanticKey(f,o);
+      if(seen[autoId]||seen[semanticKey])return;
       var at=new Date(depDt.getTime()-(o.h*60+o.m)*60000);
       rows.push({
         id:autoId,time:at,dep:new Date(depDt),lbl:o.lbl,type:f.type,armed:true,
@@ -1516,6 +1546,7 @@ function buildDisplayedDayAlarms(dk,flights){
         arrApt:f.arrApt,arrTime:f.arrTime,__displayOnly:true
       });
       seen[autoId]=true;
+      seen[semanticKey]=true;
     });
   });
   return rows;
@@ -2101,6 +2132,7 @@ function autoRegisterAll(){
   syncAllPresets();
   var added=0;
   var validAutoAlarmIds = {};
+  var validAutoAlarmKeys = {};
 
   detectedFlights.forEach(function(f){
     var depDt=parseFlightDate(f);
@@ -2115,15 +2147,20 @@ function autoRegisterAll(){
       var at=new Date(depDt.getTime()-(o.h*60+o.m)*60000);
       
       var autoId = f.id + '_' + o.id;
+      var semanticKey = autoAlarmSemanticKey(f,o);
       validAutoAlarmIds[autoId] = true;
+      validAutoAlarmKeys[semanticKey] = true;
 
-      var existing = alms.find(function(a){ return a.id === autoId; });
+      var existing = alms.find(function(a){
+        return a.id === autoId || alarmSemanticKey(a,[f]) === semanticKey;
+      });
       if(existing) {
           if (existing.time.getTime() !== at.getTime()) {
               existing.time = at;
               existing.dism = false;
               existing.missed = false;
           }
+          existing.id = autoId;
           existing.dep = new Date(depDt);
           existing.lbl = o.lbl;
           existing.type = f.type;
@@ -2142,12 +2179,36 @@ function autoRegisterAll(){
   
   alms = alms.filter(function(a) {
       if (a.type === 'direct') return true;
-      return validAutoAlarmIds[a.id];
+      return validAutoAlarmIds[a.id] || validAutoAlarmKeys[alarmSemanticKey(a)];
+  });
+
+  var uniqueAutoKeys = {};
+  alms = alms.filter(function(a){
+      if(a.type === 'direct') return true;
+      var k = alarmSemanticKey(a);
+      if(!k) return true;
+      if(uniqueAutoKeys[k]) return false;
+      uniqueAutoKeys[k] = true;
+      return true;
   });
 
   alms.sort(function(a,b){return a.time-b.time;});
   saveAlarms();scheduleNotificationsViaSW();acquireWakeLock();
   return added;
+}
+
+function dedupeAutoAlarms(){
+  var seen={};
+  alms=alms.filter(function(a){
+    if(a.time&&!(a.time instanceof Date))a.time=new Date(a.time);
+    if(a.dep&&!(a.dep instanceof Date))a.dep=new Date(a.dep);
+    if(a.type==='direct')return true;
+    var k=alarmSemanticKey(a);
+    if(!k)return true;
+    if(seen[k])return false;
+    seen[k]=true;
+    return true;
+  });
 }
 
 
@@ -2791,6 +2852,9 @@ function syncAlarmsFromDB(jsonString) {
         fnum: a.fnum, depApt: a.depApt, arrApt: a.arrApt, arrTime: a.arrTime
       };
     });
+    var beforeDedupe = alms.length;
+    dedupeAutoAlarms();
+    if(alms.length !== beforeDedupe) saveAlarms();
 
 
     renderDirectAlarms();
