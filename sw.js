@@ -1,5 +1,5 @@
 const CACHE_NAME = 'crewclock-offline-v1';
-const APP_SHELL = ['./', './index.html', './manifest.webmanifest'];
+const APP_SHELL = ['./', './index.html', './manifest.webmanifest', './app_icon.png'];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
