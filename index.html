@@ -45,11 +45,12 @@ body.dark{
 html{height:auto;min-height:100%;overflow-x:hidden;overflow-y:visible;}
 body{min-height:100dvh;overflow-x:hidden;overflow-y:visible;-webkit-overflow-scrolling:touch;}
 body{background:var(--bg);color:var(--tx);font-family:'Inter',sans-serif;font-size:14px;
-  padding-bottom:calc(112px + env(safe-area-inset-bottom)) !important;overscroll-behavior-y:auto;
+  padding-top:106px;
+  padding-bottom:calc(80px + env(safe-area-inset-bottom)) !important;overscroll-behavior-y:auto;
 }
 
 
-.top-nav{position:sticky;top:0;z-index:50;
+.top-nav{position:fixed;top:0;left:0;right:0;z-index:50;
   background:var(--nav-bg,var(--white));
   border-bottom:1px solid var(--bdr);
   display:flex;align-items:center;justify-content:center;
@@ -72,7 +73,7 @@ body{background:var(--bg);color:var(--tx);font-family:'Inter',sans-serif;font-si
 .nav-bell .badge.show{display:block}
 
 
-.page-tabs{display:flex;background:var(--nav-bg,var(--white));border-bottom:1px solid var(--bdr);
+.page-tabs{position:fixed;top:62px;left:0;right:0;z-index:49;display:flex;background:var(--nav-bg,var(--white));border-bottom:1px solid var(--bdr);
   -ms-overflow-style:none;scrollbar-width:none}
 .page-tabs::-webkit-scrollbar{display:none}
 .ptab{flex:1;padding:11px 8px;border:none;background:transparent;
@@ -81,7 +82,7 @@ body{background:var(--bg);color:var(--tx);font-family:'Inter',sans-serif;font-si
 .ptab.active{color:var(--blue);border-bottom-color:var(--blue);font-weight:600}
 
 
-.panel{display:none;min-height:calc(100dvh - 94px);overflow:visible;padding-bottom:calc(120px + env(safe-area-inset-bottom));}.panel.show{display:block}
+.panel{display:none;overflow:visible;}.panel.show{display:block}
 .sec{padding:14px 14px 0}
 
 
@@ -508,7 +509,7 @@ body.dark .dl-inp[type=date]{color-scheme:dark}
     <div class="day-flights" id="dayFlights"></div>
     <div id="dayAlarms" style="display:none;"></div>
   </div>  
-  <div class="sec" style="padding-top:14px; padding-bottom:80px;">
+  <div class="sec" style="padding-top:14px; padding-bottom:20px;">
     <div id="homeFlightList"></div>
   </div>
 </div>
@@ -2372,29 +2373,43 @@ function checkAlarms(){
   alms.forEach(function(a){
     if(!(a.time instanceof Date)) a.time=new Date(a.time);
     if(a.dep&&!(a.dep instanceof Date)) a.dep=new Date(a.dep);
-    if(a.dism||a.ring||a.missed)return;
-    var diff=now-a.time;
-    if(diff>=0&&diff<300000){
-        a.ring=true;
-        needRender=true;
+    if(a.dism||a.missed) return;
+
+    var diff = now - a.time;
+    if(diff < 0) return;
+
+    // ringState: 'idle' → 'ring1' → 'pause' → 'ring2' → 'done'
+    if(!a.ringState) a.ringState = 'idle';
+
+    if(diff < 300000) {                   // 0~5분: 1단계 울림
+      if(a.ringState !== 'ring1') {
+        a.ringState = 'ring1';
+        a.ring = true;
+        needRender = true;
         trigAlarm(a);
-    } else if (diff >= 300000) {
-        a.missed=true;
-        a.dism=true;
-        needRender=true;
-    }
-  });
-  
-  alms.forEach(function(a){
-    if(a.ring&&(now-a.time)>=300000){
-      a.ring=false;
-      a.missed=true; 
-      a.dism=true;
-      needRender=true;
-      if(!alms.some(function(x){return x.ring;})){
-        stopSnd();document.getElementById('ro').classList.remove('show');
-        stopNativeRingingAlarm(false);
-        releaseWakeLock();
+      }
+    } else if(diff < 360000) {            // 5~6분: 자동 스누즈 (묵음)
+      if(a.ringState !== 'pause') {
+        a.ringState = 'pause';
+        a.ring = false;
+        needRender = true;
+        checkAndStopGlobalAlarm();
+      }
+    } else if(diff < 420000) {            // 6~7분: 2단계 최종 울림
+      if(a.ringState !== 'ring2') {
+        a.ringState = 'ring2';
+        a.ring = true;
+        needRender = true;
+        trigAlarm(a);
+      }
+    } else {                              // 7분 경과: Missed 처리 후 종료
+      if(a.ringState !== 'done') {
+        a.ringState = 'done';
+        a.ring = false;
+        a.missed = true;
+        a.dism = true;
+        needRender = true;
+        checkAndStopGlobalAlarm();
       }
     }
   });
@@ -2413,6 +2428,18 @@ function checkAlarms(){
   });
   
   if(alms.length!==bl){saveAlarms();renderDirectAlarms();}
+}
+
+function checkAndStopGlobalAlarm() {
+  if(!alms.some(function(x){return x.ring;})){
+    stopSnd();
+    var ro = document.getElementById('ro');
+    if(ro) ro.classList.add('hide-ro'); // 임시로 숨기거나 바로 제거
+    // 실제로는 show 클래스를 제거하여 숨김
+    if(ro) ro.classList.remove('show');
+    stopNativeRingingAlarm(false);
+    releaseWakeLock();
+  }
 }
 
 function trigAlarm(a){
@@ -2458,6 +2485,7 @@ function snoozeOv(minutes){
       a.ring=false;
       a.dism=false;
       a.missed=false;
+      a.ringState='idle';
       changed=true;
     }
   });
