@@ -1,0 +1,41 @@
+name: crewclock
+description: "Offline flight schedules and departure reminders for airline crew."
+publish_to: 'none'
+
+version: 1.0.4+6
+
+environment:
+  sdk: ">=3.0.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+
+  cupertino_icons: ^1.0.8
+  webview_flutter: ^4.7.0
+  webview_flutter_android: ^4.12.0
+  sqflite: ^2.3.0
+  path: ^1.9.0
+  flutter_local_notifications: ^17.2.2
+  timezone: ^0.9.4
+  file_picker: ^8.1.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+  flutter_launcher_icons: ^0.14.4
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/html/index.html
+    - assets/html/sw.js
+    - assets/html/manifest.webmanifest
+    - assets/html/app_icon.png
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/icon/app_icon.png"
