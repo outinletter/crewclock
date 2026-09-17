@@ -78,3 +78,20 @@ test('recurring flight events fail clearly instead of importing only one occurre
   const { ctx } = app();
   assert.throws(() => ctx.parseICS('BEGIN:VEVENT\nDTSTART:20300715T090000Z\nSUMMARY:BA1 LHR-JFK\nRRULE:FREQ=DAILY;COUNT=3\nEND:VEVENT'), /Recurring flight events/);
 });
+
+test('manual pasted iPhone schedule text parses dates, arrows, and airline codes', () => {
+  const { ctx } = app();
+  const els = new Map([
+    ['manualFlightInput', { value: 'Mon 03 Jun 2025  KE913  ICN → MAD  09:55–17:45' }],
+    ['manualMonth', { value: '2025-06' }],
+  ]);
+  ctx.document.getElementById = id => els.get(id) || { value: '', classList: { add(){}, remove(){} }, style:{} };
+  ctx.replaceMonthFlights = flights => { ctx.__flights = flights; return flights.length; };
+  ctx.initFlightToggles = ctx.autoRegisterAll = ctx.saveFlights = ctx.renderHomeFlightList = ctx.renderSheetFalWrap = ctx.renderCal = ctx.renderDaySchedule = () => {};
+  ctx.parseManualEntry();
+  assert.equal(ctx.__flights.length, 1);
+  assert.equal(ctx.__flights[0].flight, 'KE913');
+  assert.equal(ctx.__flights[0].date, '2025-06-03');
+  assert.equal(ctx.__flights[0].depApt, 'ICN');
+  assert.equal(ctx.__flights[0].arrApt, 'MAD');
+});
