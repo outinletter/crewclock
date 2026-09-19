@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, target-densitydpi=device-dpi, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="theme-color" content="#3b82c4">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -291,6 +291,15 @@ body{background:var(--bg);color:var(--tx);font-family:'Inter',sans-serif;font-si
 .sheet-handle{width:36px;height:4px;background:var(--bdr2);border-radius:2px;margin:12px auto 16px}
 .sheet-title{font-size:15px;font-weight:700;color:var(--tx);padding:0 20px 12px;border-bottom:1px solid var(--bdr)}
 .sheet-body{padding:16px 20px}
+.import-view[hidden],#importBack[hidden]{display:none!important}
+.import-choice{display:flex;align-items:center;gap:14px;width:100%;padding:18px;margin-bottom:12px;border:1.5px solid var(--bdr);border-radius:14px;background:var(--bg);color:var(--tx);text-align:left;cursor:pointer;font:inherit}
+.import-choice strong{display:block;font-size:15px;margin-bottom:5px}
+.import-choice small{display:block;font-size:12px;line-height:1.5;color:var(--tx2)}
+.import-badge{display:grid;place-items:center;flex-shrink:0;width:48px;height:48px;border-radius:12px;background:var(--blue-light);color:var(--blue);font-size:15px;font-weight:700}
+.import-copy{font-size:13px;line-height:1.65;color:var(--tx2);margin:0 0 16px}
+.import-label{display:block;font-size:13px;font-weight:600;color:var(--tx);margin:16px 0 8px}
+.import-field{box-sizing:border-box;width:100%;padding:12px;border:1.5px solid var(--bdr);border-radius:10px;background:var(--bg);color:var(--tx);font:inherit;font-size:16px;line-height:1.6}
+.import-back{border:0;background:transparent;color:var(--blue);font:inherit;min-height:44px;padding:0;cursor:pointer;margin-bottom:8px}
 
 
 .alarm-card{background:var(--white);border-radius:14px;box-shadow:var(--shadow);overflow:hidden}
@@ -524,10 +533,14 @@ body.dark .dl-inp[type=date]{color-scheme:dark}
       </div>
       <div class="alarm-card-body">
         <div class="dl-row"><label>Label</label>
-          <input type="text" class="dl-inp" id="dLabel" placeholder="e.g. Wake up, Depart airport...">
+          <input type="text" class="dl-inp" id="dLabel" placeholder="e.g. Wake up, Leave for airport">
         </div>
         <div class="dl-row"><label>Date</label>
-          <input type="date" class="dl-inp" id="dDate">
+          <div class="dl-inp" id="dDateDisplay" onclick="openDateSheet()" style="cursor:pointer; display:flex; align-items:center; justify-content:space-between; background:var(--bg); border:1.5px solid var(--bdr); border-radius:9px; padding:10px 12px; font-size:13px; color:var(--tx);">
+            <span id="dDateText">Select Date</span>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity:0.6"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+          </div>
+          <input type="hidden" id="dDate">
         </div>
         <div class="dl-row" style="margin-bottom:0">
           <label>Time</label>
@@ -556,14 +569,17 @@ body.dark .dl-inp[type=date]{color-scheme:dark}
     <div class="settings-section">
       <div class="settings-row"><div style="flex:1">
         <label>Home Base Airport (IATA)</label>
-        <input type="text" class="settings-inp" id="baseAptInput" maxlength="3" placeholder="e.g. ICN">
+        <input type="text" class="settings-inp" id="baseAptInput" maxlength="3" placeholder="e.g. LHR" aria-label="Home base IATA airport code">
+        <label for="domesticAptsInput">Domestic airport codes</label>
+        <input type="text" class="settings-inp" id="domesticAptsInput" placeholder="e.g. LHR, LGW, MAN, EDI">
+        <p style="font-size:12px">Enter airports in your home country, separated by commas. These select your domestic alarm presets.</p>
       </div></div>
       <div class="settings-row" style="justify-content:space-between">
         <div>
           <div style="font-size:13px;font-weight:600;color:var(--tx)">Dark Mode</div>
           <div style="font-size:11px;color:var(--tx3);margin-top:2px">Switch to dark background</div>
         </div>
-        <button class="tog" id="darkTogBtn" onclick="toggleDark(this)"></button>
+        <button class="tog" id="darkTogBtn" aria-label="Toggle dark mode" onclick="toggleDark(this)"></button>
       </div>
       <div class="settings-row" style="justify-content:space-between">
         <div>
@@ -604,9 +620,20 @@ body.dark .dl-inp[type=date]{color-scheme:dark}
       <div class="preset-body" id="intlPresets"></div>
     </div>
     
+    <details style="padding:14px;line-height:1.6;font-size:13px">
+      <summary>Alarm and time zone guide</summary>
+      <p>Times use a 24-hour clock. Calendar timestamps with UTC or a time zone retain their scheduled instant when you travel. Manual entries and calendar times without a time zone use your device time zone. Check imported dates and times before enabling alarms.</p>
+      <p id="platformAlarmGuide">Background alerts require notification permission. Check your device notification and sound settings.</p>
+      <p>Set your home base and domestic airport codes before importing a schedule. Review the departure reminder offsets for each flight.</p>
+    </details>
+    <details style="padding:14px;line-height:1.6;font-size:13px">
+      <summary>Privacy and stored data</summary>
+      <p>CrewClock stores imported schedules, alarm labels, and settings on this device. Calendar files are read to import flight events. The app does not require an account.</p>
+      <p>Use Delete All Flights and Alarms to remove schedule and alarm data. Preferences remain saved. System backups may retain app data according to your device settings. Alarm labels and routes may appear on your lock screen; control previews in system notification settings.</p>
+    </details>
     <button class="btn-az" style="margin-top:15px;" onclick="saveSettingsUI()">Save Settings</button>
     <button onclick="clearAllData()" style="width:100%;padding:11px;background:transparent;border:1.5px solid var(--red);border-radius:10px;color:var(--red);font-size:13px;font-weight:600;cursor:pointer;margin-top:8px;font-family:Inter,sans-serif">
-      Clear All Saved Data
+      Delete All Flights and Alarms
     </button>
   </div>
 </div>
@@ -621,7 +648,7 @@ body.dark .dl-inp[type=date]{color-scheme:dark}
 <div class="sheet" id="uploadSheet">
   <div class="sheet-handle"></div>
   <div class="sheet-title" style="display:flex;align-items:center;justify-content:space-between">
-    <span>Import Schedule</span>
+    <span id="importTitle">Import Schedule</span>
     <button onclick="closeUploadSheet()" style="background:var(--blue-light);border:none;border-radius:8px;padding:5px 12px;font-size:12px;font-weight:600;color:var(--blue);cursor:pointer;font-family:Inter,sans-serif">Done</button>
   </div>
   <div class="sheet-body">
@@ -629,18 +656,30 @@ body.dark .dl-inp[type=date]{color-scheme:dark}
     <input type="file" accept=".ics,.ical,text/calendar" id="icsIn" onchange="handleICS(event)" style="display:none">
     
     
-    <div style="display:flex; gap:10px; margin-bottom: 12px;">
-      <button onclick="document.getElementById('icsIn').click()" class="btn-az" style="flex:1; margin-top:0;">Upload ICS File</button>
-      <button onclick="showManualEntryFallback()" class="btn-az btn-outline" style="flex:1; margin-top:0;">Manual Text</button>
+    <button id="importBack" class="import-back" onclick="resetImportMode()" hidden>&larr; Import methods</button>
+    <div id="importModeChooser" class="import-view">
+      <p class="import-copy">How would you like to add your schedule?</p>
+      <button onclick="openICSImport()" class="import-choice"><span class="import-badge" aria-hidden="true">.ics</span><span><strong>Import calendar file</strong><small>Select an .ics or .ical file from Files.</small></span></button>
+      <button onclick="showManualEntryFallback()" class="import-choice"><span class="import-badge" aria-hidden="true">Aa</span><span><strong>Paste schedule text</strong><small>Paste text copied from a schedule image or document.</small></span></button>
+      <p class="import-copy">Both methods work offline on this device.</p>
     </div>
-
-    <div style="padding:10px 14px;background:var(--blue-light);border-radius:10px;font-size:11px;color:var(--tx2);line-height:1.6">
-      <strong style="color:var(--blue);display:block;margin-bottom:2px">Offline - No internet required</strong>
-      RESERVE, OFF, STANDBY, DO entries are automatically excluded from ICS.
-    </div>
-    
-    <div id="icsResultWrap" style="margin-top:10px"></div>
-    <div id="sheetFalWrap"></div>
+    <section id="icsImportView" class="import-view" hidden aria-label="Import ICS file">
+      <p class="import-copy">Select a calendar file exported from your roster or calendar app.</p>
+      <button onclick="chooseICSFile()" class="btn-az">Choose ICS file</button>
+      <p class="import-copy" style="margin-top:12px">Accepted formats: .ics, .ical<br>RESERVE, OFF, STANDBY and DO entries are excluded.</p>
+      <div id="icsResultWrap" role="status" aria-live="polite"></div>
+      <div id="sheetFalWrap"></div>
+    </section>
+    <section id="textImportView" class="import-view" hidden aria-label="Paste schedule text">
+      <p class="import-copy">On iPhone, open your schedule image in Photos, select its text using Live Text, then copy it. Touch and hold the field below and choose Paste.</p>
+      <label class="import-label" for="manualFlightInput">Schedule text</label>
+      <textarea id="manualFlightInput" class="import-field" rows="6" spellcheck="false" placeholder="03 KE913 ICN 09:55 MAD 17:45&#10;05 KE914 MAD 20:00 ICN 15:46"></textarea>
+      <p class="import-copy">Paste the recognized text, rather than the image itself. Check that each flight is on its own line with a day, flight number, airports and times.</p>
+      <label class="import-label" for="manualMonth">Schedule month and year</label>
+      <input type="month" id="manualMonth" class="import-field">
+      <p class="import-copy" style="margin-top:8px">Used when the text does not include a month or year. Times use your device time zone.</p>
+      <button class="btn-az" onclick="parseManualEntry()">Import text &amp; register alarms</button>
+    </section>
   </div>
 </div>
 
@@ -670,13 +709,36 @@ body.dark .dl-inp[type=date]{color-scheme:dark}
   <div class="pb-ico">Flight</div>
   <div class="pb-body">
     <div class="pb-title">Add to Home Screen</div>
-    <div class="pb-sub">Install for reliable background alarms</div>
+    <div class="pb-sub">Add quick access to your schedule</div>
   </div>
   <button class="pb-btn" id="pwaInstallBtn" onclick="installPWA()">Install</button>
   <button class="pb-close" onclick="dismissPWA()">&#x2715;</button>
 </div>
 
-<div class="toast" id="toast"></div>
+<div class="sheet-overlay" id="dateSheetOverlay" onclick="closeDateSheet()"></div>
+<div class="sheet" id="dateSheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-title">Select Date</div>
+  <div class="sheet-body">
+    <div class="drum-row">
+      <div class="drum-col">
+        <div class="dc-label">YR</div>
+        <div class="drum" id="drumY"><div class="drum-line"></div><div class="drum-inner" id="drumY-inner"></div></div>
+      </div>
+      <div class="drum-col">
+        <div class="dc-label">MO</div>
+        <div class="drum" id="drumMo"><div class="drum-line"></div><div class="drum-inner" id="drumMo-inner"></div></div>
+      </div>
+      <div class="drum-col">
+        <div class="dc-label">DY</div>
+        <div class="drum" id="drumD"><div class="drum-line"></div><div class="drum-inner" id="drumD-inner"></div></div>
+      </div>
+    </div>
+    <button class="btn-az" onclick="confirmDate()" style="margin-top:20px">Confirm Date</button>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <script>
 
@@ -689,6 +751,7 @@ var keepAliveAudio = null;
 var silentWav = "data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA";
 
 function startKeepAlive(){
+  if(window.crewclock)return;
   if(keepAliveAudio) return;
   try {
     getACtx();
@@ -726,7 +789,7 @@ function acquireWakeLock(){
     wakeLock=wl;
     wl.addEventListener('release',function(){
       wakeLock=null;
-      if(alms.some(function(a){return !a.dism&&a.armed;})){
+      if(alms.some(function(a){return a.ring;})){
         setTimeout(acquireWakeLock,2000);
       }
     });
@@ -739,7 +802,7 @@ function releaseWakeLock(){
 
 document.addEventListener('visibilitychange',function(){
   if(document.visibilityState==='visible'){
-    if(alms.some(function(a){return !a.dism&&a.armed;}))acquireWakeLock();
+    if(alms.some(function(a){return a.ring;}))acquireWakeLock();
   }
 });
 
@@ -880,6 +943,7 @@ var baseApt='ICN',baseOffs=[],domOffs=[],intlOffs=[],baseOn={},domOn={},intlOn={
 var alms=[],detectedFlights=[],flightToggles={},openFlights={},registeredFlights={};
 var aCtx=null,oscs=[];
 var _now=new Date(),drumH_val=_now.getHours(),drumM_val=_now.getMinutes();
+var drumY_val=_now.getFullYear()-2025,drumMo_val=_now.getMonth(),drumD_val=_now.getDate()-1;
 var calYear,calMonth,calSelDate;
 var ITEM_H=26;
 
@@ -1003,7 +1067,13 @@ function dc(o){return JSON.parse(JSON.stringify(o));}
 function escQ(s){return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');}
 function todayStr(){var n=new Date();return n.getFullYear()+'-'+p2(n.getMonth()+1)+'-'+p2(n.getDate());}
 function buildDate(ds,h,m){if(ds){var dp=ds.split('-');return new Date(+dp[0],+dp[1]-1,+dp[2],h,m,0,0);}var d=new Date();d.setHours(h,m,0,0);return d;}
-function parseFlightDate(f){if(!f.date)return new Date(9999,0,1);var dp=f.date.split('-');var tp=(f.depTime||'00:00').split(':');return new Date(+dp[0],+dp[1]-1,+dp[2],+tp[0],+tp[1],0,0);}
+function parseFlightDate(f){if(f.departureUtc)return new Date(f.departureUtc);if(!f.date)return new Date(9999,0,1);var dp=f.date.split('-');var tp=(f.depTime||'00:00').split(':');return new Date(+dp[0],+dp[1]-1,+dp[2],+tp[0],+tp[1],0,0);}
+
+function refreshFlightLocalTimes(f){
+  function dateText(d){return d.getFullYear()+'-'+p2(d.getMonth()+1)+'-'+p2(d.getDate());}
+  if(f.departureUtc){var dep=new Date(f.departureUtc);f.date=dateText(dep);f.depTime=fmt(dep);}
+  if(f.arrivalUtc){var arr=new Date(f.arrivalUtc);f.arrDate=dateText(arr);f.arrTime=fmt(arr);}
+}
 
 
 function loadSettings(){
@@ -1012,6 +1082,7 @@ function loadSettings(){
     if(s){
       var d=JSON.parse(s);
       baseApt=(d.baseApt||'ICN').toUpperCase();
+      if(Array.isArray(d.domesticAirports)) KR_DOM=d.domesticAirports;
       baseOffs=d.baseOffs||dc(DEF_BASE);
       domOffs=d.domOffs||dc(DEF_DOM);
       intlOffs=d.intlOffs||dc(DEF_INTL);
@@ -1028,7 +1099,7 @@ function saveSettings(){
   try{
     syncAllPresets();
     localStorage.setItem('crewclock_v5',JSON.stringify({
-      baseApt:baseApt,baseOffs:baseOffs,domOffs:domOffs,intlOffs:intlOffs,
+      domesticAirports:KR_DOM,baseApt:baseApt,baseOffs:baseOffs,domOffs:domOffs,intlOffs:intlOffs,
       baseOn:baseOn,domOn:domOn,intlOn:intlOn
     }));
   }catch(e){}
@@ -1051,6 +1122,7 @@ function loadFlights(){
         var parsed = JSON.parse(f);
         detectedFlights = parsed;
         detectedFlights.forEach(function(fl){
+            refreshFlightLocalTimes(fl);
             if (!fl.arrDate) fl.arrDate = fl.date;
         });
     }
@@ -1103,12 +1175,13 @@ function init(){
   var now=new Date();calYear=now.getFullYear();calMonth=now.getMonth();calSelDate=todayStr();
   document.getElementById('dDate').value=todayStr();
   document.getElementById('baseAptInput').value=baseApt;
+  document.getElementById('domesticAptsInput').value=KR_DOM.join(', ');
   var dark=localStorage.getItem('crewclock_dark')==='1';
   if(dark){document.body.classList.add('dark');var b=document.getElementById('darkTogBtn');if(b)b.classList.add('on');}
   
   loadFlights();
   loadAlarms();
-  if(detectedFlights.length){
+  if(detectedFlights.length && !window.crewclock){
     initFlightToggles();
     autoRegisterAll();
   }
@@ -1127,7 +1200,7 @@ function switchTab(name,btn){
   var settingsPanel = document.getElementById('panel-settings');
   if (settingsPanel && settingsPanel.classList.contains('show') && name !== 'settings') {
       var v=(document.getElementById('baseAptInput').value||'').trim().toUpperCase().slice(0,3);
-      if(v.length >= 2) baseApt=v;
+      if(/^[A-Z]{3}$/.test(v)) baseApt=v;
       syncAllPresets();
       baseOffs.sort(function(a,b){return (b.h*60+b.m)-(a.h*60+a.m);});
       domOffs.sort(function(a,b){return (b.h*60+b.m)-(a.h*60+a.m);});
@@ -1152,6 +1225,7 @@ function switchTab(name,btn){
   
   if(name==='settings'){
       document.getElementById('baseAptInput').value=baseApt;
+  document.getElementById('domesticAptsInput').value=KR_DOM.join(', ');
       renderBasePresets();
       renderDomPresets();
       renderIntlPresets();
@@ -1172,20 +1246,47 @@ function switchTab(name,btn){
       if(detectedFlights.length) renderHomeFlightList();
   }
   if(name==='alarm'){
-      var _n=new Date();setDrum('drumH',_n.getHours(),true);setDrum('drumM',_n.getMinutes(),true);
+      var _n=new Date();
+      setDrum('drumH',_n.getHours(),true);
+      setDrum('drumM',_n.getMinutes(),true);
+      setDrum('drumY',_n.getFullYear()-2025,true);
+      setDrum('drumMo',_n.getMonth(),true);
+      setDrum('drumD',_n.getDate()-1,true);
+      updateDateDisplay();
       renderDirectAlarms();
   }
 }
 
 
 function openUploadSheet(){
+  resetImportMode();
   document.getElementById('sheetOverlay').classList.add('show');
   document.getElementById('uploadSheet').classList.add('open');
+}
+function openICSImport(){
+  setImportMode('ics');
+}
+function chooseICSFile(){
+  var input=document.getElementById('icsIn');
+  input.value='';
+  input.click();
+}
+function setImportMode(mode){
+  document.getElementById('importModeChooser').hidden=mode!=='choose';
+  document.getElementById('icsImportView').hidden=mode!=='ics';
+  document.getElementById('textImportView').hidden=mode!=='text';
+  document.getElementById('importBack').hidden=mode==='choose';
+  var title=document.getElementById('importTitle');
+  title.textContent=mode==='ics'?'Import ICS File':mode==='text'?'Paste Schedule Text':'Import Schedule';
+  title.tabIndex=-1;
+  title.focus({preventScroll:true});
+  document.getElementById('uploadSheet').scrollTop=0;
 }
 function closeUploadSheet(){
   document.getElementById('sheetOverlay').classList.remove('show');
   document.getElementById('uploadSheet').classList.remove('open');
   if(detectedFlights.length) switchTab('calendar',null);
+  resetImportMode();
 }
 
 
@@ -1237,41 +1338,44 @@ function replaceMonthFlights(newFlights) {
 
 
 function showManualEntryFallback(){
-  var wrap=document.getElementById('sheetFalWrap');
-  if(!wrap)return;
-  wrap.innerHTML='<div style="margin-top:14px;background:var(--white);border-radius:12px;padding:16px;box-shadow:var(--shadow)">'
-    +'<div style="font-size:12px;font-weight:700;color:var(--tx);margin-bottom:10px">Manual Flight Entry</div>'
-    +'<div style="font-size:11px;color:var(--tx2);margin-bottom:12px;line-height:1.5">'
-    +'Enter one flight per line:<br>'
-    +'<code style="font-size:10px;background:var(--bg);padding:2px 6px;border-radius:4px">KE913 ICN 09:55 MAD 17:45</code>'
-    +'</div>'
-    +'<textarea id="manualFlightInput" rows="6" style="width:100%;padding:10px;border:1.5px solid var(--bdr);border-radius:9px;font-family:Share Tech Mono,monospace;font-size:12px;background:var(--bg);color:var(--tx);resize:vertical;outline:none;line-height:1.8" placeholder="03 KE913 ICN 09:55 MAD 17:45&#10;05 KE914 MAD 20:00 ICN 15:46"></textarea>'
-    +'<div style="margin-bottom:8px; margin-top:8px"><label style="font-size:11px;color:var(--tx2);font-weight:600">Month &amp; Year</label>'
-    +'<input type="month" id="manualMonth" style="width:100%;margin-top:4px;padding:9px 10px;border:1.5px solid var(--bdr);border-radius:9px;background:var(--bg);color:var(--tx);font-size:13px;outline:none;color-scheme:light dark"></div>'
-    +'<button class="btn-az" onclick="parseManualEntry()" style="margin-top:10px">Parse Flights</button>'
-    +'</div>';
-    
+  setImportMode('text');
   var dt = new Date();
-  document.getElementById('manualMonth').value = dt.getFullYear() + "-" + p2(dt.getMonth() + 1);
+  if(!document.getElementById('manualMonth').value)
+    document.getElementById('manualMonth').value = dt.getFullYear() + "-" + p2(dt.getMonth() + 1);
+}
+function resetImportMode(){
+  setImportMode('choose');
+  var rw=document.getElementById('icsResultWrap');if(rw)rw.innerHTML='';
+  var wrap=document.getElementById('sheetFalWrap');if(wrap)wrap.innerHTML='';
 }
 
 function parseManualEntry(){
   var raw=document.getElementById('manualFlightInput').value||'';
+  raw=raw.replace(/[‐‑‒–—−]/g,'-').replace(/[→➝➞➔]/g,'-').replace(/[·•]/g,' ').replace(/\u00a0/g,' ');
   var mo=document.getElementById('manualMonth').value||'';
   var yr,mIdx;
   if(mo){var mp=mo.split('-');yr=+mp[0];mIdx=+mp[1]-1;}
   else{var n=new Date();yr=n.getFullYear();mIdx=n.getMonth();}
 
   var flights=[];var seen={};
-  raw.split('\n').forEach(function(line){
-    line=line.trim();if(!line)return;
+  raw.split(/\r?\n/).forEach(function(line){
+    line=line.replace(/\s+/g,' ').trim();if(!line)return;
     
-    var datePrefix=line.match(/^(\d{1,2})\s+/);
-    var dayNum=datePrefix?parseInt(datePrefix[1]):null;
+    var datePrefix=line.match(/\b(\d{1,2})(?:st|nd|rd|th)?[ ./-]+(?:([A-Za-z]{3,9})[ ./-]+)?(20\d{2})?\b|\b([A-Za-z]{3,9})[ ./-]+(\d{1,2})(?:st|nd|rd|th)?(?:[ ./-]+(20\d{2}))?\b/i);
+    var months={jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11};
+    var dayNum=datePrefix ? parseInt(datePrefix[1]||datePrefix[5],10) : null;
+    if(datePrefix && datePrefix[4]) mIdx=months[datePrefix[4].slice(0,3).toLowerCase()] ?? mIdx;
+    if(datePrefix && (datePrefix[3]||datePrefix[6])) yr=parseInt(datePrefix[3]||datePrefix[6],10);
     var d=dayNum||1;
     var dateStr=yr+'-'+p2(mIdx+1)+'-'+p2(d);
 
-    var fnumMatch = line.match(/\b([A-Z]{2,3}\s?\d{2,4})\b/i);
+    var fnumCandidates = line.match(/\b([A-Z]{2,3}\s?\d{1,4})\b/gi) || [];
+    var fnumMatch = null;
+    fnumCandidates.some(function(candidate){
+      if(!/^(MON|TUE|WED|THU|FRI|SAT|SUN|JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)\s*\d/i.test(candidate)){fnumMatch={1:candidate};return true;}
+      return false;
+    });
+    if(!fnumMatch)return;
     var times = line.match(/\b\d{1,2}:\d{2}\b/g) || [];
     
 
@@ -1284,20 +1388,18 @@ function parseManualEntry(){
         }
     }
     
-    var apts = line.match(/\b[A-Z]{3}\b/gi) || [];
-    
-    if(!fnumMatch || times.length === 0 || apts.length === 0) return;
-    
     var fnum = fnumMatch[1].replace(/\s/g, '').toUpperCase();
     
+    var apts = line.match(/\b[A-Z]{3}\b/gi) || [];
     apts = apts.map(function(a){return a.toUpperCase();});
-    apts = apts.filter(function(a){ return fnum.indexOf(a) !== 0 && !['DAY','OFF','RES','INT','DOM','ATD','REP','ARR','DEP'].includes(a); });
+    apts = apts.filter(function(a){ return fnum.indexOf(a) !== 0 && !['DAY','OFF','RES','INT','DOM','ATD','REP','ARR','DEP','MON','TUE','WED','THU','FRI','SAT','SUN','JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'].includes(a); });
     
     if(apts.length === 0) return;
     
     var depApt = apts[0];
     var arrApt = apts.length > 1 ? apts[1] : '???';
     
+    if(!times.length)return;
     var depTime = times[0];
     var arrTime = times.length > 1 ? times[1] : '';
 
@@ -1307,7 +1409,7 @@ function parseManualEntry(){
     var safeId = (dateStr+'_'+fnum+'_'+depApt).replace(/[^a-zA-Z0-9_-]/g, '_');
     if(seen[safeId])return;seen[safeId]=true;
     
-    var isDomRoute = KR_DOM.indexOf(depApt) >= 0 && KR_DOM.indexOf(arrApt) >= 0;
+    var isDomRoute = KR_DOM.indexOf(arrApt) >= 0;
     var type = depApt === baseApt ? (isDomRoute ? 'dom' : 'base') : (depApt !== '???' ? 'intl' : 'ics');
     
     var flightObj = {
@@ -1763,25 +1865,27 @@ function parseICS(text){
     else unfolded.push(l);
   });
   unfolded.forEach(function(line){
-    if(line.trim()==='BEGIN:VEVENT'){cur={raw:{}};}
+    if(line.trim()==='BEGIN:VEVENT'){cur={raw:{},zones:{}};}
     else if(line.trim()==='END:VEVENT'&&cur){events.push(cur);cur=null;}
     else if(cur){
       var ci=line.indexOf(':');if(ci<0)return;
       var key=line.slice(0,ci).split(';')[0].trim();
       var val=line.slice(ci+1).trim();
       cur.raw[key]=val;
+      var zone=line.slice(0,ci).match(/TZID=([^;]+)/i);
+      if(zone)cur.zones[key]=zone[1].replace(/^"|"$/g,'');
     }
   });
 
   var parsedFlights=[];
   events.forEach(function(ev){
     var summary=(ev.raw['SUMMARY']||'').trim().toUpperCase();
-    if(['RESERVE','DO','OFF','STANDBY','SICK'].some(function(k){ return summary.includes(k); })) return;
+    if(['RESERVE','DO','OFF','STANDBY','SICK'].some(function(k){ return new RegExp('\\b'+k+'\\b').test(summary); })) return;
     
     var dtstart=ev.raw['DTSTART']||ev.raw['DTSTART;TZID']||'';
     var dtend=ev.raw['DTEND']||ev.raw['DTEND;TZID']||'';
-    var dt=parseICSDate(dtstart);
-    var dte=parseICSDate(dtend);
+    var dt=parseICSDate(dtstart,ev.zones.DTSTART);
+    var dte=parseICSDate(dtend,ev.zones.DTEND);
     if(!dt) return;
     var dateStr=dt.getFullYear()+'-'+p2(dt.getMonth()+1)+'-'+p2(dt.getDate());
     
@@ -1795,9 +1899,10 @@ function parseICS(text){
         }
     }
 
-    var fnumMatch = summary.match(/\b([A-Z]{2,3}\s?\d{2,4})\b/);
+    var fnumMatch = summary.match(/\b([A-Z0-9]{2,3}\s?\d{1,4})\b/);
     if(!fnumMatch) return; 
     var fnum = fnumMatch[1].replace(/\s/g, '');
+    if(ev.raw.RRULE || ev.raw.RDATE)throw new Error('Recurring flight events are not supported. Export individual flight legs.');
     
     var times = summary.match(/\b\d{1,2}:\d{2}\b/g) || [];
     
@@ -1849,10 +1954,12 @@ function parseICS(text){
 
     if (!depTime || depTime === '') depTime = dtTime || '00:00';
     
-    if (!arrTime && dte && (dte.getHours() > 0 || dte.getMinutes() > 0)) {
+    if (!arrTime && dte) {
         arrTime = p2(dte.getHours()) + ':' + p2(dte.getMinutes());
     }
 
+    if(dtstart.includes('T')) depTime=fmt(dt);
+    if(dte && dtend.includes('T')){arrTime=fmt(dte);arrDateStr=dte.getFullYear()+'-'+p2(dte.getMonth()+1)+'-'+p2(dte.getDate());isEndParsed=true;}
     if (depTime) depTime = p2(parseInt(depTime.split(':')[0])) + ':' + p2(parseInt(depTime.split(':')[1]));
     if (arrTime) arrTime = p2(parseInt(arrTime.split(':')[0])) + ':' + p2(parseInt(arrTime.split(':')[1]));
 
@@ -1864,7 +1971,7 @@ function parseICS(text){
     var depApt = apts.length > 0 ? apts[0] : '???';
     var arrApt = apts.length > 1 ? apts[1] : '???';
 
-    var isDomRoute = KR_DOM.indexOf(depApt) >= 0 && KR_DOM.indexOf(arrApt) >= 0;
+    var isDomRoute = KR_DOM.indexOf(arrApt) >= 0;
     var type = depApt === baseApt ? (isDomRoute ? 'dom' : 'base') : (depApt !== '???' ? 'intl' : 'ics');
     
     var safeId = (dateStr+'_'+(fnum||summary.slice(0,10))+'_'+(depApt||'???')+'_'+depTime).replace(/[^a-zA-Z0-9_-]/g, '_');
@@ -1872,7 +1979,9 @@ function parseICS(text){
     parsedFlights.push({
         id: safeId, date: dateStr, arrDate: arrDateStr, flight: fnum,
         depApt: depApt, depTime: depTime, arrApt: arrApt, arrTime: arrTime,
-        type: type, summary: summary, isArrivalOnly: (!depTime || depTime==='00:00') && arrTime,
+        departureUtc: dtstart.includes('T') ? dt.toISOString() : null,
+        arrivalUtc: dte && dtend.includes('T') ? dte.toISOString() : null,
+        type: type, summary: summary, isArrivalOnly: !dtstart.includes('T') && (!depTime || depTime==='00:00') && arrTime,
         isEndParsed: isEndParsed
     });
   });
@@ -1904,7 +2013,18 @@ function parseICS(text){
   return finalFlights;
 }
 
-function parseICSDate(s){
+function zonedCalendarDate(y,mo,d,h,mi,se,zone){
+  if(!zone)return new Date(y,mo-1,d,h,mi,se);
+  var formatter=new Intl.DateTimeFormat('en-GB',{timeZone:zone,year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23'});
+  var target=Date.UTC(y,mo-1,d,h,mi,se), value=target;
+  function wall(ms){var p={};formatter.formatToParts(new Date(ms)).forEach(function(t){p[t.type]=t.value;});return Date.UTC(+p.year,+p.month-1,+p.day,+p.hour,+p.minute,+p.second);}
+  for(var i=0;i<4;i++){var delta=target-wall(value);if(!delta)break;value+=delta;}
+  if(wall(value)!==target)throw new Error('Calendar contains a nonexistent local time: '+zone);
+  if(wall(value-3600000)===target||wall(value+3600000)===target)throw new Error('Calendar contains an ambiguous daylight-saving time. Export with UTC timestamps.');
+  return new Date(value);
+}
+
+function parseICSDate(s,zone){
   if(!s)return null;
   s=s.replace(/;[^:]*:/,':').replace(/.*:/,'');
   if(s.includes('T')){
@@ -1913,7 +2033,7 @@ function parseICSDate(s){
       if(m[7] === 'Z') {
          return new Date(Date.UTC(+m[1], +m[2]-1, +m[3], +m[4], +m[5], +m[6]));
       } else {
-         return new Date(+m[1], +m[2]-1, +m[3], +m[4], +m[5], +m[6]);
+         return zonedCalendarDate(+m[1], +m[2], +m[3], +m[4], +m[5], +m[6], zone);
       }
     }
   }else{
@@ -2194,7 +2314,7 @@ function autoRegisterAll(){
   });
 
   alms.sort(function(a,b){return a.time-b.time;});
-  saveAlarms();scheduleNotificationsViaSW();acquireWakeLock();
+  saveAlarms();scheduleNotificationsViaSW();
   return added;
 }
 
@@ -2222,7 +2342,7 @@ function addDirectAlarm(){
   if(alms.find(function(a){return !a.dism&&Math.abs(a.time-at)<2000;})){toast('An alarm already exists at this time','er');return;}
   alms.push({id:uid(),time:at,dep:null,lbl:lbl,type:'direct',armed:true,ring:false,dism:false, missed:false});
   alms.sort(function(a,b){return a.time-b.time;});
-  saveAlarms();scheduleNotificationsViaSW();acquireWakeLock();
+  saveAlarms();scheduleNotificationsViaSW();
   renderDirectAlarms();renderCal();renderDaySchedule(calSelDate);
   toast('"'+lbl+'" '+p2(h)+':'+p2(m),'ok');
   document.getElementById('dLabel').value='';
@@ -2373,6 +2493,10 @@ function checkAlarms(){
   alms.forEach(function(a){
     if(!(a.time instanceof Date)) a.time=new Date(a.time);
     if(a.dep&&!(a.dep instanceof Date)) a.dep=new Date(a.dep);
+    if(a.type!=='direct'){
+      var liveTime=getLocalAlarmDisplayTime(a);
+      if(liveTime && !isNaN(liveTime.getTime())) a.time=liveTime;
+    }
     if(a.dism||a.missed) return;
 
     var diff = now - a.time;
@@ -2508,7 +2632,7 @@ function snoozeOv(minutes){
 
 
 function clearAllData(){
-  if(!confirm('Clear all saved flights and alarms?')) return;
+  if(!confirm('Delete all saved flights and alarms? This cannot be undone.')) return;
   try{
     localStorage.removeItem('crewclock_flights');
     localStorage.removeItem('crewclock_alarms');
@@ -2516,9 +2640,12 @@ function clearAllData(){
     localStorage.removeItem('crewclock_registered');
   }catch(e){}
   detectedFlights=[];alms=[];flightToggles={};openFlights={};registeredFlights={};
+  saveAlarms();
+  stopSnd();stopNativeRingingAlarm(false);releaseWakeLock();
+  document.getElementById('ro').classList.remove('show');
   renderHomeFlightList();renderDirectAlarms();renderCal();renderDaySchedule(calSelDate);
   if(swReg&&swReg.active) swReg.active.postMessage({type:'CANCEL_ALL'});
-  toast('All data cleared','ok');
+  toast('Flights and alarms deleted','ok');
 }
 
 function toggleDark(btn){var d=document.body.classList.toggle('dark');btn.classList.toggle('on',d);localStorage.setItem('crewclock_dark',d?'1':'0');}
@@ -2554,9 +2681,13 @@ function stopAllRingingAlarms(){
 }
 function saveSettingsUI(){
   var v=(document.getElementById('baseAptInput').value||'').trim().toUpperCase().slice(0,3);
-  if(v.length<2){toast('Please enter an airport code','er');return;}
+  if(!/^[A-Z]{3}$/.test(v)){toast('Enter a three-letter IATA airport code','er');return;}
   syncAllPresets();
+  var codes=document.getElementById('domesticAptsInput').value.toUpperCase().split(/[,\s]+/).filter(Boolean);
+  if(codes.some(function(code){return !/^[A-Z]{3}$/.test(code);})){toast('Use three-letter airport codes separated by commas','er');return;}
+  KR_DOM=Array.from(new Set(codes));
   baseApt=v;
+  detectedFlights.forEach(function(f){f.type=f.depApt===baseApt?(KR_DOM.includes(f.arrApt)?'dom':'base'):'intl';});
   
   baseOffs.sort(function(a,b){return (b.h*60+b.m)-(a.h*60+a.m);});
   domOffs.sort(function(a,b){return (b.h*60+b.m)-(a.h*60+a.m);});
@@ -2730,24 +2861,58 @@ function addIntlOff(){
 }
 
 
-function initDrums(){buildDrum('drumH',24,drumH_val);buildDrum('drumM',60,drumM_val);}
+function initDrums(){
+  buildDrum('drumH',24,drumH_val);
+  buildDrum('drumM',60,drumM_val);
+  buildDrum('drumY',10,drumY_val);
+  buildDrum('drumMo',12,drumMo_val);
+  var dim=new Date(drumY_val+2025, drumMo_val+1, 0).getDate();
+  buildDrum('drumD',dim,drumD_val);
+}
 function buildDrum(id,count,initVal){
+  var drum=document.getElementById(id);if(!drum)return;
   var inner=document.getElementById(id+'-inner');var items='';var pad=5;
-  for(var i=-pad;i<count+pad;i++){var v=((i%count)+count)%count;items+='<div class="drum-item" data-v="'+v+'">'+p2(v)+'</div>';}
-  inner.innerHTML=items;setDrum(id,initVal,false);attachDrumEvents(id,count);
+  drum.tabIndex=0;
+  drum.setAttribute('role','spinbutton');
+  drum.setAttribute('aria-label',({drumH:'Hour',drumM:'Minute',drumY:'Year',drumMo:'Month',drumD:'Day'})[id]);
+  drum.setAttribute('aria-valuemin','0');
+  drum.setAttribute('aria-valuemax',String(count-1));
+  drum.dataset.count=count;
+  for(var i=-pad;i<count+pad;i++){
+    var v=((i%count)+count)%count;
+    var txt=p2(v);
+    if(id==='drumY')txt=v+2025;
+    else if(id==='drumMo'||id==='drumD')txt=p2(v+1);
+    items+='<div class="drum-item" data-v="'+v+'">'+txt+'</div>';
+  }
+  inner.innerHTML=items;setDrum(id,initVal,false);
+  if(!drum._evAt) { attachDrumEvents(id); drum._evAt=true; }
 }
 function setDrum(id,val,animate){
+  var drum=document.getElementById(id);if(!drum)return;
   var inner=document.getElementById(id+'-inner');var pad=5;
+  var count=parseInt(drum.dataset.count);
   var y=-(pad+val)*ITEM_H+ITEM_H;
+  drum.setAttribute('aria-valuenow',String(val));
+  drum.setAttribute('aria-valuetext',String(id==='drumY'?val+2025:(id==='drumMo'||id==='drumD'?val+1:val)));
   inner.style.transition=animate?'transform .18s cubic-bezier(.25,.46,.45,.94)':'none';
   inner.style.transform='translateY('+y+'px)';
   inner.querySelectorAll('.drum-item').forEach(function(el){el.classList.toggle('sel',+el.dataset.v===val);});
-  if(id==='drumH')drumH_val=val;else drumM_val=val;
+  if(id==='drumH')drumH_val=val;
+  else if(id==='drumM')drumM_val=val;
+  else if(id==='drumY')drumY_val=val;
+  else if(id==='drumMo')drumMo_val=val;
+  else if(id==='drumD')drumD_val=val;
 }
-function attachDrumEvents(id,count){
+function attachDrumEvents(id){
   var drum=document.getElementById(id);
   var lastY,rafId=0,velocity=0,pixelOffset=0;
-  function getVal(){return id==='drumH'?drumH_val:drumM_val;}
+  function getVal(){
+    if(id==='drumH')return drumH_val;if(id==='drumM')return drumM_val;
+    if(id==='drumY')return drumY_val;if(id==='drumMo')return drumMo_val;
+    if(id==='drumD')return drumD_val;
+    return 0;
+  }
   function applyOffset(){
     var pad=5;var baseY=-(pad+getVal())*ITEM_H+ITEM_H;
     var inner=document.getElementById(id+'-inner');
@@ -2755,7 +2920,9 @@ function attachDrumEvents(id,count){
   }
   function snapToNearest(){
     var steps=Math.round(-pixelOffset/ITEM_H);pixelOffset=0;
+    var count=parseInt(drum.dataset.count);
     setDrum(id,((getVal()+steps)%count+count)%count,true);
+    if(id==='drumY'||id==='drumMo') updateDayDrumCount();
   }
   function momentum(){
     if(Math.abs(velocity)<0.4){snapToNearest();return;}
@@ -2767,18 +2934,70 @@ function attachDrumEvents(id,count){
   function onMove(y){
     if(!drum.dataset.drag)return;
     var dy=lastY-y;velocity=dy;lastY=y;pixelOffset-=dy;
-    while(pixelOffset<=-ITEM_H){pixelOffset+=ITEM_H;var nv=((getVal()+1)%count+count)%count;if(id==='drumH')drumH_val=nv;else drumM_val=nv;document.querySelectorAll('#'+id+'-inner .drum-item').forEach(function(el){el.classList.toggle('sel',+el.dataset.v===nv);});}
-    while(pixelOffset>=ITEM_H){pixelOffset-=ITEM_H;var nv=((getVal()-1)%count+count)%count;if(id==='drumH')drumH_val=nv;else drumM_val=nv;document.querySelectorAll('#'+id+'-inner .drum-item').forEach(function(el){el.classList.toggle('sel',+el.dataset.v===nv);});}
+    var count=parseInt(drum.dataset.count);
+    while(pixelOffset<=-ITEM_H){
+      pixelOffset+=ITEM_H;var nv=((getVal()+1)%count+count)%count;
+      updateDrumValGlobal(id,nv);
+      document.querySelectorAll('#'+id+'-inner .drum-item').forEach(function(el){el.classList.toggle('sel',+el.dataset.v===nv);});
+    }
+    while(pixelOffset>=ITEM_H){
+      pixelOffset-=ITEM_H;var nv=((getVal()-1)%count+count)%count;
+      updateDrumValGlobal(id,nv);
+      document.querySelectorAll('#'+id+'-inner .drum-item').forEach(function(el){el.classList.toggle('sel',+el.dataset.v===nv);});
+    }
     applyOffset();
   }
   function onEnd(){drum.dataset.drag='';rafId=requestAnimationFrame(momentum);}
+  drum.addEventListener('keydown',function(e){
+    if(e.key!=='ArrowUp'&&e.key!=='ArrowDown')return;
+    e.preventDefault();
+    var count=parseInt(drum.dataset.count);
+    setDrum(id,(getVal()+(e.key==='ArrowUp'?1:-1)+count)%count,true);
+    if(id==='drumY'||id==='drumMo')updateDayDrumCount();
+  });
   drum.addEventListener('touchstart',function(e){onStart(e.touches[0].clientY);},{passive:true});
   drum.addEventListener('touchmove',function(e){e.preventDefault();onMove(e.touches[0].clientY);},{passive:false});
   drum.addEventListener('touchend',onEnd);
   drum.addEventListener('mousedown',function(e){onStart(e.clientY);e.preventDefault();});
   document.addEventListener('mousemove',function(e){if(drum.dataset.drag)onMove(e.clientY);});
   document.addEventListener('mouseup',function(){if(drum.dataset.drag)onEnd();});
-  drum.addEventListener('wheel',function(e){e.preventDefault();setDrum(id,((getVal()+(e.deltaY>0?1:-1))%count+count)%count,true);},{passive:false});
+  drum.addEventListener('wheel',function(e){
+    e.preventDefault();var count=parseInt(drum.dataset.count);
+    setDrum(id,((getVal()+(e.deltaY>0?1:-1))%count+count)%count,true);
+    if(id==='drumY'||id==='drumMo') updateDayDrumCount();
+  },{passive:false});
+}
+function updateDrumValGlobal(id,nv){
+  if(id==='drumH')drumH_val=nv;else if(id==='drumM')drumM_val=nv;
+  else if(id==='drumY')drumY_val=nv;else if(id==='drumMo')drumMo_val=nv;else if(id==='drumD')drumD_val=nv;
+}
+function updateDayDrumCount(){
+  var y=drumY_val+2025, m=drumMo_val;
+  var dim=new Date(y, m+1, 0).getDate();
+  var drumD=document.getElementById('drumD');
+  if(parseInt(drumD.dataset.count)!==dim){
+    if(drumD_val>=dim) drumD_val=dim-1;
+    buildDrum('drumD',dim,drumD_val);
+  }
+}
+function openDateSheet(){
+  document.getElementById('dateSheetOverlay').classList.add('show');
+  document.getElementById('dateSheet').classList.add('open');
+  updateDayDrumCount();
+}
+function closeDateSheet(){
+  document.getElementById('dateSheetOverlay').classList.remove('show');
+  document.getElementById('dateSheet').classList.remove('open');
+}
+function confirmDate(){
+  updateDateDisplay();
+  closeDateSheet();
+}
+function updateDateDisplay(){
+  var yr=drumY_val+2025, mo=drumMo_val+1, dy=drumD_val+1;
+  var ds=yr+'-'+p2(mo)+'-'+p2(dy);
+  document.getElementById('dDate').value=ds;
+  document.getElementById('dDateText').textContent=ds;
 }
 
 
@@ -2858,12 +3077,12 @@ function saveAlarms(){
 function syncAlarmsFromDB(jsonString) {
   try {
 
-    if (!jsonString || typeof jsonString !== "string" || jsonString.trim() === "" || jsonString === "null") {
+    if (!jsonString || (!Array.isArray(jsonString) && typeof jsonString !== "string") || (typeof jsonString === "string" && jsonString.trim() === "") || jsonString === "null") {
       console.warn('DB sync payload is empty; using an empty alarm list.');
       jsonString = "[]";
     }
 
-    var parsedData = JSON.parse(jsonString);
+    var parsedData = Array.isArray(jsonString) ? jsonString : JSON.parse(jsonString);
     if (!parsedData || !Array.isArray(parsedData)) return;
 
     alms = parsedData.map(function(a) {
@@ -2880,6 +3099,8 @@ function syncAlarmsFromDB(jsonString) {
         fnum: a.fnum, depApt: a.depApt, arrApt: a.arrApt, arrTime: a.arrTime
       };
     });
+    localStorage.setItem('crewclock_alarms', JSON.stringify(alms));
+    if(detectedFlights.length){detectedFlights.forEach(refreshFlightLocalTimes);initFlightToggles();autoRegisterAll();saveFlights();renderHomeFlightList();}
     var beforeDedupe = alms.length;
     dedupeAutoAlarms();
     if(alms.length !== beforeDedupe) saveAlarms();
