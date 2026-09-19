@@ -291,6 +291,15 @@ body{background:var(--bg);color:var(--tx);font-family:'Inter',sans-serif;font-si
 .sheet-handle{width:36px;height:4px;background:var(--bdr2);border-radius:2px;margin:12px auto 16px}
 .sheet-title{font-size:15px;font-weight:700;color:var(--tx);padding:0 20px 12px;border-bottom:1px solid var(--bdr)}
 .sheet-body{padding:16px 20px}
+.import-view[hidden],#importBack[hidden]{display:none!important}
+.import-choice{display:flex;align-items:center;gap:14px;width:100%;padding:18px;margin-bottom:12px;border:1.5px solid var(--bdr);border-radius:14px;background:var(--bg);color:var(--tx);text-align:left;cursor:pointer;font:inherit}
+.import-choice strong{display:block;font-size:15px;margin-bottom:5px}
+.import-choice small{display:block;font-size:12px;line-height:1.5;color:var(--tx2)}
+.import-badge{display:grid;place-items:center;flex-shrink:0;width:48px;height:48px;border-radius:12px;background:var(--blue-light);color:var(--blue);font-size:15px;font-weight:700}
+.import-copy{font-size:13px;line-height:1.65;color:var(--tx2);margin:0 0 16px}
+.import-label{display:block;font-size:13px;font-weight:600;color:var(--tx);margin:16px 0 8px}
+.import-field{box-sizing:border-box;width:100%;padding:12px;border:1.5px solid var(--bdr);border-radius:10px;background:var(--bg);color:var(--tx);font:inherit;font-size:16px;line-height:1.6}
+.import-back{border:0;background:transparent;color:var(--blue);font:inherit;min-height:44px;padding:0;cursor:pointer;margin-bottom:8px}
 
 
 .alarm-card{background:var(--white);border-radius:14px;box-shadow:var(--shadow);overflow:hidden}
@@ -639,7 +648,7 @@ body.dark .dl-inp[type=date]{color-scheme:dark}
 <div class="sheet" id="uploadSheet">
   <div class="sheet-handle"></div>
   <div class="sheet-title" style="display:flex;align-items:center;justify-content:space-between">
-    <span>Import Schedule</span>
+    <span id="importTitle">Import Schedule</span>
     <button onclick="closeUploadSheet()" style="background:var(--blue-light);border:none;border-radius:8px;padding:5px 12px;font-size:12px;font-weight:600;color:var(--blue);cursor:pointer;font-family:Inter,sans-serif">Done</button>
   </div>
   <div class="sheet-body">
@@ -647,18 +656,30 @@ body.dark .dl-inp[type=date]{color-scheme:dark}
     <input type="file" accept=".ics,.ical,text/calendar" id="icsIn" onchange="handleICS(event)" style="display:none">
     
     
-    <div id="importModeChooser" style="display:flex; gap:10px; margin-bottom:12px">
-      <button onclick="openICSImport()" class="btn-az" style="flex:1;margin-top:0">ICS calendar file</button>
-      <button onclick="showManualEntryFallback()" class="btn-az btn-outline" style="flex:1;margin-top:0">Paste schedule text</button>
+    <button id="importBack" class="import-back" onclick="resetImportMode()" hidden>&larr; Import methods</button>
+    <div id="importModeChooser" class="import-view">
+      <p class="import-copy">How would you like to add your schedule?</p>
+      <button onclick="openICSImport()" class="import-choice"><span class="import-badge" aria-hidden="true">.ics</span><span><strong>Import calendar file</strong><small>Select an .ics or .ical file from Files.</small></span></button>
+      <button onclick="showManualEntryFallback()" class="import-choice"><span class="import-badge" aria-hidden="true">Aa</span><span><strong>Paste schedule text</strong><small>Paste text copied from a schedule image or document.</small></span></button>
+      <p class="import-copy">Both methods work offline on this device.</p>
     </div>
-
-    <div style="padding:10px 14px;background:var(--blue-light);border-radius:10px;font-size:11px;color:var(--tx2);line-height:1.6">
-      <strong style="color:var(--blue);display:block;margin-bottom:2px">Offline - No internet required</strong>
-      RESERVE, OFF, STANDBY, DO entries are automatically excluded from ICS.
-    </div>
-    
-    <div id="icsResultWrap" style="margin-top:10px"></div>
-    <div id="sheetFalWrap"></div>
+    <section id="icsImportView" class="import-view" hidden aria-label="Import ICS file">
+      <p class="import-copy">Select a calendar file exported from your roster or calendar app.</p>
+      <button onclick="chooseICSFile()" class="btn-az">Choose ICS file</button>
+      <p class="import-copy" style="margin-top:12px">Accepted formats: .ics, .ical<br>RESERVE, OFF, STANDBY and DO entries are excluded.</p>
+      <div id="icsResultWrap" role="status" aria-live="polite"></div>
+      <div id="sheetFalWrap"></div>
+    </section>
+    <section id="textImportView" class="import-view" hidden aria-label="Paste schedule text">
+      <p class="import-copy">On iPhone, open your schedule image in Photos, select its text using Live Text, then copy it. Touch and hold the field below and choose Paste.</p>
+      <label class="import-label" for="manualFlightInput">Schedule text</label>
+      <textarea id="manualFlightInput" class="import-field" rows="6" spellcheck="false" placeholder="03 KE913 ICN 09:55 MAD 17:45&#10;05 KE914 MAD 20:00 ICN 15:46"></textarea>
+      <p class="import-copy">Paste the recognized text, rather than the image itself. Check that each flight is on its own line with a day, flight number, airports and times.</p>
+      <label class="import-label" for="manualMonth">Schedule month and year</label>
+      <input type="month" id="manualMonth" class="import-field">
+      <p class="import-copy" style="margin-top:8px">Used when the text does not include a month or year. Times use your device time zone.</p>
+      <button class="btn-az" onclick="parseManualEntry()">Import text &amp; register alarms</button>
+    </section>
   </div>
 </div>
 
@@ -1238,13 +1259,28 @@ function switchTab(name,btn){
 
 
 function openUploadSheet(){
+  resetImportMode();
   document.getElementById('sheetOverlay').classList.add('show');
   document.getElementById('uploadSheet').classList.add('open');
 }
 function openICSImport(){
-  var chooser=document.getElementById('importModeChooser');if(chooser)chooser.style.display='none';
-  var rw=document.getElementById('icsResultWrap');if(rw)rw.innerHTML='<div style="padding:12px;background:var(--white);border-radius:10px;font-size:12px;color:var(--tx2)"><strong>ICS calendar file</strong><br>Select an .ics or .ical file exported from your calendar. The file is read on this device.</div>';
-  document.getElementById('icsIn').click();
+  setImportMode('ics');
+}
+function chooseICSFile(){
+  var input=document.getElementById('icsIn');
+  input.value='';
+  input.click();
+}
+function setImportMode(mode){
+  document.getElementById('importModeChooser').hidden=mode!=='choose';
+  document.getElementById('icsImportView').hidden=mode!=='ics';
+  document.getElementById('textImportView').hidden=mode!=='text';
+  document.getElementById('importBack').hidden=mode==='choose';
+  var title=document.getElementById('importTitle');
+  title.textContent=mode==='ics'?'Import ICS File':mode==='text'?'Paste Schedule Text':'Import Schedule';
+  title.tabIndex=-1;
+  title.focus({preventScroll:true});
+  document.getElementById('uploadSheet').scrollTop=0;
 }
 function closeUploadSheet(){
   document.getElementById('sheetOverlay').classList.remove('show');
@@ -1302,28 +1338,13 @@ function replaceMonthFlights(newFlights) {
 
 
 function showManualEntryFallback(){
-  var wrap=document.getElementById('sheetFalWrap');
-  if(!wrap)return;
-  var chooser=document.getElementById('importModeChooser');if(chooser)chooser.style.display='none';
-  var rw=document.getElementById('icsResultWrap');if(rw)rw.innerHTML='';
-  wrap.innerHTML='<div style="margin-top:14px;background:var(--white);border-radius:12px;padding:16px;box-shadow:var(--shadow)">'
-    +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px"><div style="font-size:12px;font-weight:700;color:var(--tx)">Paste schedule text</div><button class="btn-az btn-outline" onclick="resetImportMode()" style="margin:0;padding:6px 10px;font-size:11px">Change method</button></div>'
-    +'<div style="font-size:11px;color:var(--tx2);margin-bottom:12px;line-height:1.5">'
-    +'Copy the schedule text from your iPhone and paste it below. One flight per line is recommended. Supported examples:<br>'
-    +'<code style="font-size:10px;background:var(--bg);padding:2px 6px;border-radius:4px">03 Jun  KE913  ICN 09:55  MAD 17:45</code><br>'
-    +'<code style="font-size:10px;background:var(--bg);padding:2px 6px;border-radius:4px">Jun 3 · KE913 · ICN → MAD · 09:55–17:45</code>'
-    +'</div>'
-    +'<textarea id="manualFlightInput" rows="6" style="width:100%;padding:10px;border:1.5px solid var(--bdr);border-radius:9px;font-family:Share Tech Mono,monospace;font-size:12px;background:var(--bg);color:var(--tx);resize:vertical;outline:none;line-height:1.8" placeholder="03 KE913 ICN 09:55 MAD 17:45&#10;05 KE914 MAD 20:00 ICN 15:46"></textarea>'
-    +'<div style="margin-bottom:8px; margin-top:8px"><label style="font-size:11px;color:var(--tx2);font-weight:600">Month &amp; Year</label>'
-    +'<input type="month" id="manualMonth" style="width:100%;margin-top:4px;padding:9px 10px;border:1.5px solid var(--bdr);border-radius:9px;background:var(--bg);color:var(--tx);font-size:13px;outline:none;color-scheme:light dark"></div>'
-    +'<button class="btn-az" onclick="parseManualEntry()" style="margin-top:10px">Parse Flights</button>'
-    +'</div>';
-    
+  setImportMode('text');
   var dt = new Date();
-  document.getElementById('manualMonth').value = dt.getFullYear() + "-" + p2(dt.getMonth() + 1);
+  if(!document.getElementById('manualMonth').value)
+    document.getElementById('manualMonth').value = dt.getFullYear() + "-" + p2(dt.getMonth() + 1);
 }
 function resetImportMode(){
-  var chooser=document.getElementById('importModeChooser');if(chooser)chooser.style.display='flex';
+  setImportMode('choose');
   var rw=document.getElementById('icsResultWrap');if(rw)rw.innerHTML='';
   var wrap=document.getElementById('sheetFalWrap');if(wrap)wrap.innerHTML='';
 }

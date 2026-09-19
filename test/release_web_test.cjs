@@ -85,7 +85,7 @@ test('manual pasted iPhone schedule text parses dates, arrows, and airline codes
     ['manualFlightInput', { value: 'Mon 03 Jun 2025  KE913  ICN → MAD  09:55–17:45' }],
     ['manualMonth', { value: '2025-06' }],
   ]);
-  ctx.document.getElementById = id => els.get(id) || { value: '', classList: { add(){}, remove(){} }, style:{} };
+  ctx.document.getElementById = id => els.get(id) || { value: '', focus(){}, classList: { add(){}, remove(){} }, style:{} };
   ctx.replaceMonthFlights = flights => { ctx.__flights = flights; return flights.length; };
   ctx.initFlightToggles = ctx.autoRegisterAll = ctx.saveFlights = ctx.renderHomeFlightList = ctx.renderSheetFalWrap = ctx.renderCal = ctx.renderDaySchedule = () => {};
   ctx.parseManualEntry();
