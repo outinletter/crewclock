@@ -300,6 +300,17 @@ body{background:var(--bg);color:var(--tx);font-family:'Inter',sans-serif;font-si
 .import-label{display:block;font-size:13px;font-weight:600;color:var(--tx);margin:16px 0 8px}
 .import-field{box-sizing:border-box;width:100%;padding:12px;border:1.5px solid var(--bdr);border-radius:10px;background:var(--bg);color:var(--tx);font:inherit;font-size:16px;line-height:1.6}
 .import-back{border:0;background:transparent;color:var(--blue);font:inherit;min-height:44px;padding:0;cursor:pointer;margin-bottom:8px}
+#uploadSheet{display:flex;flex-direction:column;overflow:hidden}
+#uploadSheet .sheet-body{overflow-y:auto;min-height:0;overscroll-behavior:contain}
+#uploadSheet .sheet-title,#uploadSheet .sheet-handle{flex-shrink:0}
+.import-actions{flex-shrink:0;padding:10px 20px 16px;border-top:1px solid var(--bdr);background:var(--white)}
+.import-actions[hidden]{display:none!important}
+.import-actions p{margin:0 0 8px;font-size:12px;line-height:1.5;color:var(--tx2)}
+.import-action-row{display:flex;gap:8px}
+.import-action-row .btn-az{flex:1;min-height:46px;margin:0;padding:10px 8px}
+.import-action-row .btn-az:disabled{background:var(--bdr);color:var(--tx2);cursor:not-allowed;box-shadow:none}
+#manualReview:focus{outline:2px solid var(--blue);outline-offset:4px}
+body.import-open #notifBanner,body.import-open #pwaBanner,body.import-open #iosGuide{display:none!important}
 
 
 .alarm-card{background:var(--white);border-radius:14px;box-shadow:var(--shadow);overflow:hidden}
@@ -645,11 +656,11 @@ body.dark .dl-inp[type=date]{color-scheme:dark}
 
 
 <div class="sheet-overlay" id="sheetOverlay" onclick="closeUploadSheet()"></div>
-<div class="sheet" id="uploadSheet">
+<div class="sheet" id="uploadSheet" role="dialog" aria-modal="true" aria-labelledby="importTitle" aria-hidden="true" inert>
   <div class="sheet-handle"></div>
   <div class="sheet-title" style="display:flex;align-items:center;justify-content:space-between">
     <span id="importTitle">Import Schedule</span>
-    <button onclick="closeUploadSheet()" style="background:var(--blue-light);border:none;border-radius:8px;padding:5px 12px;font-size:12px;font-weight:600;color:var(--blue);cursor:pointer;font-family:Inter,sans-serif">Done</button>
+    <button onclick="closeUploadSheet()" style="background:var(--blue-light);border:none;border-radius:8px;padding:5px 12px;min-height:44px;font-size:12px;font-weight:600;color:var(--blue);cursor:pointer;font-family:Inter,sans-serif">Close</button>
   </div>
   <div class="sheet-body">
     
@@ -673,13 +684,20 @@ body.dark .dl-inp[type=date]{color-scheme:dark}
     <section id="textImportView" class="import-view" hidden aria-label="Paste schedule text">
       <p class="import-copy">On iPhone, open your schedule image in Photos, select its text using Live Text, then copy it. Touch and hold the field below and choose Paste.</p>
       <label class="import-label" for="manualFlightInput">Schedule text</label>
-      <textarea id="manualFlightInput" class="import-field" rows="6" spellcheck="false" placeholder="03 KE913 ICN 09:55 MAD 17:45&#10;05 KE914 MAD 20:00 ICN 15:46"></textarea>
-      <p class="import-copy">Paste the recognized text, rather than the image itself. Check that each flight is on its own line with a day, flight number, airports and times.</p>
+      <textarea id="manualFlightInput" class="import-field" rows="8" spellcheck="false" oninput="clearManualReview()" placeholder="Oct 03&#10;KE 955 ICN 13:40 - IST 19:40&#10;Oct 04&#10;KE 956 IST 21:20 - ICN&#10;Oct 05&#10;KE 956 IST - ICN 13:25"></textarea>
+      <p class="import-copy">Paste the text copied from your monthly roster. Date headings apply to the flights below them. Departure and arrival entries on separate days are joined. Days off, reserve, layovers and training entries are excluded, as with flight calendar imports.</p>
       <label class="import-label" for="manualMonth">Schedule month and year</label>
-      <input type="month" id="manualMonth" class="import-field">
-      <p class="import-copy" style="margin-top:8px">Used when the text does not include a month or year. Times use your device time zone.</p>
-      <button class="btn-az" onclick="parseManualEntry()">Import text &amp; register alarms</button>
+      <input type="month" id="manualMonth" class="import-field" oninput="clearManualReview()">
+      <p class="import-copy" style="margin-top:8px">If the calendar title (for example, October 2026) was not copied, select the correct year and month here. Date headings such as Oct 03 are read from the text. Times use your device time zone.</p>
+      <div id="manualReview" style="margin-top:16px" tabindex="-1" aria-live="polite"></div>
     </section>
+  </div>
+  <div id="manualActions" class="import-actions" hidden>
+    <p id="manualStatus" role="status">Step 1: Review your text. Step 2: Register alarms.</p>
+    <div class="import-action-row">
+      <button id="manualReviewButton" class="btn-az btn-outline" onclick="parseManualEntry()">Review schedule</button>
+      <button id="manualConfirm" class="btn-az" onclick="confirmManualImport()" disabled>Register alarms</button>
+    </div>
   </div>
 </div>
 
@@ -847,6 +865,7 @@ function dismissNotifBanner(){
   try{localStorage.setItem('crewclock_notif_asked','1');}catch(e){}
 }
 function initNotifications(){
+  if(window.crewclock)return;
   if(!('Notification' in window)){
     if(isIOS()&&!isStandalone())setTimeout(showIOSInstallGuide,2500);
     return;
@@ -1258,10 +1277,15 @@ function switchTab(name,btn){
 }
 
 
+var importReturnFocus=null;
 function openUploadSheet(){
-  resetImportMode();
+  document.body.classList.add('import-open');
+  importReturnFocus=document.activeElement;
+  document.getElementById('uploadSheet').inert=false;
+  document.getElementById('uploadSheet').setAttribute('aria-hidden','false');
   document.getElementById('sheetOverlay').classList.add('show');
   document.getElementById('uploadSheet').classList.add('open');
+  resetImportMode();
 }
 function openICSImport(){
   setImportMode('ics');
@@ -1276,18 +1300,34 @@ function setImportMode(mode){
   document.getElementById('icsImportView').hidden=mode!=='ics';
   document.getElementById('textImportView').hidden=mode!=='text';
   document.getElementById('importBack').hidden=mode==='choose';
+  document.getElementById('manualActions').hidden=mode!=='text';
   var title=document.getElementById('importTitle');
   title.textContent=mode==='ics'?'Import ICS File':mode==='text'?'Paste Schedule Text':'Import Schedule';
   title.tabIndex=-1;
-  title.focus({preventScroll:true});
-  document.getElementById('uploadSheet').scrollTop=0;
+  if(document.getElementById('uploadSheet').classList.contains('open'))title.focus({preventScroll:true});
+  document.querySelector('#uploadSheet .sheet-body').scrollTop=0;
 }
 function closeUploadSheet(){
+  document.body.classList.remove('import-open');
   document.getElementById('sheetOverlay').classList.remove('show');
   document.getElementById('uploadSheet').classList.remove('open');
   if(detectedFlights.length) switchTab('calendar',null);
   resetImportMode();
+  if(importReturnFocus&&importReturnFocus.isConnected)importReturnFocus.focus();
+  document.getElementById('uploadSheet').inert=true;
+  document.getElementById('uploadSheet').setAttribute('aria-hidden','true');
 }
+document.addEventListener('keydown',function(event){
+  var sheet=document.getElementById('uploadSheet');
+  if(!sheet.classList.contains('open'))return;
+  if(event.key==='Escape'){event.preventDefault();closeUploadSheet();return;}
+  if(event.key!=='Tab')return;
+  var controls=Array.from(sheet.querySelectorAll('button:not(:disabled),input:not([type="hidden"]),textarea,[tabindex="0"]')).filter(function(el){return el.getClientRects().length>0;});
+  if(!controls.length)return;
+  var first=controls[0],last=controls[controls.length-1];
+  if(event.shiftKey&&(document.activeElement===first||!controls.includes(document.activeElement))){event.preventDefault();last.focus();}
+  else if(!event.shiftKey&&(document.activeElement===last||!controls.includes(document.activeElement))){event.preventDefault();first.focus();}
+});
 
 
 function replaceMonthFlights(newFlights) {
@@ -1349,89 +1389,118 @@ function resetImportMode(){
   var wrap=document.getElementById('sheetFalWrap');if(wrap)wrap.innerHTML='';
 }
 
-function parseManualEntry(){
-  var raw=document.getElementById('manualFlightInput').value||'';
-  raw=raw.replace(/[‐‑‒–—−]/g,'-').replace(/[→➝➞➔]/g,'-').replace(/[·•]/g,' ').replace(/\u00a0/g,' ');
-  var mo=document.getElementById('manualMonth').value||'';
-  var yr,mIdx;
-  if(mo){var mp=mo.split('-');yr=+mp[0];mIdx=+mp[1]-1;}
-  else{var n=new Date();yr=n.getFullYear();mIdx=n.getMonth();}
-
-  var flights=[];var seen={};
-  raw.split(/\r?\n/).forEach(function(line){
-    line=line.replace(/\s+/g,' ').trim();if(!line)return;
-    
-    var datePrefix=line.match(/\b(\d{1,2})(?:st|nd|rd|th)?[ ./-]+(?:([A-Za-z]{3,9})[ ./-]+)?(20\d{2})?\b|\b([A-Za-z]{3,9})[ ./-]+(\d{1,2})(?:st|nd|rd|th)?(?:[ ./-]+(20\d{2}))?\b/i);
-    var months={jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11};
-    var dayNum=datePrefix ? parseInt(datePrefix[1]||datePrefix[5],10) : null;
-    if(datePrefix && datePrefix[4]) mIdx=months[datePrefix[4].slice(0,3).toLowerCase()] ?? mIdx;
-    if(datePrefix && (datePrefix[3]||datePrefix[6])) yr=parseInt(datePrefix[3]||datePrefix[6],10);
-    var d=dayNum||1;
-    var dateStr=yr+'-'+p2(mIdx+1)+'-'+p2(d);
-
-    var fnumCandidates = line.match(/\b([A-Z]{2,3}\s?\d{1,4})\b/gi) || [];
-    var fnumMatch = null;
-    fnumCandidates.some(function(candidate){
-      if(!/^(MON|TUE|WED|THU|FRI|SAT|SUN|JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)\s*\d/i.test(candidate)){fnumMatch={1:candidate};return true;}
-      return false;
-    });
-    if(!fnumMatch)return;
-    var times = line.match(/\b\d{1,2}:\d{2}\b/g) || [];
-    
-
-    if (times.length === 0) {
-        var sNoFnum = line;
-        if (fnumMatch) sNoFnum = line.replace(new RegExp("\\b"+fnumMatch[1]+"\\b", "gi"), "");
-        var m4 = sNoFnum.match(/\b([0-1][0-9]|2[0-3])([0-5][0-9])\b/g);
-        if (m4) {
-            times = m4.map(function(t){ return t.substring(0,2) + ':' + t.substring(2,4); });
-        }
+function parseManualSchedule(raw,month){
+  var flights=[],warnings=[],errors=[],rows=[],airports=new Set(),seen={};
+  var selected=/^(\d{4})-(\d{2})$/.exec(month||'');
+  if(!selected || +selected[2]<1 || +selected[2]>12)return {flights:[],warnings:[],errors:['Select the schedule month and year.']};
+  var year=+selected[1],monthNum=+selected[2],currentDate=null;
+  var months=['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+  var text=raw.normalize('NFKC').replace(/[‐‑‒–—−→➝➞➔]/g,'-').replace(/[·•]/g,' ').replace(/\r\n?/g,'\n');
+  function dateString(y,m,d){return y+'-'+p2(m)+'-'+p2(d);}
+  function validDate(y,m,d){var dt=new Date(y,m-1,d);return dt.getFullYear()===y&&dt.getMonth()===m-1&&dt.getDate()===d;}
+  function time(s){if(!s)return '';var p=s.includes(':')?s.split(':'):[s.slice(0,2),s.slice(2)];return +p[0]<24&&+p[1]<60?p2(+p[0])+':'+p2(+p[1]):null;}
+  text.split('\n').forEach(function(original,index){
+    var line=original.toUpperCase().replace(/\s+/g,' ').trim();
+    line=line.replace(/^(?:MON(?:DAY)?|TUE(?:SDAY)?|WED(?:NESDAY)?|THU(?:RSDAY)?|FRI(?:DAY)?|SAT(?:URDAY)?|SUN(?:DAY)?)(?:\s+|$)/,'');
+    if(!line)return;
+    var monthHeading=/^(JANUARY|FEBRUARY|MARCH|APRIL|MAY|JUNE|JULY|AUGUST|SEPTEMBER|OCTOBER|NOVEMBER|DECEMBER|JAN|FEB|MAR|APR|JUN|JUL|AUG|SEP|OCT|NOV|DEC)\s+(20\d{2})$/.exec(line);
+    if(monthHeading){year=+monthHeading[2];monthNum=months.indexOf(monthHeading[1].slice(0,3))+1;currentDate=null;return;}
+    var dateMatch=/^(\d{4})-(\d{2})-(\d{2})(?=\s|$)/.exec(line), day=null, m=monthNum, y=year;
+    if(dateMatch){y=+dateMatch[1];m=+dateMatch[2];day=+dateMatch[3];}
+    else{
+      dateMatch=/^(JAN(?:UARY)?|FEB(?:RUARY)?|MAR(?:CH)?|APR(?:IL)?|MAY|JUN(?:E)?|JUL(?:Y)?|AUG(?:UST)?|SEP(?:TEMBER)?|OCT(?:OBER)?|NOV(?:EMBER)?|DEC(?:EMBER)?)\s+(\d{1,2})(?:ST|ND|RD|TH)?(?:[, ]+(20\d{2}))?(?=\s|$)/.exec(line);
+      if(dateMatch){m=months.indexOf(dateMatch[1].slice(0,3))+1;day=+dateMatch[2];if(dateMatch[3])y=+dateMatch[3];}
+      else{
+        dateMatch=/^(\d{1,2})(?:ST|ND|RD|TH)?(?:\s+(JAN(?:UARY)?|FEB(?:RUARY)?|MAR(?:CH)?|APR(?:IL)?|MAY|JUN(?:E)?|JUL(?:Y)?|AUG(?:UST)?|SEP(?:TEMBER)?|OCT(?:OBER)?|NOV(?:EMBER)?|DEC(?:EMBER)?)(?:\s+(20\d{2}))?)?(?=\s|$)/.exec(line);
+        if(dateMatch){day=+dateMatch[1];if(dateMatch[2])m=months.indexOf(dateMatch[2].slice(0,3))+1;if(dateMatch[3])y=+dateMatch[3];}
+      }
     }
-    
-    var fnum = fnumMatch[1].replace(/\s/g, '').toUpperCase();
-    
-    var apts = line.match(/\b[A-Z]{3}\b/gi) || [];
-    apts = apts.map(function(a){return a.toUpperCase();});
-    apts = apts.filter(function(a){ return fnum.indexOf(a) !== 0 && !['DAY','OFF','RES','INT','DOM','ATD','REP','ARR','DEP','MON','TUE','WED','THU','FRI','SAT','SUN','JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'].includes(a); });
-    
-    if(apts.length === 0) return;
-    
-    var depApt = apts[0];
-    var arrApt = apts.length > 1 ? apts[1] : '???';
-    
-    if(!times.length)return;
-    var depTime = times[0];
-    var arrTime = times.length > 1 ? times[1] : '';
-
-    depTime = p2(parseInt(depTime.split(':')[0])) + ':' + p2(parseInt(depTime.split(':')[1]));
-    if(arrTime) arrTime = p2(parseInt(arrTime.split(':')[0])) + ':' + p2(parseInt(arrTime.split(':')[1]));
-    
-    var safeId = (dateStr+'_'+fnum+'_'+depApt).replace(/[^a-zA-Z0-9_-]/g, '_');
-    if(seen[safeId])return;seen[safeId]=true;
-    
-    var isDomRoute = KR_DOM.indexOf(arrApt) >= 0;
-    var type = depApt === baseApt ? (isDomRoute ? 'dom' : 'base') : (depApt !== '???' ? 'intl' : 'ics');
-    
-    var flightObj = {
-        id:safeId, date:dateStr, arrDate:dateStr, flight:fnum, 
-        depApt:depApt, depTime:depTime, arrApt:arrApt, arrTime:arrTime, type:type
-    };
-
-    var AMERICAS = ['SEA','SFO','LAX','JFK','ATL','DFW','ORD','HNL','YVR','YYZ','BOS','IAD','LAS','DTW','MIA','MCO','EWR','HOU','MEX','YYC'];
-    var isEastboundCrossPacific = (type === 'intl' && AMERICAS.indexOf(arrApt) >= 0);
-
-    if(arrTime && parseInt(arrTime.replace(':','')) < parseInt(depTime.replace(':',''))) {
-        if (!isEastboundCrossPacific) {
-            var dtObj = buildDate(dateStr, 0, 0);
-            dtObj.setDate(dtObj.getDate() + 1);
-            flightObj.arrDate = dtObj.getFullYear()+'-'+p2(dtObj.getMonth()+1)+'-'+p2(dtObj.getDate());
-        }
+    if(dateMatch){
+      if(!validDate(y,m,day)){errors.push('Line '+(index+1)+': invalid date.');currentDate=null;return;}
+      // A monthly roster may continue into January of the following year.
+      if(monthNum===12&&m===1&&y===year&&!/20\d{2}/.test(dateMatch[0]))y++;
+      year=y;monthNum=m;currentDate=dateString(y,m,day);line=line.slice(dateMatch[0].length).trim();
     }
-
-    flights.push(flightObj);
+    var flight=/^((?:[A-Z]{2,3}|[A-Z]\d|\d[A-Z]))\s*(\d{1,4})(?=\s|$)\s*(.*)$/.exec(line);
+    if(!flight)return; // Duty codes, layovers, calendar headings and footers.
+    var label='Line '+(index+1)+' ('+flight[1]+flight[2]+')';
+    if(!currentDate){errors.push(label+': add a date heading before this flight.');return;}
+    var route=/^([A-Z]{2,3})\s+(?:(\d{1,2}:\d{2}|\d{4})\s*)?(?:-\s*)?([A-Z]{2,3})(?=\s|$)\s*(.*)$/.exec(flight[3]);
+    if(!route){errors.push(label+': could not read both airports and times.');return;}
+    var tail=route[4].match(/\d{1,2}:\d{2}|\b\d{4}\b/g)||[];
+    var departure=time(route[2]),arrival='';
+    if(tail.length>2 || (route[2]&&tail.length>1)){errors.push(label+': too many times; keep one flight per line.');return;}
+    if(!route[2]&&tail.length===2){departure=time(tail[0]);arrival=time(tail[1]);}
+    else if(tail.length)arrival=time(tail[0]);
+    if(departure===null||arrival===null||(!departure&&!arrival)){errors.push(label+': missing or invalid flight time.');return;}
+    [route[1],route[3]].forEach(function(code){if(code.length===3)airports.add(code);});
+    rows.push({flight:flight[1]+flight[2],date:currentDate,depApt:route[1],arrApt:route[3],depTime:departure,arrTime:arrival,label:label});
   });
+  function correctAirport(code,row){
+    if(code.length===3)return code;
+    var options=Array.from(airports).filter(function(full){return [full.slice(1),full[0]+full[2],full.slice(0,2)].includes(code);});
+    if(options.length!==1){errors.push(row.label+': airport '+code+' is incomplete; enter its three-letter code.');return null;}
+    warnings.push(row.label+': '+code+' → '+options[0]+'. Check this correction.');return options[0];
+  }
+  rows.sort(function(a,b){return a.date.localeCompare(b.date)||Number(!a.depTime)-Number(!b.depTime);});
+  rows.forEach(function(row){
+    row.depApt=correctAirport(row.depApt,row);row.arrApt=correctAirport(row.arrApt,row);
+    if(!row.depApt||!row.arrApt)return;
+    var signature=[row.date,row.flight,row.depApt,row.arrApt,row.depTime,row.arrTime].join('|');
+    if(seen[signature])return;seen[signature]=true;
+    if(!row.depTime){
+      var candidates=flights.filter(function(f){return !f.arrTime&&f.flight===row.flight&&f.depApt===row.depApt&&f.arrApt===row.arrApt&&f.date<=row.date&&(buildDate(row.date,0,0)-buildDate(f.date,0,0))<=3*86400000;});
+      if(candidates.length!==1){errors.push(row.label+': arrival has no unique matching departure.');return;}
+      candidates[0].arrTime=row.arrTime;candidates[0].arrDate=row.date;return;
+    }
+    var id=(row.date+'_'+row.flight+'_'+row.depApt+'_'+row.depTime).replace(/[^a-zA-Z0-9_-]/g,'_');
+    if(flights.some(function(f){return f.id===id;})){errors.push(row.label+': conflicting duplicate flight.');return;}
+    flights.push({id:id,date:row.date,arrDate:row.date,flight:row.flight,depApt:row.depApt,arrApt:row.arrApt,depTime:row.depTime,arrTime:row.arrTime,type:row.depApt===baseApt?(KR_DOM.includes(row.arrApt)?'dom':'base'):'intl'});
+  });
+  flights.sort(function(a,b){return (a.date+' '+a.depTime).localeCompare(b.date+' '+b.depTime);});
+  flights.forEach(function(f){if(!f.arrTime)errors.push(f.flight+' on '+f.date+': missing arrival entry/time.');});
+  // Keep roster calendar dates: a lower arrival clock time can cross the date line.
+  if(/\bSLT\b/i.test(text))warnings.push('SLT means station local times. Dates and clock times are kept as printed, as in the supplied calendar. Verify your device time zone before registering alarms.');
+  return {flights:flights,warnings:warnings,errors:errors};
+}
 
-  if(!flights.length){toast('No valid flights found in input','er');return;}
+var manualImportDraft=null;
+function clearManualReview(){
+  manualImportDraft=null;
+  document.getElementById('manualReview').innerHTML='';
+  document.getElementById('manualConfirm').disabled=true;
+  document.getElementById('manualStatus').textContent='Step 1: Review your text. Step 2: Register alarms.';
+}
+function focusManualReview(){
+  var review=document.getElementById('manualReview');
+  review.focus({preventScroll:true});
+  review.scrollIntoView({block:'start'});
+}
+function parseManualEntry(){
+  clearManualReview();
+  var raw=document.getElementById('manualFlightInput').value||'',month=document.getElementById('manualMonth').value||'';
+  var result=parseManualSchedule(raw,month);
+  var messages=result.errors.concat(result.warnings);
+  var html='<p class="import-copy"><strong>'+result.flights.length+' flights found</strong></p>';
+  html+=messages.map(function(message){return '<p class="import-copy">'+escQ(message)+'</p>';}).join('');
+  html+=result.flights.map(function(f){return '<p class="import-copy"><strong>'+escQ(f.flight)+(f.flight.startsWith('DH')?' · Extra duty':'')+' · '+escQ(f.depApt)+' → '+escQ(f.arrApt)+'</strong><br>'+f.date+' '+f.depTime+' → '+f.arrDate+' '+(f.arrTime||'Missing arrival')+'</p>';}).join('');
+  if(result.errors.length||!result.flights.length){
+    document.getElementById('manualReview').innerHTML=html+'<p class="import-copy">Correct the text above, then review again. Nothing has been imported.</p>';
+    document.getElementById('manualStatus').textContent='Not registered. Check the issues above and review again.';
+    focusManualReview();return;
+  }
+  html+='<p class="import-copy">Confirm the dates, routes and times. Importing replaces flights in the main schedule month and updates their alarms.</p>';
+  document.getElementById('manualReview').innerHTML=html;
+  manualImportDraft={raw:raw,month:month,flights:result.flights};
+  document.getElementById('manualConfirm').disabled=false;
+  document.getElementById('manualStatus').textContent=result.flights.length+' flights ready. Check the preview, then register alarms.';
+  focusManualReview();
+}
+function confirmManualImport(){
+  if(!manualImportDraft)return;
+  if(manualImportDraft.raw!==document.getElementById('manualFlightInput').value||manualImportDraft.month!==document.getElementById('manualMonth').value){clearManualReview();toast('Text changed. Review the schedule again.','er');return;}
+  var flights=manualImportDraft.flights;
+  clearManualReview();
   
   var addedCount = replaceMonthFlights(flights);
   
@@ -1458,7 +1527,7 @@ function parseManualEntry(){
       renderSheetFalWrap();
       renderCal();
       renderDaySchedule(calSelDate);
-      toast('Manual entry saved! ' + addedCount + ' flights updated', 'ok');
+      toast(addedCount+' flights saved. Alarm reminders updated.','ok');
   }
   closeUploadSheet();
 }

@@ -85,13 +85,77 @@ test('manual pasted iPhone schedule text parses dates, arrows, and airline codes
     ['manualFlightInput', { value: 'Mon 03 Jun 2025  KE913  ICN → MAD  09:55–17:45' }],
     ['manualMonth', { value: '2025-06' }],
   ]);
-  ctx.document.getElementById = id => els.get(id) || { value: '', focus(){}, classList: { add(){}, remove(){} }, style:{} };
+  ctx.document.getElementById = id => els.get(id) || { value: '', focus(){}, scrollIntoView(){}, classList: { add(){}, remove(){} }, style:{} };
+  ctx.closeUploadSheet=()=>{};
   ctx.replaceMonthFlights = flights => { ctx.__flights = flights; return flights.length; };
   ctx.initFlightToggles = ctx.autoRegisterAll = ctx.saveFlights = ctx.renderHomeFlightList = ctx.renderSheetFalWrap = ctx.renderCal = ctx.renderDaySchedule = () => {};
   ctx.parseManualEntry();
+  assert.equal(ctx.__flights, undefined, 'review must not write schedules');
+  ctx.confirmManualImport();
   assert.equal(ctx.__flights.length, 1);
   assert.equal(ctx.__flights[0].flight, 'KE913');
   assert.equal(ctx.__flights[0].date, '2025-06-03');
   assert.equal(ctx.__flights[0].depApt, 'ICN');
   assert.equal(ctx.__flights[0].arrApt, 'MAD');
+});
+
+test('monthly roster joins next-day arrivals and preserves same-day date-line crossings', () => {
+  const {ctx}=app();
+  const result=ctx.parseManualSchedule('October 2030\nSunday\nOct 03\nKE 901 ICN 13:40 - IST 19:40\nLO IST\nOct 04\nKE 902 IST 21:20 - ICN\nOct 05\nKE 902 IST - ICN 13:25\nOct 17\nKE 031 ICN 09:20 - DFW 08:10\nOct 30\n787UPRT ICN 15:50 - ICN 22:30','2029-11');
+  assert.equal(result.errors.length,0);
+  assert.equal(result.flights.length,3);
+  assert.equal(result.flights[0].date,'2030-10-03');
+  assert.equal(result.flights[1].arrDate,'2030-10-05');
+  assert.equal(result.flights[1].depTime,'21:20');
+  assert.equal(result.flights[2].arrDate,'2030-10-17');
+});
+
+test('OCR airport corrections are reported and ambiguous codes block registration',()=>{
+  const {ctx}=app();
+  const result=ctx.parseManualSchedule('Oct 08\nKE 433 IN 18:00 - DPS 23:50\nOct 10\nKE 434 DPS 01:10 - ICN 09:25ł\nOct 25\nDH 678 HKT 22:55 - IC\nOct 26\nDH 678 HKT - ICN 06:40','2030-10');
+  assert.equal(result.errors.length,0);
+  assert.equal(result.flights.length,3);
+  assert.equal(result.flights[0].depApt,'ICN');
+  assert.equal(result.flights[2].flight,'DH678');
+  assert.ok(!result.warnings.some(w=>w.includes('flight number')), 'DH is an extra assignment, not a typo');
+  assert.equal(result.flights[2].arrDate,'2030-10-26');
+  assert.ok(result.warnings.some(w=>w.includes('IN → ICN')));
+  assert.ok(result.warnings.some(w=>w.includes('IC → ICN')));
+  const ambiguous=ctx.parseManualSchedule('Oct 08\nKE 433 IN 18:00 - DPS 23:50\nOct 09\nKE 434 DPS 01:10 - ICN 09:25\nKE 435 INN 12:00 - DPS 13:00','2030-10');
+  assert.ok(ambiguous.errors.some(e=>e.includes('incomplete')));
+});
+
+test('invalid dates, missing dates, bad times and orphan arrivals do not silently import',()=>{
+  const {ctx}=app();
+  for(const raw of ['Oct 32\nKE 433 ICN 18:00 - DPS 23:50','KE 433 ICN 18:00 - DPS 23:50','Oct 08\nKE 433 ICN 25:00 - DPS 23:50','Oct 09\nKE 434 DPS - ICN 09:25','Oct 08\nKE 433 ICN 18:00 - DPS']){
+    assert.ok(ctx.parseManualSchedule(raw,'2030-10').errors.length>0,raw);
+  }
+});
+
+test('numbered dates, compact times, alphanumeric airlines and repeated pastes are supported',()=>{
+  const {ctx}=app();
+  const line='03 B6 1 JFK 0900 LAX 1200';
+  const result=ctx.parseManualSchedule(line+'\n'+line,'2030-10');
+  assert.equal(result.errors.length,0);
+  assert.equal(result.flights.length,1);
+  assert.equal(result.flights[0].flight,'B61');
+  assert.equal(result.flights[0].depTime,'09:00');
+});
+
+test('a roster without its month/year title uses the selected year and individual date headings',()=>{
+  const {ctx}=app();
+  const result=ctx.parseManualSchedule('Sunday\nMonday\nOct 25\nDH 678 HKT 22:55 - ICN\nOct 26\nDH 678 HKT - ICN 06:40','2031-09');
+  assert.equal(result.errors.length,0);
+  assert.equal(result.flights[0].date,'2031-10-25');
+  assert.equal(result.flights[0].arrDate,'2031-10-26');
+  assert.equal(result.flights[0].flight,'DH678');
+});
+
+test('calendar columns copied out of date order still join departure and arrival',()=>{
+  const {ctx}=app();
+  const result=ctx.parseManualSchedule('Oct 05\nKE 956 IST - ICN 13:25\nOct 04\nKE 956 IST 21:20 - ICN','2030-10');
+  assert.equal(result.errors.length,0);
+  assert.equal(result.flights.length,1);
+  assert.equal(result.flights[0].date,'2030-10-04');
+  assert.equal(result.flights[0].arrDate,'2030-10-05');
 });
