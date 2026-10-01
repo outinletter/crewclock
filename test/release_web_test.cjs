@@ -159,3 +159,31 @@ test('calendar columns copied out of date order still join departure and arrival
   assert.equal(result.flights[0].date,'2030-10-04');
   assert.equal(result.flights[0].arrDate,'2030-10-05');
 });
+
+test('DH extra assignments register the same enabled reminders as operating flights',()=>{
+  function register(prefix,disableCheckout){
+    const {ctx,messages}=app();
+    ctx.document.getElementById=()=>null;
+    ctx.todayStr=()=>'2030-10-01';
+    ctx.resetDef();
+    if(disableCheckout)ctx.intlOn.i2=false;
+    const parsed=ctx.parseManualSchedule('Oct 25\n'+prefix+' 678 HKT 22:55 - ICN\nOct 26\n'+prefix+' 678 HKT - ICN 06:40','2030-10');
+    assert.equal(parsed.errors.length,0);
+    ctx.detectedFlights=parsed.flights;
+    ctx.initFlightToggles();
+    ctx.autoRegisterAll();
+    const alarms=JSON.parse(JSON.stringify(ctx.alms));
+    assert.ok(alarms.every(a=>a.fnum===prefix+'678'&&a.armed));
+    assert.equal(messages.at(-1).length,alarms.length,'all reminders reach the native bridge');
+    ctx.autoRegisterAll();
+    assert.equal(ctx.alms.length,alarms.length,'no duplicate alarms when registered again');
+    return alarms.map(a=>({time:a.time,label:a.lbl,type:a.type,depApt:a.depApt,arrApt:a.arrApt}));
+  }
+  const dh=register('DH',false);
+  assert.equal(dh.length,3);
+  assert.deepEqual(dh,register('KE',false));
+  assert.deepEqual(dh.map(a=>{const d=new Date(a.time);return d.getHours()+':'+String(d.getMinutes()).padStart(2,'0');}),['19:55','20:55','22:15']);
+  const reduced=register('DH',true);
+  assert.equal(reduced.length,2);
+  assert.deepEqual(reduced,register('KE',true));
+});
