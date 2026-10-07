@@ -26,6 +26,10 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSAlarmKitUsageDescription</key>
+	<string>CrewClock schedules flight and personal alarms that ring on your lock screen until you stop or snooze them.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>CrewClock needs access to your photo library when you choose a schedule image to import or read its text. Your photos stay on your device and are not uploaded.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

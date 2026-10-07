@@ -21,6 +21,8 @@ class NativeAlarmScheduler {
   static const MethodChannel _nativeAlarmChannel =
       MethodChannel('crewclock/native_alarm');
   bool _initialized = false;
+  bool systemAlarmEnabled = false;
+  String? _iosSound;
 
   Future<void> init() async {
     if (_initialized) return;
@@ -68,7 +70,27 @@ class NativeAlarmScheduler {
     bool requestExactPermissions = false,
   }) async {
     await init();
-    await _notifications.cancelAll();
+    if (Platform.isIOS) {
+      if (requestExactPermissions && records.isNotEmpty) {
+        await _requestNotificationPermissions();
+      }
+      systemAlarmEnabled = await _nativeAlarmChannel.invokeMethod<bool>(
+            'scheduleAlarms',
+            {'records': records, 'requestPermission': requestExactPermissions},
+          ) ??
+          false;
+      _iosSound =
+          await _nativeAlarmChannel.invokeMethod<String>('getAlarmSound');
+      // Keep delivered reminders; only replace pending schedules.
+      for (final pending
+          in await _notifications.pendingNotificationRequests()) {
+        await _nativeAlarmChannel.invokeMethod<void>(
+            'cancelPending', pending.id);
+      }
+      if (systemAlarmEnabled) return;
+    } else {
+      await _notifications.cancelAll();
+    }
 
     if (requestExactPermissions && records.isNotEmpty) {
       await _requestNotificationPermissions();
@@ -128,8 +150,8 @@ class NativeAlarmScheduler {
     required String? payload,
   }) async {
     final scheduledAt = tz.TZDateTime.from(alarmTimeUtc, tz.UTC);
-    const details = NotificationDetails(
-      android: AndroidNotificationDetails(
+    final details = NotificationDetails(
+      android: const AndroidNotificationDetails(
         'crewclock_alarm_channel_continuous',
         'CrewClock Alarms',
         channelDescription: 'Flight and direct alarm notifications',
@@ -146,8 +168,9 @@ class NativeAlarmScheduler {
         presentAlert: true,
         presentBadge: true,
         presentSound: true,
+        sound: _iosSound,
       ),
-      macOS: DarwinNotificationDetails(
+      macOS: const DarwinNotificationDetails(
         presentAlert: true,
         presentBadge: true,
         presentSound: true,
@@ -213,19 +236,19 @@ class NativeAlarmScheduler {
   }
 
   Future<bool> chooseAlarmSound() async {
-    if (!Platform.isAndroid) return false;
+    if (!Platform.isAndroid && !Platform.isIOS) return false;
     final selected =
         await _nativeAlarmChannel.invokeMethod<String>('chooseAlarmSound');
     return selected != null;
   }
 
   Future<void> stopRingingAlarm() async {
-    if (!Platform.isAndroid) return;
+    if (!Platform.isAndroid && !Platform.isIOS) return;
     await _nativeAlarmChannel.invokeMethod<void>('stopAlarm');
   }
 
   Future<void> reconcileDismissals() async {
-    if (!Platform.isAndroid) return;
+    if (!Platform.isAndroid && !Platform.isIOS) return;
     final ids = await _nativeAlarmChannel
         .invokeListMethod<String>('getDismissedAlarmIds');
     if (ids == null || ids.isEmpty) return;
@@ -334,6 +357,17 @@ class _CrewClockHomeState extends State<CrewClockHome>
     final data = await AppDatabase.instance.getAlarmsState();
     await controller.runJavaScript('syncAlarmsFromDB(${jsonEncode(data)});');
     await _alarmScheduler.scheduleFromRecords(data);
+    if (Platform.isIOS) await _syncIOSAlarmUI();
+  }
+
+  Future<void> _syncIOSAlarmUI() async {
+    final system = _alarmScheduler.systemAlarmEnabled;
+    final sound = _alarmScheduler._iosSound == null ? 'Default' : 'Beep';
+    await controller.runJavaScript(
+      'window.crewclockSystemAlarm = $system;'
+      'document.getElementById("alarmSoundChoice").textContent = ${jsonEncode(sound)};'
+      'document.getElementById("platformAlarmGuide").textContent = ${jsonEncode(system ? 'System alarm enabled. Use Stop or Snooze on the lock screen.' : 'Notification reminders only. iOS 26 or later and alarm permission are required for lock-screen alarms. Silent mode and Focus may silence notification sounds.')};',
+    );
   }
 
   void _initWebView() {
@@ -374,13 +408,10 @@ class _CrewClockHomeState extends State<CrewClockHome>
               await controller.runJavaScript(
                 'syncAlarmsFromDB(${jsonEncode(data)});',
               );
-              if (Platform.isIOS) {
-                await controller.runJavaScript(
-                  "document.getElementById('platformAlarmGuide').textContent = "
-                  "'On iPhone, background reminders use notification sounds, not a continuous alarm. Silent mode and Focus may silence them. Only the next 64 reminders are scheduled; reopen CrewClock regularly to schedule later reminders.';",
-                );
-              }
               await _alarmScheduler.scheduleFromRecords(data);
+              if (Platform.isIOS) {
+                await _syncIOSAlarmUI();
+              }
             });
           },
         ),
@@ -393,6 +424,9 @@ class _CrewClockHomeState extends State<CrewClockHome>
 
             await AppDatabase.instance.saveAlarmsState(message.message);
             await _alarmScheduler.scheduleFromJsonString(message.message);
+            if (Platform.isIOS) {
+              await _syncIOSAlarmUI();
+            }
           });
         },
       )
@@ -408,14 +442,12 @@ class _CrewClockHomeState extends State<CrewClockHome>
 
       switch (decoded['type']) {
         case 'CHOOSE_ALARM_SOUND':
-          if (!Platform.isAndroid) {
-            await controller.runJavaScript(
-              "toast('iPhone reminders use the default notification sound', 'in');",
-            );
-            return true;
-          }
           final selected = await _alarmScheduler.chooseAlarmSound();
           if (!selected) return true;
+          await _alarmScheduler.scheduleFromRecords(
+            await AppDatabase.instance.getAlarmsState(),
+          );
+          if (Platform.isIOS) await _syncIOSAlarmUI();
           await controller.runJavaScript(
             "toast('Alarm sound selected', 'ok');",
           );
@@ -497,25 +529,7 @@ class _CrewClockHomeState extends State<CrewClockHome>
   Widget build(BuildContext context) {
     return Scaffold(
       body: SafeArea(
-        child: Stack(
-          children: [
-            Positioned.fill(
-              child: WebViewWidget(controller: controller),
-            ),
-            Positioned(
-              top: 8,
-              right: 8,
-              child: Material(
-                color: Colors.transparent,
-                child: IconButton(
-                  icon: const Icon(Icons.refresh),
-                  tooltip: 'Reload CrewClock',
-                  onPressed: () => controller.reload(),
-                ),
-              ),
-            ),
-          ],
-        ),
+        child: WebViewWidget(controller: controller),
       ),
     );
   }

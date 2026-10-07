@@ -597,7 +597,7 @@ body.dark .dl-inp[type=date]{color-scheme:dark}
           <div style="font-size:13px;font-weight:600;color:var(--tx)">Alarm Sound</div>
           <div style="font-size:11px;color:var(--tx3);margin-top:2px">Use the phone alarm tone picker</div>
         </div>
-        <button class="settings-action-btn" onclick="chooseNativeAlarmSound()">Choose</button>
+        <button id="alarmSoundChoice" class="settings-action-btn" onclick="chooseNativeAlarmSound()">Choose</button>
       </div>
     </div>
     
@@ -639,6 +639,7 @@ body.dark .dl-inp[type=date]{color-scheme:dark}
     </details>
     <details style="padding:14px;line-height:1.6;font-size:13px">
       <summary>Privacy and stored data</summary>
+      <p><a href="https://outinletter.github.io/privacy-policy/">Privacy Policy</a></p>
       <p>CrewClock stores imported schedules, alarm labels, and settings on this device. Calendar files are read to import flight events. The app does not require an account.</p>
       <p>Use Delete All Flights and Alarms to remove schedule and alarm data. Preferences remain saved. System backups may retain app data according to your device settings. Alarm labels and routes may appear on your lock screen; control previews in system notification settings.</p>
     </details>
@@ -2566,41 +2567,26 @@ function checkAlarms(){
       var liveTime=getLocalAlarmDisplayTime(a);
       if(liveTime && !isNaN(liveTime.getTime())) a.time=liveTime;
     }
-    if(a.dism||a.missed) return;
+    if(a.dism||a.missed||window.crewclockSystemAlarm) return;
 
     var diff = now - a.time;
     if(diff < 0) return;
+    diff = diff % 420000;
 
-    // ringState: 'idle' → 'ring1' → 'pause' → 'ring2' → 'done'
+    // Foreground cycle: ring for two minutes, then pause for five minutes.
     if(!a.ringState) a.ringState = 'idle';
 
-    if(diff < 300000) {                   // 0~5분: 1단계 울림
+    if(diff < 120000) {
       if(a.ringState !== 'ring1') {
         a.ringState = 'ring1';
         a.ring = true;
         needRender = true;
         trigAlarm(a);
       }
-    } else if(diff < 360000) {            // 5~6분: 자동 스누즈 (묵음)
+    } else {
       if(a.ringState !== 'pause') {
         a.ringState = 'pause';
         a.ring = false;
-        needRender = true;
-        checkAndStopGlobalAlarm();
-      }
-    } else if(diff < 420000) {            // 6~7분: 2단계 최종 울림
-      if(a.ringState !== 'ring2') {
-        a.ringState = 'ring2';
-        a.ring = true;
-        needRender = true;
-        trigAlarm(a);
-      }
-    } else {                              // 7분 경과: Missed 처리 후 종료
-      if(a.ringState !== 'done') {
-        a.ringState = 'done';
-        a.ring = false;
-        a.missed = true;
-        a.dism = true;
         needRender = true;
         checkAndStopGlobalAlarm();
       }

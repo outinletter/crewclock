@@ -36,6 +36,36 @@ test('deleting flights and alarms sends an empty native schedule and stop comman
   assert.ok(messages.some(m => Array.isArray(m) && m.length === 0));
   assert.ok(messages.some(m => m.type === 'STOP_RINGING_ALARM'));
 });
+test('foreground alarms ring for two minutes and pause for five, until dismissed', () => {
+  const { ctx } = app();
+  const RealDate = Date;
+  const base = RealDate.parse('2030-10-07T12:00:00Z');
+  let now = base;
+  ctx.Date = class extends RealDate {
+    constructor(...args) { super(...(args.length ? args : [now])); }
+  };
+  let rings = 0, pauses = 0;
+  ctx.trigAlarm = () => rings++;
+  ctx.checkAndStopGlobalAlarm = () => pauses++;
+  ctx.todayStr = () => '2030-10-07';
+  const alarm = { id: 'cycle', type: 'direct', time: new ctx.Date(base), armed: true };
+  ctx.alms = [alarm];
+  for (const offset of [0, 119999, 120000, 419999, 420000, 539999, 540000]) {
+    now = base + offset;
+    ctx.checkAlarms();
+    assert.equal(alarm.ring, offset % 420000 < 120000);
+  }
+  assert.equal(rings, 2);
+  assert.equal(pauses, 2);
+  alarm.dism = true;
+  now = base + 840000;
+  ctx.checkAlarms();
+  assert.equal(rings, 2);
+  alarm.dism = false;
+  ctx.window.crewclockSystemAlarm = true;
+  ctx.checkAlarms();
+  assert.equal(rings, 2, 'native alarms must not ring again in the WebView');
+});
 test('IANA time zones honor winter and summer UTC offsets', () => {
   const { ctx } = app();
   assert.equal(ctx.parseICSDate('20300115T090000', 'America/New_York').toISOString(), '2030-01-15T14:00:00.000Z');
