@@ -31,6 +31,7 @@ migrate_working_dir/
 .pub-cache/
 .pub/
 /build/
+/.flutter-build/
 /coverage/
 
 # Symbolication related
@@ -43,6 +44,8 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+/android/local.properties
+ios/._*
 
 # Local signing credentials
 /android/key.properties
