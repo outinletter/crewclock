@@ -1290,8 +1290,8 @@ function openUploadSheet(){
   resetImportMode();
 }
 function openICSImport(){
-  setImportMode('ics');
   chooseICSFile();
+  closeUploadSheet();
 }
 function chooseICSFile(){
   var input=document.getElementById('icsIn');
@@ -1880,7 +1880,7 @@ function handleICS(e){
       var newFlights=parseICS(ev.target.result);
 
       if(!newFlights.length){
-        if(rw)rw.innerHTML='<div class="empty-state">No flight events found.<br>Check that the file contains flight legs.</div>';
+        toast('No flight events found. Check that the file contains flight legs.','er');
         return;
       }
 

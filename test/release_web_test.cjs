@@ -19,6 +19,15 @@ function app() {
   for (const name of ['renderDirectAlarms', 'renderCal', 'renderDaySchedule', 'renderHomeFlightList', 'toast', 'stopSnd', 'releaseWakeLock']) ctx[name] = () => {};
   return { ctx, items, messages };
 }
+test('ICS import opens the picker and closes the sheet without the legacy step', () => {
+  const { ctx } = app();
+  const calls = [];
+  ctx.setImportMode = () => assert.fail('Legacy ICS step must not open');
+  ctx.chooseICSFile = () => calls.push('picker');
+  ctx.closeUploadSheet = () => calls.push('close');
+  ctx.openICSImport();
+  assert.deepEqual(calls, ['picker', 'close']);
+});
 test('native DB arrays and legacy JSON strings both restore alarms', () => {
   const { ctx, items } = app();
   const alarms = [{ id: 'test', time: '2030-01-01T00:00:00Z', type: 'direct', armed: 1, dism: 0 }];
