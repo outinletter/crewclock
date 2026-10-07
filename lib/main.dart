@@ -442,7 +442,7 @@ class _CrewClockHomeState extends State<CrewClockHome>
           });
         },
       )
-      ..loadFlutterAsset('assets/html/index.html');
+      ..loadFlutterAsset('index.html');
 
     _initFilePicker();
   }

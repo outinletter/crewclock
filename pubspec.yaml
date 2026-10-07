@@ -31,10 +31,10 @@ dev_dependencies:
 flutter:
   uses-material-design: true
   assets:
-    - assets/html/index.html
-    - assets/html/sw.js
-    - assets/html/manifest.webmanifest
-    - assets/html/app_icon.png
+    - index.html
+    - sw.js
+    - manifest.webmanifest
+    - app_icon.png
 
 flutter_launcher_icons:
   android: true
