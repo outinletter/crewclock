@@ -477,10 +477,11 @@ body.dark .dl-inp[type=date]{color-scheme:dark}
   font-size:20px;cursor:pointer;padding:0 4px;flex-shrink:0}
 
 
-.toast{position:fixed;top:18px;left:50%;transform:translateX(-50%) translateY(-60px);
+.toast{position:fixed;top:18px;left:50%;transform:translateX(-50%) translateY(calc(-100% - 24px));
   background:var(--tx);color:#fff;border-radius:10px;padding:9px 16px;font-size:12px;
   font-weight:600;z-index:999;transition:all .3s cubic-bezier(.34,1.56,.64,1);
-  white-space:nowrap;box-shadow:0 8px 24px rgba(0,0,0,.2)}
+  width:max-content;max-width:calc(100% - 32px);box-sizing:border-box;white-space:normal;overflow-wrap:anywhere;
+  text-align:center;line-height:1.4;box-shadow:0 8px 24px rgba(0,0,0,.2)}
 .toast.show{transform:translateX(-50%) translateY(0)}
 .toast.ok{background:var(--grn)}.toast.er{background:var(--red)}.toast.in{background:var(--blue)}
 </style>
@@ -2631,6 +2632,7 @@ function trigAlarm(a){
   document.getElementById('rtt').textContent=a.lbl + (a.fnum ? ' ('+a.fnum+')' : '');
   document.getElementById('rdt').textContent=fmt(a.time)+(a.dep?' - DEP '+fmt(a.dep):'') + (a.fnum ? ' ['+a.depApt+arrTxt+']' : '');
   document.getElementById('ro').classList.add('show');
+  document.getElementById('ro')._alarmID = a.id;
 
   var ctx=getACtx();
   if(ctx&&ctx.state==='suspended'){
@@ -3139,6 +3141,9 @@ function syncAlarmsFromDB(jsonString) {
 
     var parsedData = Array.isArray(jsonString) ? jsonString : JSON.parse(jsonString);
     if (!parsedData || !Array.isArray(parsedData)) return;
+    var ringingIDs = alms.filter(function(a){return a.ring;}).map(function(a){return a.id;});
+    var popupID = document.getElementById('ro')._alarmID;
+    if(popupID) ringingIDs = [popupID];
 
     alms = parsedData.map(function(a) {
       return {
@@ -3155,6 +3160,9 @@ function syncAlarmsFromDB(jsonString) {
       };
     });
     localStorage.setItem('crewclock_alarms', JSON.stringify(alms));
+    if(ringingIDs.length && !alms.some(function(a){return ringingIDs.indexOf(a.id)>=0 && !a.dism;})){
+      stopSnd();releaseWakeLock();document.getElementById('ro').classList.remove('show');
+    }
     if(detectedFlights.length){detectedFlights.forEach(refreshFlightLocalTimes);initFlightToggles();autoRegisterAll();saveFlights();renderHomeFlightList();}
     var beforeDedupe = alms.length;
     dedupeAutoAlarms();

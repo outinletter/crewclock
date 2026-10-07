@@ -10,6 +10,7 @@ import AVFoundation
 @main
 @objc class AppDelegate: FlutterAppDelegate, FlutterImplicitEngineDelegate {
   private var soundPreview: AVAudioPlayer?
+  private var alarmDismissObserver: NSObjectProtocol?
   override func application(
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
@@ -22,6 +23,9 @@ import AVFoundation
     GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
     let channel = FlutterMethodChannel(name: "crewclock/native_alarm",
       binaryMessenger: engineBridge.applicationRegistrar.messenger())
+    alarmDismissObserver = NotificationCenter.default.addObserver(
+      forName: Notification.Name("crewclock.alarmDismissed"), object: nil, queue: .main
+    ) { _ in channel.invokeMethod("alarmDismissed", arguments: nil) }
     channel.setMethodCallHandler { [weak self] call, result in
       Task { @MainActor in
         do {
@@ -44,8 +48,9 @@ import AVFoundation
             try await CrewSystemAlarms.sync(args["records"] as? [[String: Any]] ?? [])
             result(true)
           case "cancelPending":
+            let pending = await UNUserNotificationCenter.current().pendingNotificationRequests()
             UNUserNotificationCenter.current().removePendingNotificationRequests(
-              withIdentifiers: [String(describing: call.arguments!)])
+              withIdentifiers: pending.filter { Int($0.identifier) != nil }.map { $0.identifier })
             result(nil)
           case "getAlarmSound":
             result(UserDefaults.standard.string(forKey: "crewclock.sound"))
@@ -73,6 +78,30 @@ import AVFoundation
         }
       }
     }
+  }
+
+  override func userNotificationCenter(_ center: UNUserNotificationCenter,
+    didReceive response: UNNotificationResponse,
+    withCompletionHandler completionHandler: @escaping () -> Void) {
+    guard response.actionIdentifier == "crewclock.stop" else {
+      super.userNotificationCenter(center, didReceive: response, withCompletionHandler: completionHandler)
+      return
+    }
+    let info = response.notification.request.content.userInfo
+    if let source = (info["crewclockSourceID"] ?? info["payload"]) as? String {
+      if #available(iOS 26.0, *),
+        let mapping = UserDefaults.standard.dictionary(forKey: "crewclock.alarmIDs") as? [String: String],
+        let raw = mapping[source], let uuid = UUID(uuidString: raw) {
+        do { try CrewSystemAlarms.dismiss(uuid) }
+        catch { NSLog("[CrewClock] Stop alarm failed: %@", error.localizedDescription) }
+      } else {
+        recordAlarmDismissal(source)
+      }
+    }
+    let ids = [response.notification.request.identifier]
+    center.removePendingNotificationRequests(withIdentifiers: ids)
+    center.removeDeliveredNotifications(withIdentifiers: ids)
+    completionHandler()
   }
 
   @MainActor private func chooseSound(_ result: @escaping FlutterResult) {
@@ -165,6 +194,8 @@ enum CrewSystemAlarms {
       if signatures.count < 64 {
         let content = UNMutableNotificationContent()
         content.title = label
+        content.categoryIdentifier = "crewclock_alarm"
+        content.userInfo = ["crewclockSourceID": source]
         content.body = "CrewClock alarm. Open CrewClock to view your schedule."
         let trigger = UNTimeIntervalNotificationTrigger(timeInterval: max(1, date.timeIntervalSinceNow), repeats: false)
         try await UNUserNotificationCenter.current().add(UNNotificationRequest(
@@ -205,14 +236,21 @@ enum CrewSystemAlarms {
     let notificationIDs = ["alarm." + uuid.uuidString]
     UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: notificationIDs)
     UNUserNotificationCenter.current().removeDeliveredNotifications(withIdentifiers: notificationIDs)
-    try AlarmManager.shared.stop(id: uuid)
+    if try AlarmManager.shared.alarms.contains(where: { $0.id == uuid }) {
+      try AlarmManager.shared.stop(id: uuid)
+    }
     let mapping = defaults.dictionary(forKey: "crewclock.alarmIDs") as? [String: String] ?? [:]
     if let source = mapping.first(where: { $0.value == uuid.uuidString })?.key {
-      var ids = defaults.stringArray(forKey: "crewclock.dismissed") ?? []
-      if !ids.contains(source) { ids.append(source) }
-      defaults.set(ids, forKey: "crewclock.dismissed")
+      recordAlarmDismissal(source)
     }
   }
+}
+
+private func recordAlarmDismissal(_ source: String) {
+  var ids = UserDefaults.standard.stringArray(forKey: "crewclock.dismissed") ?? []
+  if !ids.contains(source) { ids.append(source) }
+  UserDefaults.standard.set(ids, forKey: "crewclock.dismissed")
+  NotificationCenter.default.post(name: Notification.Name("crewclock.alarmDismissed"), object: nil)
 }
 
 @available(iOS 26.0, *)

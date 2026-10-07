@@ -36,6 +36,18 @@ test('deleting flights and alarms sends an empty native schedule and stop comman
   assert.ok(messages.some(m => Array.isArray(m) && m.length === 0));
   assert.ok(messages.some(m => m.type === 'STOP_RINGING_ALARM'));
 });
+test('notification Stop closes the ringing popup when native dismissal is synced', () => {
+  const { ctx } = app();
+  const removed = [];
+  let stopped = 0;
+  ctx.document.getElementById = () => ({ _alarmID: 'stopped', classList: { remove: name => removed.push(name) } });
+  ctx.stopSnd = () => stopped++;
+  ctx.alms = [{ id: 'stopped', ring: false }];
+  ctx.syncAlarmsFromDB([{ id: 'stopped', time: '2030-01-01T00:00:00Z', type: 'direct', armed: 1, dism: 1 }]);
+  assert.equal(stopped, 1);
+  assert.ok(removed.includes('show'));
+  assert.equal(ctx.alms[0].dism, true);
+});
 test('foreground alarms ring for two minutes and pause for five, until dismissed', () => {
   const { ctx } = app();
   const RealDate = Date;

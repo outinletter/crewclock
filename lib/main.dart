@@ -31,14 +31,19 @@ class NativeAlarmScheduler {
 
     const androidSettings =
         AndroidInitializationSettings('@mipmap/ic_launcher');
-    const darwinSettings = DarwinInitializationSettings(
+    final darwinSettings = DarwinInitializationSettings(
       requestAlertPermission: false,
       requestBadgePermission: false,
       requestSoundPermission: false,
+      notificationCategories: [
+        DarwinNotificationCategory('crewclock_alarm', actions: [
+          DarwinNotificationAction.plain('crewclock.stop', 'Stop'),
+        ]),
+      ],
     );
 
     await _notifications.initialize(
-      const InitializationSettings(
+      InitializationSettings(
         android: androidSettings,
         iOS: darwinSettings,
         macOS: darwinSettings,
@@ -82,11 +87,7 @@ class NativeAlarmScheduler {
       _iosSound =
           await _nativeAlarmChannel.invokeMethod<String>('getAlarmSound');
       // Keep delivered reminders; only replace pending schedules.
-      for (final pending
-          in await _notifications.pendingNotificationRequests()) {
-        await _nativeAlarmChannel.invokeMethod<void>(
-            'cancelPending', pending.id);
-      }
+      await _nativeAlarmChannel.invokeMethod<void>('cancelPending');
       if (systemAlarmEnabled) return;
     } else {
       await _notifications.cancelAll();
@@ -169,6 +170,7 @@ class NativeAlarmScheduler {
         presentBadge: true,
         presentSound: true,
         sound: _iosSound,
+        categoryIdentifier: 'crewclock_alarm',
       ),
       macOS: const DarwinNotificationDetails(
         presentAlert: true,
@@ -324,12 +326,22 @@ class _CrewClockHomeState extends State<CrewClockHome>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    if (Platform.isIOS) {
+      NativeAlarmScheduler._nativeAlarmChannel.setMethodCallHandler((call) async {
+        if (call.method == 'alarmDismissed' && _pageReady) {
+          _enqueue(_initNativeAlarms);
+        }
+      });
+    }
     _initWebView();
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    if (Platform.isIOS) {
+      NativeAlarmScheduler._nativeAlarmChannel.setMethodCallHandler(null);
+    }
     super.dispose();
   }
 
@@ -346,7 +358,7 @@ class _CrewClockHomeState extends State<CrewClockHome>
       debugPrint('[CrewClock] $e');
       if (!mounted) return;
       await controller.runJavaScript(
-        "toast('Could not schedule alarms. Check notification and exact alarm permissions in Settings.', 'er');",
+        'toast(${jsonEncode(e is PlatformException ? e.message ?? 'Could not schedule alarms.' : 'Could not update alarms. Please try again.')}, "er");',
       );
     });
   }
