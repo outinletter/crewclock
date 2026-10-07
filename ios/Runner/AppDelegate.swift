@@ -147,6 +147,7 @@ enum CrewSystemAlarms {
       if !recordIDs.contains(source) || (record?["dism"] as? NSNumber)?.boolValue == true || (record?["armed"] as? NSNumber)?.boolValue == false {
         if live.contains(where: { $0.id == uuid }) { try AlarmManager.shared.cancel(id: uuid) }
         UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: ["alarm." + value])
+        UNUserNotificationCenter.current().removeDeliveredNotifications(withIdentifiers: ["alarm." + value])
         mapping.removeValue(forKey: source); signatures.removeValue(forKey: source)
       }
     }
@@ -201,6 +202,9 @@ enum CrewSystemAlarms {
   }
 
   static func dismiss(_ uuid: UUID) throws {
+    let notificationIDs = ["alarm." + uuid.uuidString]
+    UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: notificationIDs)
+    UNUserNotificationCenter.current().removeDeliveredNotifications(withIdentifiers: notificationIDs)
     try AlarmManager.shared.stop(id: uuid)
     let mapping = defaults.dictionary(forKey: "crewclock.alarmIDs") as? [String: String] ?? [:]
     if let source = mapping.first(where: { $0.value == uuid.uuidString })?.key {
