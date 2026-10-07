@@ -191,6 +191,9 @@ enum CrewSystemAlarms {
       if signatures[source] == signature && live.contains(where: { $0.id == uuid }) { continue }
       let configuration = config(source: source, label: label, date: date, uuid: uuid)
       _ = try await AlarmManager.shared.schedule(id: uuid, configuration: configuration)
+      mapping[source] = uuid.uuidString; signatures[source] = signature
+      defaults.set(mapping, forKey: "crewclock.alarmIDs")
+      defaults.set(signatures, forKey: "crewclock.alarmSignatures")
       if signatures.count < 64 {
         let content = UNMutableNotificationContent()
         content.title = label
@@ -198,13 +201,13 @@ enum CrewSystemAlarms {
         content.userInfo = ["crewclockSourceID": source]
         content.body = "CrewClock alarm. Open CrewClock to view your schedule."
         let trigger = UNTimeIntervalNotificationTrigger(timeInterval: max(1, date.timeIntervalSinceNow), repeats: false)
-        try await UNUserNotificationCenter.current().add(UNNotificationRequest(
-          identifier: "alarm." + uuid.uuidString, content: content, trigger: trigger))
+        do {
+          try await UNUserNotificationCenter.current().add(UNNotificationRequest(
+            identifier: "alarm." + uuid.uuidString, content: content, trigger: trigger))
+        } catch {
+          NSLog("[CrewClock] Reminder notification failed: %@", error.localizedDescription)
+        }
       }
-      mapping[source] = uuid.uuidString; signatures[source] = signature
-      // Persist each successful alarm, even if a later schedule fails.
-      defaults.set(mapping, forKey: "crewclock.alarmIDs")
-      defaults.set(signatures, forKey: "crewclock.alarmSignatures")
     }
     defaults.set(mapping, forKey: "crewclock.alarmIDs")
     defaults.set(signatures, forKey: "crewclock.alarmSignatures")
