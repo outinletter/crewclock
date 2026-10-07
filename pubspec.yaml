@@ -2,7 +2,7 @@ name: crewclock
 description: "Offline flight schedules and departure reminders for airline crew."
 publish_to: 'none'
 
-version: 1.0.4+3
+version: 1.0.4+4
 
 environment:
   sdk: ">=3.0.0 <4.0.0"

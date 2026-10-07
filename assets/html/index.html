@@ -672,7 +672,7 @@ body.dark .dl-inp[type=date]{color-scheme:dark}
     <button id="importBack" class="import-back" onclick="resetImportMode()" hidden>&larr; Import methods</button>
     <div id="importModeChooser" class="import-view">
       <p class="import-copy">How would you like to add your schedule?</p>
-      <button onclick="openICSImport()" class="import-choice"><span class="import-badge" aria-hidden="true">.ics</span><span><strong>Import calendar file</strong><small>Select an .ics or .ical file from Files.</small></span></button>
+      <button onclick="openICSImport()" class="import-choice"><span class="import-badge" aria-hidden="true">.ics</span><span><strong>Import ICS file</strong><small>Select an .ics or .ical file from Files.</small></span></button>
       <button onclick="showManualEntryFallback()" class="import-choice"><span class="import-badge" aria-hidden="true">Aa</span><span><strong>Paste schedule text</strong><small>Paste text copied from a schedule image or document.</small></span></button>
       <p class="import-copy">Both methods work offline on this device.</p>
     </div>
@@ -1291,6 +1291,7 @@ function openUploadSheet(){
 }
 function openICSImport(){
   setImportMode('ics');
+  chooseICSFile();
 }
 function chooseICSFile(){
   var input=document.getElementById('icsIn');
