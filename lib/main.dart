@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:webview_flutter_android/webview_flutter_android.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/data/latest_all.dart' as tz_data;
 import 'package:timezone/timezone.dart' as tz;
@@ -341,10 +342,27 @@ class _CrewClockHomeState extends State<CrewClockHome>
       ..setBackgroundColor(const Color(0x00000000))
       ..setNavigationDelegate(
         NavigationDelegate(
-          onNavigationRequest: (request) =>
-              request.url.startsWith('file:') || request.url == 'about:blank'
-                  ? NavigationDecision.navigate
-                  : NavigationDecision.prevent,
+          onNavigationRequest: (request) async {
+            if (request.url == 'https://outinletter.github.io/privacy-policy/') {
+              try {
+                if (!await launchUrl(
+                  Uri.parse(request.url),
+                  mode: LaunchMode.externalApplication,
+                )) {
+                  throw StateError('Could not open privacy policy');
+                }
+              } catch (error) {
+                debugPrint('[PrivacyPolicy] $error');
+                await controller.runJavaScript(
+                  "toast('Could not open privacy policy. Please try again.', 'er');",
+                );
+              }
+              return NavigationDecision.prevent;
+            }
+            return request.url.startsWith('file:') || request.url == 'about:blank'
+                ? NavigationDecision.navigate
+                : NavigationDecision.prevent;
+          },
           onWebResourceError: (WebResourceError error) {
             debugPrint('[WebView] Error: ${error.description}');
           },
