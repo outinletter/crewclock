@@ -26,6 +26,8 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>NSAlarmKitUsageDescription</key>
 	<string>CrewClock schedules flight and personal alarms that ring on your lock screen until you stop or snooze them.</string>
 	<key>NSPhotoLibraryUsageDescription</key>

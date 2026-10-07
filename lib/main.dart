@@ -374,11 +374,13 @@ class _CrewClockHomeState extends State<CrewClockHome>
 
   Future<void> _syncIOSAlarmUI() async {
     final system = _alarmScheduler.systemAlarmEnabled;
+    final queued = await NativeAlarmScheduler._nativeAlarmChannel
+        .invokeMethod<int>('getQueuedAlarmCount') ?? 0;
     final sound = _alarmScheduler._iosSound == null ? 'Default' : 'Beep';
     await controller.runJavaScript(
       'window.crewclockSystemAlarm = $system;'
       'document.getElementById("alarmSoundChoice").textContent = ${jsonEncode(sound)};'
-      'document.getElementById("platformAlarmGuide").textContent = ${jsonEncode(system ? 'System alarm enabled. Use Stop or Snooze on the lock screen.' : 'Notification reminders only. iOS 26 or later and alarm permission are required for lock-screen alarms. Silent mode and Focus may silence notification sounds.')};',
+      'document.getElementById("platformAlarmGuide").textContent = ${jsonEncode(system ? 'System alarm enabled. Use Stop or Snooze on the lock screen.${queued > 0 ? " $queued later alarms are waiting and are not yet scheduled. Reopen CrewClock regularly to schedule them as space becomes available." : ""}' : 'Notification reminders only. iOS 26 or later and alarm permission are required for lock-screen alarms. Silent mode and Focus may silence notification sounds.')};',
     );
   }
 

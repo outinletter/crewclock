@@ -54,6 +54,8 @@ import AVFoundation
             result(nil)
           case "getAlarmSound":
             result(UserDefaults.standard.string(forKey: "crewclock.sound"))
+          case "getQueuedAlarmCount":
+            result(UserDefaults.standard.stringArray(forKey: "crewclock.queuedAlarmIDs")?.count ?? 0)
           case "chooseAlarmSound":
             self?.chooseSound(result)
           case "stopAlarm":
@@ -163,24 +165,45 @@ struct CrewAlarmMetadata: AlarmMetadata { var sourceID: String }
 @available(iOS 26.0, *)
 enum CrewSystemAlarms {
   static let defaults = UserDefaults.standard
-  static func sync(_ records: [[String: Any]]) async throws {
+  static func sync(_ records: [[String: Any]], retryLimit: Bool = true) async throws {
     var mapping = defaults.dictionary(forKey: "crewclock.alarmIDs") as? [String: String] ?? [:]
     var signatures = defaults.dictionary(forKey: "crewclock.alarmSignatures") as? [String: String] ?? [:]
     let formatter = ISO8601DateFormatter()
     formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
     let live = try AlarmManager.shared.alarms
+    let now = Date()
+    let eligible = records.filter { record in
+      guard record["id"] is String,
+        (record["armed"] as? NSNumber)?.boolValue == true,
+        (record["dism"] as? NSNumber)?.boolValue != true,
+        (record["missed"] as? NSNumber)?.boolValue != true,
+        let raw = record["time"] as? String, let date = formatter.date(from: raw)
+      else { return false }
+      return date > now
+    }.sorted {
+      let first = formatter.date(from: $0["time"] as! String)!
+      let second = formatter.date(from: $1["time"] as! String)!
+      return first == second ? ($0["id"] as! String) < ($1["id"] as! String) : first < second
+    }
+    let limit = defaults.object(forKey: "crewclock.alarmCapacity") as? Int
+    let protectedCount = live.filter { $0.state != .scheduled }.count
+    let selected = limit.map { Array(eligible.prefix(max(0, $0 - protectedCount))) } ?? eligible
+    let selectedIDs = Set(selected.compactMap { $0["id"] as? String })
     let recordIDs = Set(records.compactMap { $0["id"] as? String })
     for (source, value) in mapping {
       guard let uuid = UUID(uuidString: value) else { continue }
       let record = records.first { $0["id"] as? String == source }
-      if !recordIDs.contains(source) || (record?["dism"] as? NSNumber)?.boolValue == true || (record?["armed"] as? NSNumber)?.boolValue == false {
+      let scheduled = live.first { $0.id == uuid }?.state == .scheduled
+      if !recordIDs.contains(source) || (record?["dism"] as? NSNumber)?.boolValue == true || (record?["armed"] as? NSNumber)?.boolValue == false || (scheduled && !selectedIDs.contains(source)) {
         if live.contains(where: { $0.id == uuid }) { try AlarmManager.shared.cancel(id: uuid) }
         UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: ["alarm." + value])
         UNUserNotificationCenter.current().removeDeliveredNotifications(withIdentifiers: ["alarm." + value])
         mapping.removeValue(forKey: source); signatures.removeValue(forKey: source)
       }
     }
-    for record in records {
+    defaults.set(mapping, forKey: "crewclock.alarmIDs")
+    defaults.set(signatures, forKey: "crewclock.alarmSignatures")
+    for record in selected {
       guard let source = record["id"] as? String,
         (record["armed"] as? NSNumber)?.boolValue == true, (record["dism"] as? NSNumber)?.boolValue != true,
         (record["missed"] as? NSNumber)?.boolValue != true, let raw = record["time"] as? String,
@@ -188,9 +211,20 @@ enum CrewSystemAlarms {
       let label = record["lbl"] as? String ?? "CrewClock Alarm"
       let signature = raw + label + (defaults.string(forKey: "crewclock.sound") ?? "default")
       let uuid = mapping[source].flatMap(UUID.init(uuidString:)) ?? UUID()
+      if live.contains(where: { $0.id == uuid && $0.state != .scheduled }) { continue }
       if signatures[source] == signature && live.contains(where: { $0.id == uuid }) { continue }
       let configuration = config(source: source, label: label, date: date, uuid: uuid)
-      _ = try await AlarmManager.shared.schedule(id: uuid, configuration: configuration)
+      do {
+        _ = try await AlarmManager.shared.schedule(id: uuid, configuration: configuration)
+      } catch AlarmManager.AlarmError.maximumLimitReached {
+        let capacity = try AlarmManager.shared.alarms.count
+        defaults.set(capacity, forKey: "crewclock.alarmCapacity")
+        if retryLimit && capacity > 0 {
+          try await sync(records, retryLimit: false)
+          return
+        }
+        break
+      }
       mapping[source] = uuid.uuidString; signatures[source] = signature
       defaults.set(mapping, forKey: "crewclock.alarmIDs")
       defaults.set(signatures, forKey: "crewclock.alarmSignatures")
@@ -211,6 +245,12 @@ enum CrewSystemAlarms {
     }
     defaults.set(mapping, forKey: "crewclock.alarmIDs")
     defaults.set(signatures, forKey: "crewclock.alarmSignatures")
+    let registered = Set(try AlarmManager.shared.alarms.map { $0.id.uuidString })
+    let queued = eligible.compactMap { record -> String? in
+      let source = record["id"] as! String
+      return mapping[source].map { registered.contains($0) } == true ? nil : source
+    }
+    defaults.set(queued, forKey: "crewclock.queuedAlarmIDs")
   }
 
   static func config(source: String, label: String, date: Date, uuid: UUID)
