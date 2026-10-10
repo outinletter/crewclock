@@ -489,7 +489,7 @@ body.dark .dl-inp[type=date]{color-scheme:dark}
 <body>
 
 <nav class="top-nav">
-  <div class="nav-title" onclick="switchTab('calendar',null); goToToday();" title="Go to Today">
+  <div class="nav-title">
     <h1>CREW CLOCK</h1><p>FLIGHT ALARM SYSTEM</p>
   </div>
   <button class="nav-bell" onclick="switchTab('alarm',null)">
@@ -729,7 +729,7 @@ body.dark .dl-inp[type=date]{color-scheme:dark}
   <div class="sheet-body" style="max-height:70dvh;overflow-y:auto">
     <div class="cal-nav">
       <button class="cal-nav-btn" aria-label="Previous alarm month" onclick="changeAlarmMonth(-1)">&#8249;</button>
-      <div class="cal-month" id="alarmCalendarMonth"></div>
+      <button type="button" class="cal-month" id="alarmCalendarMonth" style="border:0;background:transparent;font-family:inherit" onclick="resetAlarmDate()" title="Go to Today"></button>
       <button class="cal-nav-btn" aria-label="Next alarm month" onclick="changeAlarmMonth(1)">&#8250;</button>
     </div>
     <div class="cal-dow-row" aria-hidden="true"><span class="cal-dow-cell">S</span><span class="cal-dow-cell">M</span><span class="cal-dow-cell">T</span><span class="cal-dow-cell">W</span><span class="cal-dow-cell">T</span><span class="cal-dow-cell">F</span><span class="cal-dow-cell">S</span></div>
@@ -3065,6 +3065,12 @@ function changeAlarmMonth(step){
 }
 function selectAlarmDate(ds){
   var parts=ds.split('-');drumY_val=+parts[0]-2025;drumMo_val=+parts[1]-1;drumD_val=+parts[2]-1;
+  updateDateDisplay();renderAlarmCalendar();
+}
+function resetAlarmDate(){
+  var now=new Date();
+  drumY_val=now.getFullYear()-2025;drumMo_val=now.getMonth();drumD_val=now.getDate()-1;
+  alarmCalendarYear=now.getFullYear();alarmCalendarMonth=now.getMonth();
   updateDateDisplay();renderAlarmCalendar();
 }
 function openDateSheet(){

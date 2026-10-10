@@ -87,6 +87,23 @@ test('alarm calendar handles leap February, year rollover and keeps chosen time'
   assert.equal(ctx.alarmCalendarMonth, 0);
   assert.equal(elements.dDate.value, '2028-02-28');
 });
+test('alarm month title restores today while keeping time; app title has no navigation', () => {
+  const { ctx } = app();
+  const fixed = new Date(2030, 0, 1, 0, 7);
+  ctx.Date = class extends Date { constructor(...args) { super(...(args.length ? args : [fixed.getTime()])); } };
+  const elements = { dDate: {}, dDateText: {}, alarmCalendarMonth: {}, alarmCalendarGrid: {} };
+  ctx.document.getElementById = id => elements[id];
+  ctx.setDrum = (id, value) => { if (id === 'drumH') ctx.drumH_val = value; else ctx.drumM_val = value; };
+  ctx.drumY_val = 3; ctx.drumMo_val = 11; ctx.drumD_val = 30;
+  ctx.drumH_val = 23; ctx.drumM_val = 59;
+  ctx.resetAlarmDate();
+  assert.equal(elements.dDateText.textContent, '2030-01-01  23:59');
+  assert.equal(ctx.alarmCalendarYear, 2030);
+  assert.equal(ctx.alarmCalendarMonth, 0);
+  assert.ok(elements.alarmCalendarGrid.innerHTML.includes('aria-label="2030-01-01" aria-pressed="true"'));
+  assert.ok(html.includes('onclick="resetAlarmDate()"'));
+  assert.ok(html.includes('<div class="nav-title">'));
+});
 test('ICS import opens the picker and closes the sheet without the legacy step', () => {
   const { ctx } = app();
   const calls = [];
