@@ -70,6 +70,23 @@ test('date and time appear together and theme is sent to Flutter', () => {
   assert.equal((html.match(/id="drumH"/g) || []).length, 1);
   assert.ok(html.indexOf('id="drumH"') > html.indexOf('id="dateSheet"'));
 });
+test('alarm calendar handles leap February, year rollover and keeps chosen time', () => {
+  const { ctx } = app();
+  const elements = { dDate: { value: '2028-02-29' }, dDateText: {}, alarmCalendarMonth: {}, alarmCalendarGrid: {} };
+  ctx.document.getElementById = id => elements[id];
+  ctx.alarmCalendarYear = 2028; ctx.alarmCalendarMonth = 1;
+  ctx.drumH_val = 8; ctx.drumM_val = 15;
+  ctx.renderAlarmCalendar();
+  assert.equal((elements.alarmCalendarGrid.innerHTML.match(/<button /g) || []).length, 29);
+  assert.ok(elements.alarmCalendarGrid.innerHTML.includes('aria-label="2028-02-29" aria-pressed="true"'));
+  ctx.selectAlarmDate('2028-02-28');
+  assert.equal(elements.dDateText.textContent, '2028-02-28  08:15');
+  ctx.alarmCalendarMonth = 11;
+  ctx.changeAlarmMonth(1);
+  assert.equal(ctx.alarmCalendarYear, 2029);
+  assert.equal(ctx.alarmCalendarMonth, 0);
+  assert.equal(elements.dDate.value, '2028-02-28');
+});
 test('ICS import opens the picker and closes the sheet without the legacy step', () => {
   const { ctx } = app();
   const calls = [];

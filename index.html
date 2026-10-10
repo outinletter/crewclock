@@ -727,20 +727,13 @@ body.dark .dl-inp[type=date]{color-scheme:dark}
   <div class="sheet-handle"></div>
   <div class="sheet-title">Select Date &amp; Time</div>
   <div class="sheet-body" style="max-height:70dvh;overflow-y:auto">
-    <div class="drum-row">
-      <div class="drum-col">
-        <div class="dc-label">YR</div>
-        <div class="drum" id="drumY"><div class="drum-line"></div><div class="drum-inner" id="drumY-inner"></div></div>
-      </div>
-      <div class="drum-col">
-        <div class="dc-label">MO</div>
-        <div class="drum" id="drumMo"><div class="drum-line"></div><div class="drum-inner" id="drumMo-inner"></div></div>
-      </div>
-      <div class="drum-col">
-        <div class="dc-label">DY</div>
-        <div class="drum" id="drumD"><div class="drum-line"></div><div class="drum-inner" id="drumD-inner"></div></div>
-      </div>
+    <div class="cal-nav">
+      <button class="cal-nav-btn" aria-label="Previous alarm month" onclick="changeAlarmMonth(-1)">&#8249;</button>
+      <div class="cal-month" id="alarmCalendarMonth"></div>
+      <button class="cal-nav-btn" aria-label="Next alarm month" onclick="changeAlarmMonth(1)">&#8250;</button>
     </div>
+    <div class="cal-dow-row" aria-hidden="true"><span class="cal-dow-cell">S</span><span class="cal-dow-cell">M</span><span class="cal-dow-cell">T</span><span class="cal-dow-cell">W</span><span class="cal-dow-cell">T</span><span class="cal-dow-cell">F</span><span class="cal-dow-cell">S</span></div>
+    <div class="cal-grid" id="alarmCalendarGrid"></div>
     <div class="drum-row">
       <div class="drum-col">
         <div class="dc-label">HR</div>
@@ -1269,9 +1262,7 @@ function switchTab(name,btn){
       var _n=new Date();
       setDrum('drumH',_n.getHours(),true);
       setDrum('drumM',_n.getMinutes(),true);
-      setDrum('drumY',_n.getFullYear()-2025,true);
-      setDrum('drumMo',_n.getMonth(),true);
-      setDrum('drumD',_n.getDate()-1,true);
+      drumY_val=_n.getFullYear()-2025;drumMo_val=_n.getMonth();drumD_val=_n.getDate()-1;
       updateDateDisplay();
       renderDirectAlarms();
   }
@@ -2942,10 +2933,6 @@ function addIntlOff(){
 function initDrums(){
   buildDrum('drumH',24,drumH_val);
   buildDrum('drumM',60,drumM_val);
-  buildDrum('drumY',10,drumY_val);
-  buildDrum('drumMo',12,drumMo_val);
-  var dim=new Date(drumY_val+2025, drumMo_val+1, 0).getDate();
-  buildDrum('drumD',dim,drumD_val);
 }
 function buildDrum(id,count,initVal){
   var drum=document.getElementById(id);if(!drum)return;
@@ -3053,12 +3040,35 @@ function updateDayDrumCount(){
   var y=drumY_val+2025, m=drumMo_val;
   var dim=new Date(y, m+1, 0).getDate();
   var drumD=document.getElementById('drumD');
+  if(!drumD){drumD_val=Math.min(drumD_val,dim-1);return;}
   if(parseInt(drumD.dataset.count)!==dim){
     if(drumD_val>=dim) drumD_val=dim-1;
     buildDrum('drumD',dim,drumD_val);
   }
 }
+var alarmCalendarYear,alarmCalendarMonth;
+function renderAlarmCalendar(){
+  document.getElementById('alarmCalendarMonth').textContent=new Date(alarmCalendarYear,alarmCalendarMonth,1).toLocaleDateString('en-US',{year:'numeric',month:'long'});
+  var first=new Date(alarmCalendarYear,alarmCalendarMonth,1).getDay();
+  var days=new Date(alarmCalendarYear,alarmCalendarMonth+1,0).getDate();
+  var selected=document.getElementById('dDate').value,content='';
+  for(var i=0;i<first;i++)content+='<span></span>';
+  for(var day=1;day<=days;day++){
+    var ds=alarmCalendarYear+'-'+p2(alarmCalendarMonth+1)+'-'+p2(day),active=ds===selected;
+    content+='<button type="button" class="cal-day" style="border:0;background:'+(active?'var(--blue)':'transparent')+'" aria-label="'+ds+'" aria-pressed="'+active+'" onclick="selectAlarmDate(\''+ds+'\')"><span class="cal-day-num" style="color:'+(active?'white':'var(--tx)')+'">'+day+'</span></button>';
+  }
+  document.getElementById('alarmCalendarGrid').innerHTML=content;
+}
+function changeAlarmMonth(step){
+  var month=new Date(alarmCalendarYear,alarmCalendarMonth+step,1);
+  alarmCalendarYear=month.getFullYear();alarmCalendarMonth=month.getMonth();renderAlarmCalendar();
+}
+function selectAlarmDate(ds){
+  var parts=ds.split('-');drumY_val=+parts[0]-2025;drumMo_val=+parts[1]-1;drumD_val=+parts[2]-1;
+  updateDateDisplay();renderAlarmCalendar();
+}
 function openDateSheet(){
+  alarmCalendarYear=drumY_val+2025;alarmCalendarMonth=drumMo_val;renderAlarmCalendar();
   document.getElementById('dateSheetOverlay').classList.add('show');
   document.getElementById('dateSheet').classList.add('open');
   updateDayDrumCount();
