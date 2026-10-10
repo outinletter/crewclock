@@ -31,8 +31,18 @@ import AVFoundation
         do {
           switch call.method {
           case "scheduleAlarms":
-            guard #available(iOS 26.0, *) else { result(false); return }
             let args = call.arguments as? [String: Any] ?? [:]
+            let records = args["records"] as? [[String: Any]] ?? []
+            if records.isEmpty {
+              let center = UNUserNotificationCenter.current()
+              center.removeAllPendingNotificationRequests()
+              center.removeAllDeliveredNotifications()
+              if #available(iOS 26.0, *), AlarmManager.shared.authorizationState == .authorized {
+                try await CrewSystemAlarms.sync([])
+              }
+              result(false); return
+            }
+            guard #available(iOS 26.0, *) else { result(false); return }
             let manager = AlarmManager.shared
             if args["requestPermission"] as? Bool == true,
                manager.authorizationState == .notDetermined {
@@ -45,7 +55,7 @@ import AVFoundation
               }
               result(false); return
             }
-            try await CrewSystemAlarms.sync(args["records"] as? [[String: Any]] ?? [])
+            try await CrewSystemAlarms.sync(records)
             result(true)
           case "cancelPending":
             let pending = await UNUserNotificationCenter.current().pendingNotificationRequests()
@@ -171,6 +181,13 @@ enum CrewSystemAlarms {
     let formatter = ISO8601DateFormatter()
     formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
     let live = try AlarmManager.shared.alarms
+    if records.isEmpty {
+      for alarm in live { try AlarmManager.shared.cancel(id: alarm.id) }
+      for key in ["crewclock.alarmIDs", "crewclock.alarmSignatures", "crewclock.queuedAlarmIDs", "crewclock.dismissed", "crewclock.alarmCapacity"] {
+        defaults.removeObject(forKey: key)
+      }
+      return
+    }
     let now = Date()
     let eligible = records.filter { record in
       guard record["id"] is String,
@@ -214,9 +231,21 @@ enum CrewSystemAlarms {
       if live.contains(where: { $0.id == uuid && $0.state != .scheduled }) { continue }
       if signatures[source] == signature && live.contains(where: { $0.id == uuid }) { continue }
       let configuration = config(source: source, label: label, date: date, uuid: uuid)
+      // Updating a scheduled alarm must not require an additional slot at capacity.
+      if live.contains(where: { $0.id == uuid }) {
+        try AlarmManager.shared.cancel(id: uuid)
+        signatures.removeValue(forKey: source)
+        defaults.set(signatures, forKey: "crewclock.alarmSignatures")
+      }
       do {
         _ = try await AlarmManager.shared.schedule(id: uuid, configuration: configuration)
-      } catch AlarmManager.AlarmError.maximumLimitReached {
+      } catch {
+        let nativeError = error as NSError
+        let limitError = AlarmManager.AlarmError.maximumLimitReached as NSError
+        guard error as? AlarmManager.AlarmError == .maximumLimitReached ||
+          (nativeError.domain == limitError.domain && nativeError.code == limitError.code) else {
+          throw error
+        }
         let capacity = try AlarmManager.shared.alarms.count
         defaults.set(capacity, forKey: "crewclock.alarmCapacity")
         if retryLimit && capacity > 0 {

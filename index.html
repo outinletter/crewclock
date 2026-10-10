@@ -2689,8 +2689,14 @@ function snoozeOv(minutes){
 }
 
 
-function clearAllData(){
-  if(!confirm('Delete all saved flights and alarms? This cannot be undone.')) return;
+function clearAllData(confirmed){
+  if(confirmed!==true){
+    if(window.crewclock&&typeof window.crewclock.postMessage==='function'){
+      window.crewclock.postMessage(JSON.stringify({type:'CONFIRM_DELETE_ALL'}));
+      return;
+    }
+    if(!confirm('Delete all saved flights and alarms? This cannot be undone.')) return;
+  }
   try{
     localStorage.removeItem('crewclock_flights');
     localStorage.removeItem('crewclock_alarms');

@@ -455,6 +455,29 @@ class _CrewClockHomeState extends State<CrewClockHome>
       if (decoded is! Map) return false;
 
       switch (decoded['type']) {
+        case 'CONFIRM_DELETE_ALL':
+          if (!mounted) return true;
+          final confirmed = await showDialog<bool>(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: const Text('Delete all flights and alarms?'),
+              content: const Text('This cannot be undone. Preferences remain saved.'),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context, false),
+                  child: const Text('Cancel'),
+                ),
+                TextButton(
+                  onPressed: () => Navigator.pop(context, true),
+                  child: const Text('Delete'),
+                ),
+              ],
+            ),
+          );
+          if (confirmed == true && mounted) {
+            await controller.runJavaScript('clearAllData(true);');
+          }
+          return true;
         case 'CHOOSE_ALARM_SOUND':
           final selected = await _alarmScheduler.chooseAlarmSound();
           if (!selected) return true;

@@ -41,9 +41,26 @@ test('native DB arrays and legacy JSON strings both restore alarms', () => {
 test('deleting flights and alarms sends an empty native schedule and stop command', () => {
   const { ctx, messages } = app();
   ctx.alms = [{ id: 'test', time: new Date('2030-01-01'), type: 'direct' }];
-  ctx.clearAllData();
+  ctx.clearAllData(true);
   assert.ok(messages.some(m => Array.isArray(m) && m.length === 0));
   assert.ok(messages.some(m => m.type === 'STOP_RINGING_ALARM'));
+});
+test('native delete asks Flutter for confirmation without deleting data', () => {
+  const { ctx, messages } = app();
+  ctx.alms = [{ id: 'keep' }];
+  ctx.confirm = () => assert.fail('WebView confirm must not be used');
+  ctx.clearAllData();
+  assert.equal(ctx.alms.length, 1);
+  assert.equal(messages.length, 1);
+  assert.equal(messages[0].type, 'CONFIRM_DELETE_ALL');
+});
+test('browser delete cancellation preserves alarms', () => {
+  const { ctx } = app();
+  delete ctx.window.crewclock;
+  ctx.confirm = () => false;
+  ctx.alms = [{ id: 'keep' }];
+  ctx.clearAllData();
+  assert.equal(ctx.alms.length, 1);
 });
 test('notification Stop closes the ringing popup when native dismissal is synced', () => {
   const { ctx } = app();
