@@ -321,13 +321,15 @@ class _CrewClockHomeState extends State<CrewClockHome>
   final NativeAlarmScheduler _alarmScheduler = NativeAlarmScheduler();
   Future<void> _bridgeQueue = Future<void>.value();
   bool _pageReady = false;
+  bool _dark = false;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     if (Platform.isIOS) {
-      NativeAlarmScheduler._nativeAlarmChannel.setMethodCallHandler((call) async {
+      NativeAlarmScheduler._nativeAlarmChannel
+          .setMethodCallHandler((call) async {
         if (call.method == 'alarmDismissed' && _pageReady) {
           _enqueue(_initNativeAlarms);
         }
@@ -375,7 +377,8 @@ class _CrewClockHomeState extends State<CrewClockHome>
   Future<void> _syncIOSAlarmUI() async {
     final system = _alarmScheduler.systemAlarmEnabled;
     final queued = await NativeAlarmScheduler._nativeAlarmChannel
-        .invokeMethod<int>('getQueuedAlarmCount') ?? 0;
+            .invokeMethod<int>('getQueuedAlarmCount') ??
+        0;
     final sound = _alarmScheduler._iosSound == null ? 'Default' : 'Beep';
     await controller.runJavaScript(
       'window.crewclockSystemAlarm = $system;'
@@ -391,7 +394,8 @@ class _CrewClockHomeState extends State<CrewClockHome>
       ..setNavigationDelegate(
         NavigationDelegate(
           onNavigationRequest: (request) async {
-            if (request.url == 'https://outinletter.github.io/privacy-policy/') {
+            if (request.url ==
+                'https://outinletter.github.io/privacy-policy/') {
               try {
                 if (!await launchUrl(
                   Uri.parse(request.url),
@@ -407,7 +411,8 @@ class _CrewClockHomeState extends State<CrewClockHome>
               }
               return NavigationDecision.prevent;
             }
-            return request.url.startsWith('file:') || request.url == 'about:blank'
+            return request.url.startsWith('file:') ||
+                    request.url == 'about:blank'
                 ? NavigationDecision.navigate
                 : NavigationDecision.prevent;
           },
@@ -455,13 +460,39 @@ class _CrewClockHomeState extends State<CrewClockHome>
       if (decoded is! Map) return false;
 
       switch (decoded['type']) {
+        case 'SET_THEME':
+          if (mounted) setState(() => _dark = decoded['dark'] == true);
+          return true;
+        case 'CONFIRM_RESTORE_ALARMS':
+          if (!mounted) return true;
+          final restore = await showDialog<bool>(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: const Text('Restore default alarms?'),
+              content: const Text(
+                  'Flight alarm presets will be reset. Your flights and personal alarms will be kept.'),
+              actions: [
+                TextButton(
+                    onPressed: () => Navigator.pop(context, false),
+                    child: const Text('Cancel')),
+                TextButton(
+                    onPressed: () => Navigator.pop(context, true),
+                    child: const Text('Restore')),
+              ],
+            ),
+          );
+          if (restore == true && mounted) {
+            await controller.runJavaScript('restoreAlarmDefaults(true);');
+          }
+          return true;
         case 'CONFIRM_DELETE_ALL':
           if (!mounted) return true;
           final confirmed = await showDialog<bool>(
             context: context,
             builder: (context) => AlertDialog(
               title: const Text('Delete all flights and alarms?'),
-              content: const Text('This cannot be undone. Preferences remain saved.'),
+              content: const Text(
+                  'This cannot be undone. Preferences remain saved.'),
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(context, false),
@@ -564,9 +595,14 @@ class _CrewClockHomeState extends State<CrewClockHome>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: SafeArea(
-        child: WebViewWidget(controller: controller),
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: _dark ? SystemUiOverlayStyle.light : SystemUiOverlayStyle.dark,
+      child: Scaffold(
+        backgroundColor:
+            _dark ? const Color(0xff0d1f2d) : const Color(0xffdaeefa),
+        body: SafeArea(
+          child: WebViewWidget(controller: controller),
+        ),
       ),
     );
   }

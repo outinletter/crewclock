@@ -19,6 +19,57 @@ function app() {
   for (const name of ['renderDirectAlarms', 'renderCal', 'renderDaySchedule', 'renderHomeFlightList', 'toast', 'stopSnd', 'releaseWakeLock']) ctx[name] = () => {};
   return { ctx, items, messages };
 }
+test('restore presets requires native confirmation and preserves personal data', () => {
+  const { ctx, messages } = app();
+  ctx.alms = [{ id: 'personal', type: 'direct', time: new Date('2030-01-01') }];
+  ctx.detectedFlights = [{ id: 'flight' }];
+  ctx.restoreAlarmDefaults();
+  assert.equal(messages[0].type, 'CONFIRM_RESTORE_ALARMS');
+  assert.equal(ctx.alms.length, 1);
+  for (const name of ['renderBasePresets', 'renderDomPresets', 'renderIntlPresets', 'saveSettings', 'saveFlights', 'initFlightToggles', 'autoRegisterAll']) ctx[name] = () => {};
+  ctx.baseOffs = [];
+  ctx.restoreAlarmDefaults(true);
+  assert.equal(ctx.baseOffs.length, 3);
+  assert.equal(ctx.baseOffs[0].h, 4);
+  assert.equal(ctx.baseOffs[0].m, 30);
+  assert.equal(ctx.alms[0].id, 'personal');
+  assert.equal(ctx.detectedFlights[0].id, 'flight');
+});
+test('browser restore cancellation leaves customized presets unchanged', () => {
+  const { ctx } = app();
+  delete ctx.window.crewclock;
+  ctx.confirm = () => false;
+  ctx.baseOffs = [{ id: 'custom', h: 9, m: 0 }];
+  ctx.restoreAlarmDefaults();
+  assert.equal(ctx.baseOffs[0].id, 'custom');
+});
+test('confirmed restore replaces flight alarms but keeps personal alarms', () => {
+  const { ctx, messages } = app();
+  for (const name of ['renderBasePresets', 'renderDomPresets', 'renderIntlPresets', 'syncAllPresets']) ctx[name] = () => {};
+  ctx.detectedFlights = [{ id: 'flight', date: '2030-01-02', depTime: '12:00', type: 'base', flight: 'CC101', depApt: 'ICN', arrApt: 'LHR' }];
+  ctx.alms = [{ id: 'personal', type: 'direct', time: new Date('2030-01-01') }, { id: 'old', type: 'base', time: new Date('2030-01-01') }];
+  ctx.restoreAlarmDefaults(true);
+  assert.equal(ctx.alms.length, 4);
+  assert.ok(ctx.alms.some(a => a.id === 'personal'));
+  assert.ok(!ctx.alms.some(a => a.id === 'old'));
+  assert.equal(ctx.alms.find(a => a.id === 'flight_b1').time.getHours(), 7);
+  assert.equal(ctx.alms.find(a => a.id === 'flight_b1').time.getMinutes(), 30);
+  assert.ok(messages.some(m => Array.isArray(m) && m.length === 4));
+});
+test('date and time appear together and theme is sent to Flutter', () => {
+  const { ctx, messages } = app();
+  const elements = { dDate: {}, dDateText: {} };
+  ctx.document.getElementById = id => elements[id];
+  ctx.drumY_val = 5; ctx.drumMo_val = 1; ctx.drumD_val = 27;
+  ctx.drumH_val = 7; ctx.drumM_val = 5;
+  ctx.updateDateDisplay();
+  assert.equal(elements.dDate.value, '2030-02-28');
+  assert.equal(elements.dDateText.textContent, '2030-02-28  07:05');
+  ctx.syncNativeTheme(true);
+  assert.deepEqual(messages[0], { type: 'SET_THEME', dark: true });
+  assert.equal((html.match(/id="drumH"/g) || []).length, 1);
+  assert.ok(html.indexOf('id="drumH"') > html.indexOf('id="dateSheet"'));
+});
 test('ICS import opens the picker and closes the sheet without the legacy step', () => {
   const { ctx } = app();
   const calls = [];
