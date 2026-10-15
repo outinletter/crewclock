@@ -361,3 +361,28 @@ test('confirming manual date and time registers once and rejects past times', ()
   ctx.confirmDate();
   assert.equal(ctx.alms.length, 1);
 });
+
+test('today shows the next schedule alarm list and promotes it on its date', () => {
+  const { ctx } = app();
+  let now = new Date(2030, 0, 1, 12);
+  ctx.Date = class extends Date { constructor(...args) { super(...(args.length ? args : [now.getTime()])); } };
+  const elements = {};
+  ctx.document.getElementById = id => elements[id] ||= { style: {} };
+  ctx.detectedFlights = [{ id: 'next', date: '2030-01-03', depTime: '09:20', flight: 'KE031', depApt: 'ICN', arrApt: 'DFW', type: 'base' }];
+  ctx.baseOffs = [{ id: 'b1', h: 4, m: 30, lbl: 'Prepare for Duty' }];
+  ctx.flightToggles = { next: { b1: true } };
+  ctx.alms = [{ id: 'today', type: 'direct', time: new Date(2030, 0, 1, 18), lbl: 'Today alarm' }];
+  vm.runInContext(script.slice(script.indexOf('function renderDaySchedule('), script.indexOf('function renderHomeFlightList(')), ctx);
+  ctx.renderDaySchedule('2030-01-01');
+  assert.equal(elements.nextDayCard.style.display, 'block');
+  assert.match(elements.dayFlights.innerHTML, /Today alarm/);
+  assert.match(elements.nextDayTitle.textContent, /2030-01-03/);
+  assert.match(elements.nextDayFlightHeaderInfo.innerHTML, /KE031/);
+  assert.match(elements.nextDayFlights.innerHTML, /Prepare for Duty/);
+  assert.match(elements.nextDayFlights.innerHTML, /opacity:0.45/);
+  now = new Date(2030, 0, 3, 0, 1);
+  ctx.renderDaySchedule('2030-01-03');
+  assert.equal(elements.nextDayCard.style.display, 'none');
+  assert.match(elements.dayFlights.innerHTML, /Prepare for Duty/);
+  assert.doesNotMatch(elements.dayFlights.innerHTML, /opacity:0.45/);
+});

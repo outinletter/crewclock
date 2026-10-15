@@ -532,6 +532,17 @@ body.dark .dl-inp[type=date]{color-scheme:dark}
     <div class="day-flights" id="dayFlights"></div>
     <div id="dayAlarms" style="display:none;"></div>
   </div>  
+  <div class="day-card" id="nextDayCard" style="display:none">
+    <div class="day-header">
+      <div style="display:flex; align-items:center; gap:8px;">
+        <div class="day-title" id="nextDayTitle">---</div>
+        <div id="nextDayFlightHeaderInfo" style="display:none; font-size:11px; font-weight:700; color:var(--blue); background:var(--blue-light); padding:2px 6px; border-radius:4px; font-family:'Share Tech Mono',monospace;"></div>
+      </div>
+      <div class="day-more" onclick="openUploadSheet()">+ Add </div>
+    </div>
+    <div class="day-flights" id="nextDayFlights"></div>
+    <div id="nextDayAlarms" style="display:none;"></div>
+  </div>
   <div class="sec" style="padding-top:14px; padding-bottom:20px;">
     <div id="homeFlightList"></div>
   </div>
@@ -1719,15 +1730,25 @@ function buildDisplayedDayAlarms(dk,flights){
   return rows;
 }
 
-function renderDaySchedule(dk){
+function renderDaySchedule(dk,target){
+  if(!target){
+    var nextCard=document.getElementById('nextDayCard');
+    var nextDates=detectedFlights.map(function(f){return f.date;}).concat(alms.filter(function(a){return a.type==='direct'&&!a.dism&&!a.missed;}).map(function(a){return dayKeyFromDate(a.time);}));
+    var next=nextDates.filter(function(date){return date>todayStr();}).sort()[0];
+    if(nextCard){
+      nextCard.style.display=dk===todayStr()&&next?'block':'none';
+      if(dk===todayStr()&&next)renderDaySchedule(next,'nextDay');
+    }
+    target='day';
+  }
   var D=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   var dp=dk.split('-');var d=new Date(+dp[0],+dp[1]-1,+dp[2]);
-  document.getElementById('dayTitle').textContent=dk+' ('+D[d.getDay()]+')';
+  document.getElementById(target+'Title').textContent=dk+' ('+D[d.getDay()]+')';
   
   var flights=detectedFlights.filter(function(f){return f.date === dk || f.arrDate === dk;});
   var dayAlms=buildDisplayedDayAlarms(dk,flights);
 
-  var hInfoEl = document.getElementById('dayFlightHeaderInfo');
+  var hInfoEl = document.getElementById(target+'FlightHeaderInfo');
   if(hInfoEl) {
      if(flights.length > 0) {
          hInfoEl.innerHTML = flights.map(function(f){
@@ -1749,7 +1770,7 @@ function renderDaySchedule(dk){
   }
 
   if(!dayAlms.length){
-    document.getElementById('dayFlights').innerHTML='';
+    document.getElementById(target+'Flights').innerHTML='';
     return;
   }
   var rows=[];
@@ -1785,7 +1806,7 @@ function renderDaySchedule(dk){
   });
 
   rows.sort(function(a,b){return a.s-b.s;});
-  document.getElementById('dayFlights').innerHTML=rows.length ? rows.map(function(r){return r.html;}).join('') : '';
+  document.getElementById(target+'Flights').innerHTML=rows.length ? rows.map(function(r){return r.html;}).join('') : '';
 }
 
 function renderHomeFlightList(){
