@@ -340,3 +340,24 @@ test('DH extra assignments register the same enabled reminders as operating flig
   assert.equal(reduced.length,2);
   assert.deepEqual(reduced,register('KE',true));
 });
+
+test('confirming manual date and time registers once and rejects past times', () => {
+  const { ctx, messages } = app();
+  const elements = {};
+  ctx.document.getElementById = id => elements[id] ||= { value: '', classList: { remove() {} } };
+  ctx.scheduleNotificationsViaSW = () => {};
+  ctx.drumY_val = 10; ctx.drumMo_val = 0; ctx.drumD_val = 1;
+  ctx.drumH_val = 8; ctx.drumM_val = 15;
+  ctx.document.getElementById('dLabel').value = 'Wake up';
+  ctx.confirmDate();
+  assert.equal(ctx.alms.length, 1);
+  assert.equal(ctx.alms[0].lbl, 'Wake up');
+  assert.equal(ctx.alms[0].time.getHours(), 8);
+  assert.equal(ctx.alms[0].time.getMinutes(), 15);
+  assert.ok(messages.some(m => Array.isArray(m) && m.length === 1));
+  ctx.confirmDate();
+  assert.equal(ctx.alms.length, 1);
+  ctx.drumY_val = 0;
+  ctx.confirmDate();
+  assert.equal(ctx.alms.length, 1);
+});

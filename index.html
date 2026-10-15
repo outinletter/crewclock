@@ -156,6 +156,7 @@ body{background:var(--bg);color:var(--tx);font-family:'Inter',sans-serif;font-si
 .fal-item > *:first-child{border-radius:14px 14px 0 0;}
 .fal-item > *:last-child{border-radius:0 0 14px 14px;overflow:hidden;}
 .fal-item.future{border-color:var(--bdr)}
+.fal-item.future .fal-header,.fal-item.next-flight .fal-header{opacity:.45}
 .fal-item.today{
   border-color:var(--blue);
   box-shadow:0 2px 12px rgba(79,110,247,.15),0 1px 3px rgba(79,110,247,.1);
@@ -1774,7 +1775,7 @@ function renderDaySchedule(dk){
     }
 
     var rowCls = (a.dism || a.missed) ? 'dfr missed-dfr' : 'dfr';
-    var opac = (a.dism || a.missed) ? 'opacity:0.5;' : '';
+    var opac = (a.dism || a.missed) ? 'opacity:0.5;' : (displayTime && new Date(displayTime).setHours(0,0,0,0)>new Date().setHours(0,0,0,0) ? 'opacity:0.45;' : '');
 
     var h='<div class="'+rowCls+'" style="'+opac+'">'
       +'<div class="dfr-time">'+fmt(displayTime)+'</div>'
@@ -3090,6 +3091,7 @@ function closeDateSheet(){
 function confirmDate(){
   updateDateDisplay();
   closeDateSheet();
+  addDirectAlarm();
 }
 function updateDateDisplay(){
   var yr=drumY_val+2025, mo=drumMo_val+1, dy=drumD_val+1;
