@@ -52,8 +52,7 @@ test('confirmed restore replaces flight alarms but keeps personal alarms', () =>
   assert.equal(ctx.alms.length, 4);
   assert.ok(ctx.alms.some(a => a.id === 'personal'));
   assert.ok(!ctx.alms.some(a => a.id === 'old'));
-  assert.equal(ctx.alms.find(a => a.id === 'flight_b1').time.getHours(), 7);
-  assert.equal(ctx.alms.find(a => a.id === 'flight_b1').time.getMinutes(), 30);
+  assert.equal(ctx.alms.find(a => a.id === 'flight_b1').time.toISOString(), '2030-01-01T22:30:00.000Z');
   assert.ok(messages.some(m => Array.isArray(m) && m.length === 4));
 });
 test('date and time appear together and theme is sent to Flutter', () => {
@@ -335,10 +334,74 @@ test('DH extra assignments register the same enabled reminders as operating flig
   const dh=register('DH',false);
   assert.equal(dh.length,3);
   assert.deepEqual(dh,register('KE',false));
-  assert.deepEqual(dh.map(a=>{const d=new Date(a.time);return d.getHours()+':'+String(d.getMinutes()).padStart(2,'0');}),['19:55','20:55','22:15']);
+  assert.deepEqual(dh.map(a=>new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Bangkok',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).format(new Date(a.time))),['19:55','20:55','22:15']);
   const reduced=register('DH',true);
   assert.equal(reduced.length,2);
   assert.deepEqual(reduced,register('KE',true));
+});
+
+test('DFW UTC departure keeps the 19th local date when Korea is on the 20th', () => {
+  const { ctx } = app();
+  const f=ctx.parseICS('BEGIN:VEVENT\nDTSTART:20261020T025500Z\nDTEND:20261020T174000Z\nSUMMARY:KE032 DFW-ICN\nEND:VEVENT')[0];
+  assert.equal(f.date,'2026-10-19');assert.equal(f.depTime,'21:55');
+  assert.equal(f.arrDate,'2026-10-21');assert.equal(f.arrTime,'02:40');
+  assert.equal(ctx.parseFlightDate(f).toISOString(),'2026-10-20T02:55:00.000Z');
+  assert.equal(f.timingVersion,2);
+});
+test('floating and calendar-zone ICS both resolve to the same DFW instant', () => {
+  const { ctx } = app();
+  const floating=ctx.parseICS('BEGIN:VEVENT\nDTSTART:20261019T215500\nDTEND:20261021T024000\nSUMMARY:KE032 DFW-ICN\nEND:VEVENT')[0];
+  const korea=ctx.parseICS('X-WR-TIMEZONE:Asia/Seoul\nBEGIN:VEVENT\nDTSTART:20261020T115500\nDTEND:20261021T024000\nSUMMARY:KE032 DFW-ICN\nEND:VEVENT')[0];
+  assert.equal(floating.departureUtc,'2026-10-20T02:55:00.000Z');
+  assert.equal(korea.departureUtc,floating.departureUtc);
+  assert.equal(korea.date,'2026-10-19');assert.equal(korea.depTime,'21:55');
+  const allDay=ctx.parseICS('BEGIN:VEVENT\nDTSTART;VALUE=DATE:20261019\nDTEND;VALUE=DATE:20261020\nSUMMARY:KE032 DFW 21:55-ICN 02:40\nEND:VEVENT')[0];
+  assert.equal(allDay.departureUtc,floating.departureUtc);
+  assert.equal(allDay.arrivalUtc,floating.arrivalUtc);
+});
+test('DFW stay drives today and manual alarms, then switches on arrival in Korea', () => {
+  const { ctx } = app();
+  let now=new Date('2026-10-20T01:25:00Z');
+  ctx.Date=class extends Date { constructor(...args){super(...(args.length?args:[now.getTime()]));} };
+  ctx.detectedFlights=ctx.parseICS('BEGIN:VEVENT\nDTSTART:20261017T002000Z\nDTEND:20261017T131000Z\nSUMMARY:KE031 ICN-DFW\nEND:VEVENT\nBEGIN:VEVENT\nDTSTART:20261020T025500Z\nDTEND:20261020T174000Z\nSUMMARY:KE032 DFW-ICN\nEND:VEVENT');
+  assert.equal(ctx.stayAirport(),'DFW');assert.equal(ctx.appZone(),'America/Chicago');
+  assert.equal(ctx.todayStr(),'2026-10-19');
+  assert.equal(ctx.buildDate('2026-10-19',22,0).toISOString(),'2026-10-20T03:00:00.000Z');
+  const departure=ctx.parseFlightDate(ctx.detectedFlights[1]);
+  const alarm=new Date(departure.getTime()-3*3600000);
+  assert.equal(alarm.toISOString(),'2026-10-19T23:55:00.000Z');
+  assert.equal(ctx.dayKeyFromDate(alarm),'2026-10-19');assert.equal(ctx.fmt(alarm),'18:55');
+  ctx.resetDef();ctx.initFlightToggles();ctx.document.getElementById=()=>null;
+  ctx.autoRegisterAll();
+  assert.ok(ctx.alms.some(a=>a.fnum==='KE032'),'the DFW flight is not discarded as yesterday in Korea');
+  assert.ok(ctx.alms.filter(a=>a.fnum==='KE032').every(a=>a.dep.toISOString()==='2026-10-20T02:55:00.000Z'));
+  now=new Date('2026-10-20T18:00:00Z');
+  assert.equal(ctx.stayAirport(),'ICN');assert.equal(ctx.todayStr(),'2026-10-21');
+  assert.equal(ctx.parseFlightDate(ctx.detectedFlights[1]).toISOString(),departure.toISOString());
+});
+test('unknown floating ICS airports and DST ambiguity never silently schedule', () => {
+  const { ctx } = app();
+  assert.throws(()=>ctx.parseICS('BEGIN:VEVENT\nDTSTART:20261019T215500\nSUMMARY:ZZ1 ZZZ-ICN\nEND:VEVENT'),/Unknown departure time zone/);
+  assert.throws(()=>ctx.parseICS('BEGIN:VEVENT\nDTSTART:20261101T013000\nSUMMARY:KE032 DFW-ICN\nEND:VEVENT'),/ambiguous/);
+});
+
+test('sample roster previews future flights without saving or changing existing alarms', () => {
+  const { ctx, messages } = app();
+  const elements = {};
+  ctx.document.getElementById = id => elements[id] ||= { value: '', focus() {}, scrollIntoView() {}, style: {} };
+  ctx.setImportMode = () => {};
+  ctx.alms = [{ id: 'existing' }];
+  ctx.detectedFlights = [{ id: 'existing-flight' }];
+  const fixed = new Date(2030, 11, 31, 12);
+  ctx.Date = class extends Date { constructor(...args) { super(...(args.length ? args : [fixed.getTime()])); } };
+  ctx.previewSampleRoster();
+  assert.equal(ctx.manualImportDraft.flights.length, 2);
+  assert.equal(ctx.manualImportDraft.flights[0].date, '2031-01-02');
+  assert.equal(ctx.manualImportDraft.flights[0].flight, 'ZZ101');
+  assert.equal(ctx.alms[0].id, 'existing');
+  assert.equal(ctx.detectedFlights[0].id, 'existing-flight');
+  assert.equal(messages.length, 0);
+  assert.match(elements.manualStatus.textContent, /Fictional sample preview only/);
 });
 
 test('confirming manual date and time registers once and rejects past times', () => {

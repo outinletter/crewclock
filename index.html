@@ -509,6 +509,7 @@ body.dark .dl-inp[type=date]{color-scheme:dark}
     </div>
     <div class="cal-grid" id="calGrid"></div>
   </div>
+  <p id="stayTimeZoneGuide" style="margin:8px 20px;color:var(--tx2);font-size:11px"></p>
   <div class="day-card">
     <div class="day-header">
       <div style="display:flex; align-items:center; gap:8px;">
@@ -554,6 +555,7 @@ body.dark .dl-inp[type=date]{color-scheme:dark}
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity:0.6"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
           </button>
           <input type="hidden" id="dDate">
+          <small id="manualAlarmZone" style="color:var(--tx2)"></small>
         </div>
         <button class="btn-az" onclick="addDirectAlarm()" style="margin-top: 15px;">Add Alarm</button>
       </div>
@@ -621,7 +623,7 @@ body.dark .dl-inp[type=date]{color-scheme:dark}
     
     <details style="padding:14px;line-height:1.6;font-size:13px">
       <summary>Alarm and time zone guide</summary>
-      <p>Times use a 24-hour clock. Calendar timestamps with UTC or a time zone retain their scheduled instant when you travel. Manual entries and calendar times without a time zone use your device time zone. Check imported dates and times before enabling alarms.</p>
+      <p>Times use a 24-hour clock. Flight dates and times use their airports' local time zones, including daylight saving. UTC, TZID and calendar time-zone values retain their scheduled instant. Today's date and manual alarms use the roster-inferred stay time zone shown on screen, or the device time zone when no stay is known. Check this against your actual location and official roster before enabling alarms.</p>
       <p id="platformAlarmGuide">Background alerts require notification permission. Check your device notification and sound settings.</p>
       <p>Set your home base and domestic airport codes before importing a schedule. Review the departure reminder offsets for each flight.</p>
     </details>
@@ -662,12 +664,14 @@ body.dark .dl-inp[type=date]{color-scheme:dark}
       <p class="import-copy">How would you like to add your schedule?</p>
       <button onclick="openICSImport()" class="import-choice"><span class="import-badge" aria-hidden="true">.ics</span><span><strong>Import ICS file</strong><small>Select an .ics or .ical file from Files.</small></span></button>
       <button onclick="showManualEntryFallback()" class="import-choice"><span class="import-badge" aria-hidden="true">Aa</span><span><strong>Paste schedule text</strong><small>Paste text copied from a schedule image or document.</small></span></button>
+      <button onclick="previewSampleRoster()" class="import-choice"><span class="import-badge" aria-hidden="true">Demo</span><span><strong>Preview sample roster</strong><small>Explore two fictional flights. Nothing is saved until you register.</small></span></button>
       <p class="import-copy">Both methods work offline on this device.</p>
     </div>
     <section id="icsImportView" class="import-view" hidden aria-label="Import ICS file">
       <p class="import-copy">Select a calendar file exported from your roster or calendar app.</p>
       <button onclick="chooseICSFile()" class="btn-az">Choose ICS file</button>
       <p class="import-copy" style="margin-top:12px">Accepted formats: .ics, .ical<br>RESERVE, OFF, STANDBY and DO entries are excluded.</p>
+      <p class="import-copy">Re-import older ICS schedules if their local dates were incorrect. Floating flight times now use the airport time zone; existing personal alarm instants are preserved.</p>
       <div id="icsResultWrap" role="status" aria-live="polite"></div>
       <div id="sheetFalWrap"></div>
     </section>
@@ -678,7 +682,7 @@ body.dark .dl-inp[type=date]{color-scheme:dark}
       <p class="import-copy">Paste the text copied from your monthly roster. Date headings apply to the flights below them. Departure and arrival entries on separate days are joined. Days off, reserve, layovers and training entries are excluded, as with flight calendar imports.</p>
       <label class="import-label" for="manualMonth">Schedule month and year</label>
       <input type="month" id="manualMonth" class="import-field" oninput="clearManualReview()">
-      <p class="import-copy" style="margin-top:8px">If the calendar title (for example, October 2026) was not copied, select the correct year and month here. Date headings such as Oct 03 are read from the text. Times use your device time zone.</p>
+      <p class="import-copy" style="margin-top:8px">If the calendar title was not copied, select the correct year and month here. Date headings are station-local dates. Known airports use their local time zones; verify unknown airports against the device time zone.</p>
       <div id="manualReview" style="margin-top:16px" tabindex="-1" aria-live="polite"></div>
     </section>
   </div>
@@ -1037,7 +1041,7 @@ function initCalSwipe() {
 }
 
 function goToToday() {
-  var now = new Date();
+  var now = displayDate(new Date());
   var ty = now.getFullYear();
   var tm = now.getMonth();
   if(calYear===ty && calMonth===tm) {
@@ -1074,18 +1078,37 @@ function goToToday() {
 
 
 function p2(n){return String(n).padStart(2,'0');}
-function fmt(dt){return p2(dt.getHours())+':'+p2(dt.getMinutes());}
+function fmt(dt){var d=displayDate(dt);return p2(d.getHours())+':'+p2(d.getMinutes());}
 function uid(){return String(Date.now())+String(Math.random()).slice(2,6);}
 function dc(o){return JSON.parse(JSON.stringify(o));}
 function escQ(s){return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');}
-function todayStr(){var n=new Date();return n.getFullYear()+'-'+p2(n.getMonth()+1)+'-'+p2(n.getDate());}
-function buildDate(ds,h,m){if(ds){var dp=ds.split('-');return new Date(+dp[0],+dp[1]-1,+dp[2],h,m,0,0);}var d=new Date();d.setHours(h,m,0,0);return d;}
-function parseFlightDate(f){if(f.departureUtc)return new Date(f.departureUtc);if(!f.date)return new Date(9999,0,1);var dp=f.date.split('-');var tp=(f.depTime||'00:00').split(':');return new Date(+dp[0],+dp[1]-1,+dp[2],+tp[0],+tp[1],0,0);}
+var AIRPORT_ZONES={ICN:'Asia/Seoul',GMP:'Asia/Seoul',PUS:'Asia/Seoul',CJU:'Asia/Seoul',DFW:'America/Chicago',ORD:'America/Chicago',IAH:'America/Chicago',HOU:'America/Chicago',LAX:'America/Los_Angeles',SFO:'America/Los_Angeles',SEA:'America/Los_Angeles',LAS:'America/Los_Angeles',JFK:'America/New_York',EWR:'America/New_York',ATL:'America/New_York',BOS:'America/New_York',IAD:'America/New_York',DTW:'America/Detroit',HNL:'Pacific/Honolulu',YVR:'America/Vancouver',YYZ:'America/Toronto',NRT:'Asia/Tokyo',HND:'Asia/Tokyo',KIX:'Asia/Tokyo',FUK:'Asia/Tokyo',HKT:'Asia/Bangkok',BKK:'Asia/Bangkok',SIN:'Asia/Singapore',HKG:'Asia/Hong_Kong',TPE:'Asia/Taipei',PEK:'Asia/Shanghai',PVG:'Asia/Shanghai',CAN:'Asia/Shanghai',MNL:'Asia/Manila',CEB:'Asia/Manila',HAN:'Asia/Ho_Chi_Minh',SGN:'Asia/Ho_Chi_Minh',DAD:'Asia/Ho_Chi_Minh',DPS:'Asia/Makassar',CGK:'Asia/Jakarta',DEL:'Asia/Kolkata',BOM:'Asia/Kolkata',DXB:'Asia/Dubai',DOH:'Asia/Qatar',IST:'Europe/Istanbul',LHR:'Europe/London',CDG:'Europe/Paris',FRA:'Europe/Berlin',MAD:'Europe/Madrid',FCO:'Europe/Rome',AMS:'Europe/Amsterdam',ZRH:'Europe/Zurich',SYD:'Australia/Sydney',MEL:'Australia/Melbourne',BNE:'Australia/Brisbane',AKL:'Pacific/Auckland',GUM:'Pacific/Guam'};
+function airportZone(code){return AIRPORT_ZONES[(code||'').toUpperCase()]||null;}
+function dateAtZone(dt,zone){
+  if(!zone)return new Date(dt);
+  var p={};new Intl.DateTimeFormat('en-GB',{timeZone:zone,year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23'}).formatToParts(dt).forEach(function(t){p[t.type]=t.value;});
+  return new Date(+p.year,+p.month-1,+p.day,+p.hour,+p.minute,+p.second);
+}
+function stayAirport(){
+  var now=new Date().getTime(),landed=null,next=null;
+  (detectedFlights||[]).forEach(function(f){
+    var arrival=f.arrivalUtc?Date.parse(f.arrivalUtc):NaN,departure=f.departureUtc?Date.parse(f.departureUtc):NaN;
+    if(arrival<=now&&(!landed||arrival>Date.parse(landed.arrivalUtc)))landed=f;
+    if(departure>now&&(!next||departure<Date.parse(next.departureUtc)))next=f;
+  });
+  return landed?landed.arrApt:(next&&Date.parse(next.departureUtc)-now<3*86400000?next.depApt:null);
+}
+function appZone(){return airportZone(stayAirport());}
+function displayDate(dt){return dateAtZone(dt,appZone());}
+function todayStr(){var n=displayDate(new Date());return n.getFullYear()+'-'+p2(n.getMonth()+1)+'-'+p2(n.getDate());}
+function buildDate(ds,h,m){var dp=(ds||todayStr()).split('-');return zonedCalendarDate(+dp[0],+dp[1],+dp[2],h,m,0,appZone());}
+function parseFlightDate(f){if(f.departureUtc)return new Date(f.departureUtc);if(!f.date)return new Date(9999,0,1);var dp=f.date.split('-');var tp=(f.depTime||'00:00').split(':');return zonedCalendarDate(+dp[0],+dp[1],+dp[2],+tp[0],+tp[1],0,airportZone(f.depApt));}
+function flightDayEnd(f){var d=f.date.split('-');return zonedCalendarDate(+d[0],+d[1],+d[2],23,59,59,airportZone(f.depApt));}
 
 function refreshFlightLocalTimes(f){
   function dateText(d){return d.getFullYear()+'-'+p2(d.getMonth()+1)+'-'+p2(d.getDate());}
-  if(f.departureUtc){var dep=new Date(f.departureUtc);f.date=dateText(dep);f.depTime=fmt(dep);}
-  if(f.arrivalUtc){var arr=new Date(f.arrivalUtc);f.arrDate=dateText(arr);f.arrTime=fmt(arr);}
+  if(f.departureUtc){var dep=dateAtZone(new Date(f.departureUtc),airportZone(f.depApt));f.date=dateText(dep);f.depTime=p2(dep.getHours())+':'+p2(dep.getMinutes());}
+  if(f.arrivalUtc){var arr=dateAtZone(new Date(f.arrivalUtc),airportZone(f.arrApt));f.arrDate=dateText(arr);f.arrTime=p2(arr.getHours())+':'+p2(arr.getMinutes());}
 }
 
 
@@ -1156,7 +1179,7 @@ function loadAlarms(){
     alms=data.filter(function(a){ 
         if (a.type === 'direct') {
             var dt = a.dep ? new Date(a.dep) : new Date(a.time);
-            var dStr = dt.getFullYear() + '-' + p2(dt.getMonth()+1) + '-' + p2(dt.getDate());
+            var dStr = dayKeyFromDate(dt);
             return dStr >= tString;
         }
         return true;
@@ -1194,6 +1217,8 @@ function init(){
   syncNativeTheme(dark);
   
   loadFlights();
+  now=displayDate(new Date());calYear=now.getFullYear();calMonth=now.getMonth();calSelDate=todayStr();
+  drumY_val=now.getFullYear()-2025;drumMo_val=now.getMonth();drumD_val=now.getDate()-1;drumH_val=now.getHours();drumM_val=now.getMinutes();
   loadAlarms();
   if(detectedFlights.length && !window.crewclock){
     initFlightToggles();
@@ -1260,7 +1285,7 @@ function switchTab(name,btn){
       if(detectedFlights.length) renderHomeFlightList();
   }
   if(name==='alarm'){
-      var _n=new Date();
+      var _n=displayDate(new Date());
       setDrum('drumH',_n.getHours(),true);
       setDrum('drumM',_n.getMinutes(),true);
       drumY_val=_n.getFullYear()-2025;drumMo_val=_n.getMonth();drumD_val=_n.getDate()-1;
@@ -1373,9 +1398,18 @@ function replaceMonthFlights(newFlights) {
 
 function showManualEntryFallback(){
   setImportMode('text');
-  var dt = new Date();
+  var dt = displayDate(new Date());
   if(!document.getElementById('manualMonth').value)
     document.getElementById('manualMonth').value = dt.getFullYear() + "-" + p2(dt.getMonth() + 1);
+}
+function previewSampleRoster(){
+  showManualEntryFallback();
+  var day=displayDate(new Date());day.setDate(day.getDate()+2);
+  var month=day.getFullYear()+'-'+p2(day.getMonth()+1);
+  document.getElementById('manualMonth').value=month;
+  document.getElementById('manualFlightInput').value=dayKeyFromCivilDate(day)+'\nZZ101 ICN 09:00 - NRT 11:30\nZZ102 NRT 18:00 - ICN 20:30';
+  parseManualEntry();
+  document.getElementById('manualStatus').textContent='Fictional sample preview only. Register alarms replaces schedules in '+month+'.';
 }
 function resetImportMode(){
   setImportMode('choose');
@@ -1445,7 +1479,7 @@ function parseManualSchedule(raw,month){
     if(!row.depTime){
       var candidates=flights.filter(function(f){return !f.arrTime&&f.flight===row.flight&&f.depApt===row.depApt&&f.arrApt===row.arrApt&&f.date<=row.date&&(buildDate(row.date,0,0)-buildDate(f.date,0,0))<=3*86400000;});
       if(candidates.length!==1){errors.push(row.label+': arrival has no unique matching departure.');return;}
-      candidates[0].arrTime=row.arrTime;candidates[0].arrDate=row.date;return;
+      candidates[0].arrTime=row.arrTime;candidates[0].arrDate=row.date;candidates[0].isEndParsed=true;return;
     }
     var id=(row.date+'_'+row.flight+'_'+row.depApt+'_'+row.depTime).replace(/[^a-zA-Z0-9_-]/g,'_');
     if(flights.some(function(f){return f.id===id;})){errors.push(row.label+': conflicting duplicate flight.');return;}
@@ -1453,8 +1487,9 @@ function parseManualSchedule(raw,month){
   });
   flights.sort(function(a,b){return (a.date+' '+a.depTime).localeCompare(b.date+' '+b.depTime);});
   flights.forEach(function(f){if(!f.arrTime)errors.push(f.flight+' on '+f.date+': missing arrival entry/time.');});
+  flights.forEach(function(f){try{pinFlightInstants(f);}catch(e){errors.push(f.flight+': '+e.message);}});
   // Keep roster calendar dates: a lower arrival clock time can cross the date line.
-  if(/\bSLT\b/i.test(text))warnings.push('SLT means station local times. Dates and clock times are kept as printed, as in the supplied calendar. Verify your device time zone before registering alarms.');
+  if(/\bSLT\b/i.test(text))warnings.push('SLT means station local times. Known airports use their local time zones, including daylight saving. Unknown airports use the device time zone; verify them before registering.');
   return {flights:flights,warnings:warnings,errors:errors};
 }
 
@@ -1541,7 +1576,7 @@ function renderCal(){
   var M=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   document.getElementById('calMonthLbl').textContent=M[calMonth]+' '+calYear;
   var grid=document.getElementById('calGrid');
-  var today=new Date();today.setHours(0,0,0,0);
+  var today=displayDate(new Date());today.setHours(0,0,0,0);
   var first=new Date(calYear,calMonth,1);
   var startDow=first.getDay();
   var dim=new Date(calYear,calMonth+1,0).getDate();
@@ -1555,7 +1590,7 @@ function renderCal(){
   
   var aDates={};
   alms.filter(function(a){return !a.dism;}).forEach(function(a){
-      var dk=a.time.getFullYear()+'-'+p2(a.time.getMonth()+1)+'-'+p2(a.time.getDate());
+      var dk=dayKeyFromDate(a.time);
       aDates[dk]=(aDates[dk]||0)+1;
   });
   
@@ -1607,6 +1642,7 @@ function calSelectDay(dk){
 
 function dayKeyFromDate(dt){
   if(!(dt instanceof Date)) dt=new Date(dt);
+  dt=displayDate(dt);
   return dt.getFullYear()+'-'+p2(dt.getMonth()+1)+'-'+p2(dt.getDate());
 }
 
@@ -1784,7 +1820,7 @@ function renderDaySchedule(dk,target){
     }
 
     var rowCls = (a.dism || a.missed) ? 'dfr missed-dfr' : 'dfr';
-    var opac = (a.dism || a.missed) ? 'opacity:0.5;' : (displayTime && new Date(displayTime).setHours(0,0,0,0)>new Date().setHours(0,0,0,0) ? 'opacity:0.45;' : '');
+    var opac = (a.dism || a.missed) ? 'opacity:0.5;' : (displayTime && dayKeyFromDate(displayTime)>todayStr() ? 'opacity:0.45;' : '');
 
     var h='<div class="'+rowCls+'" style="'+opac+'">'
       +'<div class="dfr-time">'+fmt(displayTime)+'</div>'
@@ -1823,7 +1859,7 @@ function renderHomeFlightList(){
   var nextF=null;
 
   sorted.forEach(function(f){
-    var flightEndTime = buildDate(f.date, 23, 59);
+    var flightEndTime = flightDayEnd(f);
     if(flightEndTime < now) {
         past.push({f:f});
     } else {
@@ -1931,6 +1967,8 @@ function handleICS(e){
 
 function parseICS(text){
   var events=[];var cur=null;
+  var calendarZoneMatch=text.match(/^X-WR-TIMEZONE:([^\r\n]+)/mi);
+  var calendarZone=calendarZoneMatch?calendarZoneMatch[1].trim():null;
   var lines=text.replace(/\r\n/g,'\n').replace(/\r/g,'\n').split('\n');
   var unfolded=[];
   lines.forEach(function(l){
@@ -1957,14 +1995,14 @@ function parseICS(text){
     
     var dtstart=ev.raw['DTSTART']||ev.raw['DTSTART;TZID']||'';
     var dtend=ev.raw['DTEND']||ev.raw['DTEND;TZID']||'';
-    var dt=parseICSDate(dtstart,ev.zones.DTSTART);
-    var dte=parseICSDate(dtend,ev.zones.DTEND);
+    var dt=parseICSDate(dtstart,ev.zones.DTSTART||calendarZone);
+    var dte=parseICSDate(dtend,ev.zones.DTEND||calendarZone);
     if(!dt) return;
     var dateStr=dt.getFullYear()+'-'+p2(dt.getMonth()+1)+'-'+p2(dt.getDate());
     
     var arrDateStr = dateStr;
     var isEndParsed = false;
-    if (dtend && !dtend.includes('Z')) {
+    if (dtend && dtend.includes('T') && !dtend.includes('Z')) {
         var mEnd = dtend.match(/(\d{4})(\d{2})(\d{2})/);
         if (mEnd) {
             arrDateStr = mEnd[1] + '-' + mEnd[2] + '-' + mEnd[3];
@@ -2043,6 +2081,24 @@ function parseICS(text){
     
     var depApt = apts.length > 0 ? apts[0] : '???';
     var arrApt = apts.length > 1 ? apts[1] : '???';
+    // UTC/TZID values are authoritative; floating times belong to their airport.
+    if(dtstart.includes('T')){
+      if(!/Z$/.test(dtstart)&&!ev.zones.DTSTART&&!calendarZone){
+        if(!airportZone(depApt))throw new Error('Unknown departure time zone for '+depApt+'. Export this flight with UTC or TZID.');
+        dt=parseICSDate(dtstart,airportZone(depApt));
+      }
+      var depLocal=dateAtZone(dt,airportZone(depApt));
+      dateStr=dayKeyFromCivilDate(depLocal);depTime=p2(depLocal.getHours())+':'+p2(depLocal.getMinutes());
+      if(!isEndParsed)arrDateStr=dateStr;
+    }
+    if(dte&&dtend.includes('T')){
+      if(!/Z$/.test(dtend)&&!ev.zones.DTEND&&!calendarZone){
+        if(!airportZone(arrApt))throw new Error('Unknown arrival time zone for '+arrApt+'. Export this flight with UTC or TZID.');
+        dte=parseICSDate(dtend,airportZone(arrApt));
+      }
+      var arrLocal=dateAtZone(dte,airportZone(arrApt));
+      arrDateStr=dayKeyFromCivilDate(arrLocal);arrTime=p2(arrLocal.getHours())+':'+p2(arrLocal.getMinutes());
+    }
 
     var isDomRoute = KR_DOM.indexOf(arrApt) >= 0;
     var type = depApt === baseApt ? (isDomRoute ? 'dom' : 'base') : (depApt !== '???' ? 'intl' : 'ics');
@@ -2054,6 +2110,7 @@ function parseICS(text){
         depApt: depApt, depTime: depTime, arrApt: arrApt, arrTime: arrTime,
         departureUtc: dtstart.includes('T') ? dt.toISOString() : null,
         arrivalUtc: dte && dtend.includes('T') ? dte.toISOString() : null,
+        timingVersion: 2, sourceStart: dtstart, sourceEnd: dtend, sourceTimeZone: ev.zones.DTSTART||calendarZone||airportZone(depApt),
         type: type, summary: summary, isArrivalOnly: !dtstart.includes('T') && (!depTime || depTime==='00:00') && arrTime,
         isEndParsed: isEndParsed
     });
@@ -2073,7 +2130,7 @@ function parseICS(text){
           }
       }
       
-      if (!f.isEndParsed && f.arrTime && f.depTime && parseInt(f.arrTime.replace(':','')) < parseInt(f.depTime.replace(':',''))) {
+      if (!airportZone(f.depApt) && !f.isEndParsed && f.arrTime && f.depTime && parseInt(f.arrTime.replace(':','')) < parseInt(f.depTime.replace(':',''))) {
           var isEastboundCrossPacific = (f.type === 'intl' && AMERICAS.indexOf(f.arrApt) >= 0);
           if (!isEastboundCrossPacific) {
               var dtObj = buildDate(f.date, 0, 0);
@@ -2083,7 +2140,28 @@ function parseICS(text){
       }
       finalFlights.push(f);
   });
+  finalFlights.forEach(function(f){
+    if(!f.departureUtc&&!airportZone(f.depApt))throw new Error('Unknown departure time zone for '+f.depApt+'. Export this flight with UTC or TZID.');
+    pinFlightInstants(f);
+  });
   return finalFlights;
+}
+
+function dayKeyFromCivilDate(d){return d.getFullYear()+'-'+p2(d.getMonth()+1)+'-'+p2(d.getDate());}
+function pinFlightInstants(f){
+  function at(ds,time,zone){var d=ds.split('-'),t=time.split(':');return zonedCalendarDate(+d[0],+d[1],+d[2],+t[0],+t[1],0,zone);}
+  if(!f.departureUtc&&airportZone(f.depApt)&&f.depTime)f.departureUtc=at(f.date,f.depTime,airportZone(f.depApt)).toISOString();
+  if(!f.arrivalUtc&&f.arrTime&&airportZone(f.arrApt)&&f.departureUtc){
+    var ds=f.arrDate||f.date,arrival=at(ds,f.arrTime,airportZone(f.arrApt));
+    if(!f.isEndParsed){
+      for(var i=0;i<2&&arrival<=new Date(f.departureUtc);i++){
+        var d=ds.split('-'),next=new Date(+d[0],+d[1]-1,+d[2]+1);ds=dayKeyFromCivilDate(next);
+        arrival=at(ds,f.arrTime,airportZone(f.arrApt));
+      }
+    }
+    f.arrivalUtc=arrival.toISOString();
+  }
+  refreshFlightLocalTimes(f);
 }
 
 function zonedCalendarDate(y,mo,d,h,mi,se,zone){
@@ -2140,7 +2218,7 @@ function renderSheetFalWrap(){
   detectedFlights.sort(function(a,b){return parseFlightDate(a)-parseFlightDate(b);});
   var up=[],past=[];
   detectedFlights.forEach(function(f){
-      var flightEndTime = buildDate(f.date, 23, 59);
+      var flightEndTime = flightDayEnd(f);
       if(flightEndTime < now) past.push({f:f});
       else up.push({f:f});
   });
@@ -2152,9 +2230,7 @@ function renderSheetFalWrap(){
 
 function renderFalItem(f,extraCls){
   var now=new Date();var fdt=parseFlightDate(f);
-  var todayMid=new Date();todayMid.setHours(0,0,0,0);
-  var fdtMid=new Date(fdt);fdtMid.setHours(0,0,0,0);
-  var isTod=fdtMid.getTime()===todayMid.getTime();
+  var isTod=f.date===todayStr();
   var isPast=(extraCls||'').indexOf('past')>=0;
   var isNext=(extraCls||'').indexOf('next-flight')>=0;
   var cls='fal-item';
@@ -2191,7 +2267,7 @@ function renderFalItem(f,extraCls){
     var isPassed = at < now;
     var ac=on?(f.type==='base'?' on-base':(f.type==='dom'?' on-dom':' on-intl')):'';
     if(isPassed) ac += ' dimmed-alm';
-    else if(at >= new Date(todayMid.getFullYear(),todayMid.getMonth(),todayMid.getDate()+1)) ac += ' upcoming-alm';
+    else if(dayKeyFromDate(at)>todayStr()) ac += ' upcoming-alm';
     var togCls='tog'+(on?(f.type==='base'?' on':(f.type==='dom'?' on-purp':' on-amb')):'');
     var offTxt='';
     if(o.h>0&&o.m>0) offTxt='('+o.h+'h '+o.m+'m before)';
@@ -2308,13 +2384,13 @@ function rerenderFlight(id){
   var sorted=detectedFlights.slice().sort(function(a,b){return parseFlightDate(a)-parseFlightDate(b);});
   
   var upcoming=sorted.filter(function(ff){
-      var endTime = buildDate(ff.date, 23, 59);
+      var endTime = flightDayEnd(ff);
       return endTime >= now;
   });
   
   var nextFlight=upcoming.find(function(ff){return parseFlightDate(ff)>=now;});
   
-  var fEndTime = buildDate(f.date, 23, 59);
+  var fEndTime = flightDayEnd(f);
   var isPast = fEndTime < now;
   var isNext = !isPast && nextFlight && nextFlight.id===id;
   var extraCls=isPast?'past':(isNext?'next-flight':'');
@@ -2334,7 +2410,7 @@ function autoRegisterAll(){
     
 
     var checkDate = f.date; 
-    if(checkDate < todayStr()) return;
+    if(checkDate < dayKeyFromCivilDate(dateAtZone(new Date(),airportZone(f.depApt)))) return;
     
     var offs=f.type==='intl'?intlOffs:(f.type==='dom'?domOffs:baseOffs);
     offs.forEach(function(o){
@@ -2432,17 +2508,17 @@ function renderDirectAlarms(){
   var directs=alms.filter(function(a){
       if(a.type !== 'direct') return false; 
       var dt = a.dep ? new Date(a.dep) : new Date(a.time);
-      var dStr = dt.getFullYear() + '-' + p2(dt.getMonth()+1) + '-' + p2(dt.getDate());
+      var dStr = dayKeyFromDate(dt);
       return dStr >= tString;
   });
   if(!directs.length){wrap.innerHTML='';return;}
   var D=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-  var now=new Date();var todayMid=new Date();todayMid.setHours(0,0,0,0);
+  var now=new Date();
   wrap.innerHTML='<div class="dal-wrap">'+directs.map(function(a){
-    var t=a.time;var dow=D[t.getDay()];var tMid=new Date(t);tMid.setHours(0,0,0,0);
-    var isTod=tMid.getTime()===todayMid.getTime();
-    var dateStr=t.getFullYear()+'-'+p2(t.getMonth()+1)+'-'+p2(t.getDate())+'('+dow+')';
-    var timeStr=p2(t.getHours())+':'+p2(t.getMinutes());
+    var t=a.time;var civil=displayDate(t);var dow=D[civil.getDay()];
+    var isTod=dayKeyFromDate(t)===todayStr();
+    var dateStr=dayKeyFromDate(t)+'('+dow+')';
+    var timeStr=fmt(t);
     var isRing=a.ring;
     var isMissed=a.missed;
     var isDism=a.dism && !isRing && !isMissed;
@@ -2533,9 +2609,17 @@ function updateDirectCDs(){
 
 
 var lastTickToday = todayStr();
+var lastTickZone = appZone();
 function tickClock(){
   var nowToday = todayStr();
-  if(nowToday !== lastTickToday) {
+  var zone=appZone(),station=stayAirport();
+  var guide=document.getElementById('stayTimeZoneGuide'),manualGuide=document.getElementById('manualAlarmZone');
+  var zoneText=zone?'Roster-inferred stay: '+station+' · '+zone+' · '+nowToday:'Using device time zone · '+nowToday;
+  if(detectedFlights.some(function(f){return f.summary&&!f.timingVersion;}))zoneText+=' · Re-import older ICS if dates are incorrect.';
+  if(guide)guide.textContent=zoneText;
+  if(manualGuide)manualGuide.textContent=zoneText;
+  if(nowToday !== lastTickToday || zone !== lastTickZone) {
+    lastTickZone=zone;
     var wasShowingToday = (calSelDate === lastTickToday);
     var oldToday = lastTickToday;
     lastTickToday = nowToday;
@@ -2545,7 +2629,7 @@ function tickClock(){
       var dDateInp = document.getElementById('dDate');
       if(dDateInp) dDateInp.value = nowToday;
 
-      var now = new Date();
+      var now = displayDate(new Date());
       if(now.getMonth() !== calMonth || now.getFullYear() !== calYear) {
           calYear = now.getFullYear();
           calMonth = now.getMonth();
@@ -3079,7 +3163,7 @@ function selectAlarmDate(ds){
   updateDateDisplay();renderAlarmCalendar();
 }
 function resetAlarmDate(){
-  var now=new Date();
+  var now=displayDate(new Date());
   drumY_val=now.getFullYear()-2025;drumMo_val=now.getMonth();drumD_val=now.getDate()-1;
   alarmCalendarYear=now.getFullYear();alarmCalendarMonth=now.getMonth();
   updateDateDisplay();renderAlarmCalendar();
