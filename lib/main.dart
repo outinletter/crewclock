@@ -463,6 +463,15 @@ class _CrewClockHomeState extends State<CrewClockHome>
       if (decoded is! Map) return false;
 
       switch (decoded['type']) {
+        case 'EXPORT_DUTY_BRIEFING':
+          try {
+            if (!Platform.isIOS) throw Exception('PDF export requires iPhone.');
+            await NativeAlarmScheduler._nativeAlarmChannel.invokeMethod<void>(
+              'shareDutyBriefing', {'title': decoded['title'], 'lines': decoded['lines']});
+          } catch (error) {
+            await controller.runJavaScript('toast(${jsonEncode(error.toString())},"er");');
+          }
+          return true;
         case 'SET_INTERVAL_ALARMS':
           try {
             if (!Platform.isIOS) throw Exception('Repeating reminders require iPhone.');

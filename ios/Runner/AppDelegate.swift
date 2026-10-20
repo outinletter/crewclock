@@ -30,6 +30,10 @@ import AVFoundation
       Task { @MainActor in
         do {
           switch call.method {
+          case "shareDutyBriefing":
+            guard let owner = self else { throw NSError(domain: "CrewClock", code: 3) }
+            try owner.shareDutyBriefing(call.arguments as? [String: Any] ?? [:])
+            result(nil)
           case "syncIntervalAlarms":
             let args = call.arguments as? [String: Any] ?? [:]
             result(try await CrewIntervalReminders.sync(args["records"] as? [[String: Any]] ?? [],
@@ -123,6 +127,38 @@ import AVFoundation
     center.removePendingNotificationRequests(withIdentifiers: ids)
     center.removeDeliveredNotifications(withIdentifiers: ids)
     completionHandler()
+  }
+
+  @MainActor private func shareDutyBriefing(_ args: [String: Any]) throws {
+    guard let lines = args["lines"] as? [String], lines.count <= 50,
+      lines.allSatisfy({ $0.count <= 2000 }),
+      let root = UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene })
+        .flatMap({ $0.windows }).first(where: { $0.isKeyWindow })?.rootViewController else {
+      throw NSError(domain: "CrewClock", code: 3, userInfo: [NSLocalizedDescriptionKey: "Unable to export flight preparation."])
+    }
+    let title = String((args["title"] as? String ?? "CrewClock Flight Preparation").prefix(100))
+    let bounds = CGRect(x: 0, y: 0, width: 595, height: 842)
+    let renderer = UIGraphicsPDFRenderer(bounds: bounds)
+    let url = FileManager.default.temporaryDirectory.appendingPathComponent("CrewClock-\(UUID().uuidString).pdf")
+    try renderer.writePDF(to: url) { context in
+      context.beginPage()
+      var y: CGFloat = 40
+      let paragraphs = [title] + lines
+      for (index, text) in paragraphs.enumerated() {
+        let attributes: [NSAttributedString.Key: Any] = [.font: index == 0 ? UIFont.boldSystemFont(ofSize: 20) : UIFont.systemFont(ofSize: 12), .foregroundColor: UIColor.black]
+        let height = ceil((text as NSString).boundingRect(with: CGSize(width: 515, height: CGFloat.greatestFiniteMagnitude), options: [.usesLineFragmentOrigin, .usesFontLeading], attributes: attributes, context: nil).height) + 8
+        if y + height > 802 { context.beginPage(); y = 40 }
+        (text as NSString).draw(in: CGRect(x: 40, y: y, width: 515, height: height), withAttributes: attributes)
+        y += height + 6
+      }
+    }
+    var presenter = root
+    while let presented = presenter.presentedViewController { presenter = presented }
+    let sheet = UIActivityViewController(activityItems: [url], applicationActivities: nil)
+    sheet.popoverPresentationController?.sourceView = presenter.view
+    sheet.popoverPresentationController?.sourceRect = CGRect(x: presenter.view.bounds.midX, y: presenter.view.bounds.midY, width: 1, height: 1)
+    sheet.completionWithItemsHandler = { _, _, _, _ in try? FileManager.default.removeItem(at: url) }
+    presenter.present(sheet, animated: true)
   }
 
   @MainActor private func chooseSound(_ result: @escaping FlutterResult) {

@@ -339,6 +339,28 @@ body.import-open #notifBanner,body.import-open #pwaBanner,body.import-open #iosG
 .dl-inp{width:100%;padding:10px 12px;background:var(--bg);border:1.5px solid var(--bdr);
   border-radius:9px;color:var(--tx);font-family:'Inter',sans-serif;font-size:13px;outline:none;transition:border-color .2s}
 .dl-inp:focus{border-color:var(--blue)}
+.interval-fields{display:grid;grid-template-columns:minmax(0,1fr) 100px;gap:10px;margin-bottom:10px}
+.interval-fields .dl-row{min-width:0;margin-bottom:0}
+.duty-briefing{margin:16px 16px 12px;padding:18px;border-radius:18px;background:var(--white);border:1px solid var(--bdr);box-shadow:var(--shadow-md)}
+.briefing-top{display:flex;justify-content:space-between;gap:12px;align-items:center;margin-bottom:12px}
+.briefing-kicker{font-size:10px;letter-spacing:1.5px;color:var(--blue);font-weight:700;text-transform:uppercase}
+.briefing-title{font-size:21px;letter-spacing:-.5px;margin:4px 0;font-weight:750}
+.briefing-sub{font-size:12px;color:var(--tx2);line-height:1.6}
+.briefing-clocks{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:14px 0}
+.briefing-clock{padding:10px 7px;background:var(--blue-light);border-radius:10px;min-width:0}
+.briefing-clock small{display:block;font-size:10px;color:var(--tx2);margin-bottom:5px}
+.briefing-clock strong{display:block;font-size:18px;font-variant-numeric:tabular-nums}
+.briefing-clock span{font-size:10px;color:var(--tx2)}
+.briefing-step{display:flex;justify-content:space-between;gap:12px;font-size:12px;padding:9px 0;border-bottom:1px solid var(--bdr)}
+.briefing-check{display:flex;gap:10px;align-items:center;font-size:13px;padding:10px 0;min-height:44px}
+.briefing-check input{width:20px;height:20px;flex-shrink:0;accent-color:var(--blue)}
+.briefing-check small{display:block;font-size:10px;color:var(--tx2);margin-top:3px}
+.briefing-note{resize:vertical;min-height:68px;margin-top:8px}
+.briefing-actions{display:flex;gap:8px;margin-top:10px}
+.briefing-actions input{flex:1;min-width:0}
+.briefing-actions button{border:0;border-radius:9px;background:var(--blue);color:white;padding:8px 14px;font-weight:700}
+.duty-briefing button{min-height:44px;min-width:44px}
+.duty-briefing .dl-inp{font-size:16px}
 .dl-inp[type=date]{color-scheme:light}
 body.dark .dl-inp[type=date]{color-scheme:dark}
 
@@ -484,18 +506,19 @@ body.dark .dl-inp[type=date]{color-scheme:dark}
 
 <nav class="top-nav">
   <div class="nav-title">
-    <h1>CREW CLOCK</h1><p>FLIGHT ALARM SYSTEM</p>
+    <h1>CREW CLOCK</h1><p>ROSTER · LOCAL TIME · DUTY PREP</p>
   </div>
 </nav>
 
 <div class="page-tabs">
-  <button class="ptab active" id="ptab-calendar" onclick="switchTab('calendar',this)">Calendar</button>
+  <button class="ptab active" id="ptab-calendar" onclick="switchTab('calendar',this)">Roster</button>
   <button class="ptab" id="ptab-alarm" onclick="switchTab('alarm',this)">Alarm</button>
   <button class="ptab" id="ptab-settings" onclick="switchTab('settings',this)">Settings</button>
 </div>
 
 
 <div class="panel show" id="panel-calendar">
+  <section id="dutyBriefing" class="duty-briefing" aria-label="Flight preparation briefing"></section>
   <div class="cal-card">
     <div class="cal-nav">
       <button class="cal-nav-btn" onclick="doCalMove(-1)">&#8249;</button>
@@ -564,10 +587,12 @@ body.dark .dl-inp[type=date]{color-scheme:dark}
     <div class="alarm-card" style="margin-top:16px">
       <div class="alarm-card-head"><div class="ach-lbl">Interval Reminder</div></div>
       <div class="alarm-card-body">
-        <div class="dl-row"><label for="intervalLabel">Name</label><input id="intervalLabel" class="dl-inp" maxlength="100" placeholder="e.g. Squat exercise"></div>
-        <div class="dl-row"><label for="intervalMinutes">Every (minutes)</label><input id="intervalMinutes" class="dl-inp" type="number" inputmode="numeric" min="1" max="10080" step="1" value="90"></div>
-        <p class="import-copy">First reminder after one interval, then repeats until paused or deleted. Uses iPhone notifications, including when the app is closed. Allow notification sounds; Silent mode and Focus may silence reminders.</p>
-        <button id="addIntervalButton" class="btn-az" onclick="addIntervalAlarm()">Start repeating reminder</button>
+        <div class="interval-fields">
+          <div class="dl-row"><label for="intervalLabel">Name</label><input id="intervalLabel" class="dl-inp" maxlength="100" placeholder="e.g. Squat exercise"></div>
+          <div class="dl-row"><label for="intervalMinutes">Every (min)</label><input id="intervalMinutes" class="dl-inp" type="number" inputmode="numeric" min="1" max="10080" step="1" value="90"></div>
+        </div>
+        <p class="import-copy">Repeats even when the app is closed. Allow notification sounds; Silent mode and Focus may silence reminders.</p>
+        <button id="addIntervalButton" class="btn-az" onclick="addIntervalAlarm()">Start reminder</button>
       </div>
     </div>
     <div id="intervalAlarmList"></div>
@@ -1090,6 +1115,10 @@ function goToToday() {
 
 function p2(n){return String(n).padStart(2,'0');}
 function fmt(dt){var d=displayDate(dt);return p2(d.getHours())+':'+p2(d.getMinutes());}
+function fmtAtZone(dt,zone){var d=dateAtZone(new Date(dt),zone);return p2(d.getHours())+':'+p2(d.getMinutes());}
+function alarmZone(a){return a&&a.type!=='direct'?airportZone(a.depApt):appZone();}
+function alarmDay(a,dt){return dayKeyFromCivilDate(dateAtZone(new Date(dt),alarmZone(a)));}
+function alarmTimeText(a,dt){return fmtAtZone(dt,alarmZone(a));}
 function uid(){return String(Date.now())+String(Math.random()).slice(2,6);}
 function dc(o){return JSON.parse(JSON.stringify(o));}
 function escQ(s){return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');}
@@ -1122,6 +1151,75 @@ function refreshFlightLocalTimes(f){
   if(f.arrivalUtc){var arr=dateAtZone(new Date(f.arrivalUtc),airportZone(f.arrApt));f.arrDate=dateText(arr);f.arrTime=p2(arr.getHours())+':'+p2(arr.getMinutes());}
 }
 
+
+var briefingSelected='',briefingDemo=null;
+function briefingKey(f){return [f.flight,f.depApt,parseFlightDate(f).toISOString()].join('|');}
+function briefingFlight(){
+  if(briefingDemo)return briefingDemo.flight;
+  var flights=detectedFlights.slice().sort(function(a,b){return parseFlightDate(a)-parseFlightDate(b);});
+  return flights.find(function(f){return briefingKey(f)===briefingSelected;})||flights.find(function(f){return (f.arrivalUtc?Date.parse(f.arrivalUtc):+parseFlightDate(f))>=Date.now();})||flights[flights.length-1]||null;
+}
+function briefingState(f){
+  if(briefingDemo)return briefingDemo.state;
+  var saved={};try{saved=JSON.parse(localStorage.getItem('crewclock_briefings_v1')||'{}')||{};}catch(e){}
+  var state=saved[briefingKey(f)];
+  if(state&&Array.isArray(state.tasks)&&state.tasks.length<=12&&state.tasks.every(function(t){return t&&typeof t.label==='string'&&t.label.length<=100&&(!t.checkedAt||Number.isFinite(Date.parse(t.checkedAt)));}))return state;
+  return {tasks:['Roster and departure time checked','Crew documents packed','Airport transport arranged','Personal bag ready'].map(function(label){return {label:label,checkedAt:null};}),note:''};
+}
+function saveBriefingState(f,state){
+  if(briefingDemo){briefingDemo.state=state;return true;}
+  try{var saved=JSON.parse(localStorage.getItem('crewclock_briefings_v1')||'{}')||{};if(typeof saved!=='object'||Array.isArray(saved))saved={};saved[briefingKey(f)]=state;localStorage.setItem('crewclock_briefings_v1',JSON.stringify(saved));return true;}
+  catch(e){toast('Could not save preparation notes on this device.','er');return false;}
+}
+function chooseBriefing(key){briefingSelected=key;renderDutyBriefing();}
+function toggleBriefingTask(index){var f=briefingFlight();if(!f)return;var s=briefingState(f);if(!s.tasks[index])return;s.tasks[index].checkedAt=s.tasks[index].checkedAt?null:new Date().toISOString();saveBriefingState(f,s);renderDutyBriefing();}
+function addBriefingTask(){var input=document.getElementById('briefingNewTask'),label=input.value.trim(),f=briefingFlight();if(!f||!label)return;var s=briefingState(f);if(s.tasks.length>=12){toast('Up to 12 preparation items per flight.','er');return;}s.tasks.push({label:label.slice(0,100),checkedAt:null});if(saveBriefingState(f,s))input.value='';input.blur();renderDutyBriefing();}
+function deleteBriefingTask(index){var f=briefingFlight();if(!f)return;var s=briefingState(f);s.tasks.splice(index,1);saveBriefingState(f,s);renderDutyBriefing();}
+function saveBriefingNote(note){var f=briefingFlight();if(!f)return;var s=briefingState(f);s.note=note.slice(0,1000);saveBriefingState(f,s);}
+function startBriefingDemo(){
+  var civil=dateAtZone(new Date(),'America/Chicago');civil.setDate(civil.getDate()+2);
+  var departure=zonedCalendarDate(civil.getFullYear(),civil.getMonth()+1,civil.getDate(),11,55,0,'America/Chicago');
+  var f={flight:'CC102',depApt:'DFW',arrApt:'ICN',type:'intl',departureUtc:departure.toISOString(),arrivalUtc:new Date(+departure+14*3600000).toISOString()};refreshFlightLocalTimes(f);
+  briefingDemo={flight:f,state:{tasks:['Roster and departure time checked','Crew documents packed','Airport transport arranged','Personal bag ready'].map(function(label){return {label:label,checkedAt:null};}),note:''}};renderDutyBriefing();
+}
+function closeBriefingDemo(){briefingDemo=null;renderDutyBriefing();}
+function briefingExportLines(f,state){
+  var dep=parseFlightDate(f),zone=airportZone(f.depApt);
+  function stamp(dt,z){return dayKeyFromCivilDate(dateAtZone(new Date(dt),z))+' '+fmtAtZone(dt,z);}
+  return [(briefingDemo?'FICTIONAL DEMO - no alarms scheduled':'Personal flight preparation'),
+    f.flight+' '+f.depApt+' → '+f.arrApt,
+    'Departure '+f.depApt+': '+stamp(dep,zone)+' ('+(zone||'device time zone')+')',
+    'Departure '+baseApt+': '+stamp(dep,airportZone(baseApt)),
+    'Departure UTC: '+stamp(dep,'UTC'),
+    'Departure instant: '+dep.toISOString(),
+    'PREPARATION TIMELINE ('+f.depApt+' local)'].concat(getOffsetsForFlight(f).map(function(o){return stamp(new Date(+dep-(o.h*60+o.m)*60000),zone)+' — '+o.lbl;}),
+    ['PERSONAL PREPARATION'],state.tasks.map(function(t){return (t.checkedAt?'[Checked '+stamp(t.checkedAt,zone)+'] ':'[ ] ')+t.label;}),
+    ['LAYOVER / PICKUP NOTE',state.note||'No note.','Created UTC: '+new Date().toISOString(),'Personal organization only. Use your airline’s official operational procedures and roster.']);
+}
+function exportDutyBriefing(){
+  var f=briefingFlight();if(!f)return;
+  if(!window.crewclock||typeof window.crewclock.postMessage!=='function'){toast('PDF export is available in the iPhone app.','in');return;}
+  window.crewclock.postMessage(JSON.stringify({type:'EXPORT_DUTY_BRIEFING',title:'CrewClock Flight Preparation',lines:briefingExportLines(f,briefingState(f))}));
+}
+function renderDutyBriefing(){
+  var wrap=document.getElementById('dutyBriefing');if(!wrap)return;
+  if(document.activeElement&&wrap.contains(document.activeElement)&&(document.activeElement.tagName==='TEXTAREA'||(document.activeElement.tagName==='INPUT'&&document.activeElement.type!=='checkbox')))return;
+  var f=briefingFlight();
+  if(!f){wrap.innerHTML='<div class="briefing-kicker">Pilot workflow</div><h2 class="briefing-title">Your next duty, in one place.</h2><p class="briefing-sub">Import your roster to connect departure-local alarms, time-zone checks and a personal preparation list.</p><div class="briefing-actions"><button onclick="openUploadSheet()">Import roster</button><button onclick="startBriefingDemo()">Explore flight briefing</button></div>';return;}
+  var state=briefingState(f),departure=parseFlightDate(f),zone=airportZone(f.depApt),done=state.tasks.filter(function(t){return t.checkedAt;}).length;
+  var minutes=Math.ceil((departure-Date.now())/60000),countdown=minutes>0?'Departs in '+Math.floor(minutes/60)+'h '+minutes%60+'m':'Departure has passed';
+  function clock(label,z){var d=dateAtZone(departure,z);return '<div class="briefing-clock"><small>'+escQ(label)+'</small><strong>'+fmtAtZone(departure,z)+'</strong><span>'+dayKeyFromCivilDate(d)+'</span></div>';}
+  var html='<div class="briefing-top"><div><div class="briefing-kicker">'+(briefingDemo?'Fictional demo · no alarms scheduled':'Flight preparation')+'</div><h2 class="briefing-title">'+escQ(f.flight)+' · '+escQ(f.depApt)+' → '+escQ(f.arrApt)+'</h2><div class="briefing-sub">'+countdown+'</div></div><button class="dal-dis" onclick="'+(briefingDemo?'closeBriefingDemo()':'startBriefingDemo()')+'">'+(briefingDemo?'Exit demo':'Demo')+'</button></div>';
+  if(!briefingDemo&&detectedFlights.length>1)html+='<label class="briefing-sub" for="briefingFlight">Flight</label><select id="briefingFlight" class="dl-inp" onchange="chooseBriefing(this.value)">'+detectedFlights.slice().sort(function(a,b){return parseFlightDate(a)-parseFlightDate(b);}).map(function(other){var key=briefingKey(other);return '<option value="'+escQ(key)+'"'+(key===briefingKey(f)?' selected':'')+'>'+escQ(other.date+' '+other.flight+' '+other.depApt+' → '+other.arrApt)+'</option>';}).join('')+'</select>';
+  html+='<div class="briefing-clocks">'+clock(f.depApt+' departure',zone)+clock(baseApt+' home',airportZone(baseApt))+clock('UTC','UTC')+'</div><p class="briefing-sub">Same departure instant in three time zones. Flight reminders stay on '+escQ(f.depApt)+' local time when you travel.</p>';
+  html+='<div class="briefing-kicker" style="margin-top:16px">Departure preparation timeline</div>';
+  html+=getOffsetsForFlight(f).map(function(o){var at=new Date(+departure-(o.h*60+o.m)*60000);var enabled=!!(flightToggles[f.id]&&flightToggles[f.id][o.id]);return '<div class="briefing-step"><span>'+escQ(o.lbl)+'</span><span>'+fmtAtZone(at,zone)+' '+escQ(f.depApt)+' · '+(briefingDemo?'Preview':(enabled?'On':'Off'))+'</span></div>';}).join('');
+  html+='<div class="briefing-top" style="margin-top:18px"><div class="briefing-kicker">Personal preparation</div><span class="briefing-sub">'+done+' / '+state.tasks.length+' checked</span></div>';
+  html+=state.tasks.map(function(t,index){return '<div style="display:flex;align-items:center;gap:8px"><label class="briefing-check" style="flex:1"><input type="checkbox" '+(t.checkedAt?'checked ':'')+'onchange="toggleBriefingTask('+index+')"><span>'+escQ(t.label)+(t.checkedAt?'<small>Checked '+dayKeyFromCivilDate(dateAtZone(new Date(t.checkedAt),zone))+' '+fmtAtZone(t.checkedAt,zone)+' '+escQ(f.depApt)+'</small>':'')+'</span></label><button class="dal-del" aria-label="Delete preparation item" onclick="deleteBriefingTask('+index+')">×</button></div>';}).join('');
+  html+='<div class="briefing-actions"><input id="briefingNewTask" class="dl-inp" aria-label="New preparation item" placeholder="Add your own preparation item" maxlength="100"><button onclick="addBriefingTask()">Add</button></div><label class="briefing-sub" for="briefingNote" style="display:block;margin-top:14px">Layover / pickup note · saved on this device</label><textarea id="briefingNote" class="dl-inp briefing-note" placeholder="Hotel pickup, terminal or personal reminder" maxlength="1000" oninput="saveBriefingNote(this.value)">'+escQ(state.note||'')+'</textarea><p class="briefing-sub" style="margin-top:10px">Personal organization only. Use your airline’s official operational procedures and roster.</p>';
+  html+='<div class="briefing-actions"><button onclick="exportDutyBriefing()">Save / share briefing PDF</button></div>';
+  wrap.innerHTML=html;
+}
 
 function loadSettings(){
   try{
@@ -1232,7 +1330,9 @@ function init(){
   drumY_val=now.getFullYear()-2025;drumMo_val=now.getMonth();drumD_val=now.getDate()-1;drumH_val=now.getHours();drumM_val=now.getMinutes();
   loadAlarms();
   loadIntervalAlarms();
+  renderDutyBriefing();
   setInterval(renderIntervalAlarms,60000);
+  setInterval(renderDutyBriefing,60000);
   if(detectedFlights.length && !window.crewclock){
     initFlightToggles();
     autoRegisterAll();
@@ -1604,7 +1704,7 @@ function renderCal(){
   
   var aDates={};
   alms.filter(function(a){return !a.dism;}).forEach(function(a){
-      var dk=dayKeyFromDate(a.time);
+      var dk=alarmDay(a,a.time);
       aDates[dk]=(aDates[dk]||0)+1;
   });
   
@@ -1666,7 +1766,7 @@ function normKey(v){
 
 function alarmDepDay(a){
   if(!a||!a.dep)return '';
-  return dayKeyFromDate(a.dep);
+  return alarmDay(a,a.dep);
 }
 
 function sameFlightAlarm(f,a){
@@ -1683,7 +1783,7 @@ function autoAlarmSemanticKey(f,o){
 function alarmSemanticKey(a,flights){
   if(!a||a.type==='direct')return '';
   var f=findFlightForAlarm(a,flights);
-  var date=f&&f.date?f.date:(a.dep?dayKeyFromDate(a.dep):'');
+  var date=f&&f.date?f.date:(a.dep?alarmDay(a,a.dep):'');
   return [normKey(date),normKey(a.fnum),normKey(a.depApt),normKey(a.lbl)].join('|');
 }
 
@@ -1729,7 +1829,7 @@ function buildDisplayedDayAlarms(dk,flights){
     if(a.dep&&!(a.dep instanceof Date))a.dep=new Date(a.dep);
     var match=false;
     if(a.type!=='direct'&&a.dep){
-      match=dayKeyFromDate(a.dep)===dk||flights.some(function(f){return sameFlightAlarm(f,a);});
+      match=alarmDepDay(a)===dk||flights.some(function(f){return sameFlightAlarm(f,a);});
     }else if(a.time){
       match=dayKeyFromDate(a.time)===dk;
     }
@@ -1834,13 +1934,13 @@ function renderDaySchedule(dk,target){
     }
 
     var rowCls = (a.dism || a.missed) ? 'dfr missed-dfr' : 'dfr';
-    var opac = (a.dism || a.missed) ? 'opacity:0.5;' : (displayTime && dayKeyFromDate(displayTime)>todayStr() ? 'opacity:0.45;' : '');
+    var opac = (a.dism || a.missed) ? 'opacity:0.5;' : (displayTime && alarmDay(a,displayTime)>dayKeyFromCivilDate(dateAtZone(new Date(),alarmZone(a))) ? 'opacity:0.45;' : '');
 
     var h='<div class="'+rowCls+'" style="'+opac+'">'
-      +'<div class="dfr-time">'+fmt(displayTime)+'</div>'
+      +'<div class="dfr-time">'+alarmTimeText(a,displayTime)+'<small style="display:block;font-size:9px">'+escQ(a.type==='direct'?'':a.depApt+' local')+'</small></div>'
       +'<div class="dfr-info"><div class="dfr-route">'+routeHtml+'</div></div>'
       +'</div>';
-    rows.push({s:+(fmt(displayTime).replace(':','')), html:h});
+    rows.push({s:displayTime.getTime(), html:h});
   });
 
   rows.sort(function(a,b){return a.s-b.s;});
@@ -1848,6 +1948,7 @@ function renderDaySchedule(dk,target){
 }
 
 function renderHomeFlightList(){
+  renderDutyBriefing();
   var wrap=document.getElementById('homeFlightList');if(!wrap)return;
   
   var targetPrefix = calYear + '-' + p2(calMonth + 1); 
@@ -2244,7 +2345,7 @@ function renderSheetFalWrap(){
 
 function renderFalItem(f,extraCls){
   var now=new Date();var fdt=parseFlightDate(f);
-  var isTod=f.date===todayStr();
+  var isTod=f.date===dayKeyFromCivilDate(dateAtZone(new Date(),airportZone(f.depApt)));
   var isPast=(extraCls||'').indexOf('past')>=0;
   var isNext=(extraCls||'').indexOf('next-flight')>=0;
   var cls='fal-item';
@@ -2256,7 +2357,7 @@ function renderFalItem(f,extraCls){
   var dp=(f.date||'').split('-');
   var dateStr=(dp[1]||'')+'/'+(dp[2]||'');
   var D=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-  var dow=D[fdt.getDay()]||'';
+  var dow=D[dateAtZone(fdt,airportZone(f.depApt)).getDay()]||'';
   var tl=f.type==='base'?'HB INTL':(f.type==='dom'?'HB DOM':(f.type==='intl'?'OVERSEAS':'ICS'));
   var tc=f.type==='base'?'base':(f.type==='dom'?'dom':(f.type==='intl'?'intl':'ics'));
   var offs=f.type==='intl'?intlOffs:(f.type==='dom'?domOffs:baseOffs);
@@ -2281,7 +2382,7 @@ function renderFalItem(f,extraCls){
     var isPassed = at < now;
     var ac=on?(f.type==='base'?' on-base':(f.type==='dom'?' on-dom':' on-intl')):'';
     if(isPassed) ac += ' dimmed-alm';
-    else if(dayKeyFromDate(at)>todayStr()) ac += ' upcoming-alm';
+    else if(dayKeyFromCivilDate(dateAtZone(at,airportZone(f.depApt)))>dayKeyFromCivilDate(dateAtZone(now,airportZone(f.depApt)))) ac += ' upcoming-alm';
     var togCls='tog'+(on?(f.type==='base'?' on':(f.type==='dom'?' on-purp':' on-amb')):'');
     var offTxt='';
     if(o.h>0&&o.m>0) offTxt='('+o.h+'h '+o.m+'m before)';
@@ -2294,7 +2395,7 @@ function renderFalItem(f,extraCls){
       +'<span class="atog-offset">'+offTxt+'</span>'
       +'</div>'
       +'</div>'
-      +'<span class="atog-time">'+fmt(at)+'</span>'
+      +'<span class="atog-time">'+fmtAtZone(at,airportZone(f.depApt))+'<small style="display:block;font-size:9px">'+escQ(f.depApt)+' local</small></span>'
       +'<button class="'+togCls+'" onclick="togFA(\''+f.id+'\',\''+o.id+'\')" ></button>'
       +'</div>';
   }).join('');
@@ -2335,7 +2436,7 @@ function renderFalItem(f,extraCls){
 
 function renderFalItemPast(f){
   var fdt=parseFlightDate(f);var dp=(f.date||'').split('-');
-  var D=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];var dow=D[fdt.getDay()]||'';
+  var D=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];var dow=D[dateAtZone(fdt,airportZone(f.depApt)).getDay()]||'';
   var tl=f.type==='base'?'HB INTL':(f.type==='dom'?'HB DOM':(f.type==='intl'?'OVERSEAS':'ICS'));
   var tc=f.type==='base'?'base':(f.type==='dom'?'dom':(f.type==='intl'?'intl':'ics'));
   
@@ -2767,7 +2868,7 @@ function trigAlarm(a){
   if (arrTxt && a.arrTime) arrTxt += ' ' + a.arrTime;
   
   document.getElementById('rtt').textContent=a.lbl + (a.fnum ? ' ('+a.fnum+')' : '');
-  document.getElementById('rdt').textContent=fmt(a.time)+(a.dep?' - DEP '+fmt(a.dep):'') + (a.fnum ? ' ['+a.depApt+arrTxt+']' : '');
+  document.getElementById('rdt').textContent=alarmTimeText(a,a.time)+(a.dep?' - DEP '+alarmTimeText(a,a.dep):'') + (a.fnum ? ' ['+a.depApt+' local '+arrTxt+']' : '');
   document.getElementById('ro').classList.add('show');
   document.getElementById('ro')._alarmID = a.id;
 
@@ -2838,8 +2939,10 @@ function clearAllData(confirmed){
     localStorage.removeItem('crewclock_alarms');
     localStorage.removeItem('crewclock_toggles');
     localStorage.removeItem('crewclock_registered');
+    localStorage.removeItem('crewclock_briefings_v1');
   }catch(e){}
   if(intervalAlarms.length)updateIntervalAlarms([],'Repeating reminders deleted',false);
+  briefingSelected='';briefingDemo=null;
   detectedFlights=[];alms=[];flightToggles={};openFlights={};registeredFlights={};
   saveAlarms();
   stopSnd();stopNativeRingingAlarm(false);releaseWakeLock();

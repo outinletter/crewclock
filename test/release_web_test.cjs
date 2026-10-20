@@ -19,6 +19,50 @@ function app() {
   for (const name of ['renderDirectAlarms', 'renderCal', 'renderDaySchedule', 'renderHomeFlightList', 'toast', 'stopSnd', 'releaseWakeLock']) ctx[name] = () => {};
   return { ctx, items, messages };
 }
+test('departure-local alarm dates and times remain fixed after arrival in Korea',()=>{
+  const {ctx}=app();let now=Date.parse('2026-10-19T12:00:00Z');
+  ctx.Date=class extends Date{constructor(...args){super(...(args.length?args:[now]));}static now(){return now;}};
+  ctx.detectedFlights=ctx.parseICS('BEGIN:VEVENT\nDTSTART:20261017T002000Z\nDTEND:20261017T131000Z\nSUMMARY:KE031 ICN-DFW\nEND:VEVENT\nBEGIN:VEVENT\nDTSTART:20261019T165500Z\nDTEND:20261020T060000Z\nSUMMARY:KE032 DFW-ICN\nEND:VEVENT');
+  const f=ctx.detectedFlights[1],dep=ctx.parseFlightDate(f),a={id:'old-import',type:'intl',fnum:f.flight,depApt:'DFW',dep,time:new ctx.Date(+dep-3*3600000)};
+  assert.equal(ctx.appZone(),'America/Chicago');assert.equal(ctx.alarmTimeText(a,a.time),'08:55');
+  now=Date.parse('2026-10-20T07:00:00Z');
+  assert.equal(ctx.appZone(),'Asia/Seoul');assert.equal(ctx.fmt(dep),'01:55');
+  assert.equal(ctx.alarmDepDay(a),'2026-10-19');assert.equal(ctx.alarmTimeText(a,dep),'11:55');
+  assert.equal(ctx.alarmTimeText(a,a.time),'08:55');assert.equal(a.time.toISOString(),'2026-10-19T13:55:00.000Z');
+  assert.equal(ctx.findFlightForAlarm(a),f,'reimported flight IDs still match the departure-local date');
+  ctx.resetDef();ctx.detectedFlights=[f];ctx.alms=[a];
+  assert.ok(ctx.buildDisplayedDayAlarms('2026-10-19',[f]).some(row=>row.id===a.id));
+  assert.equal(ctx.buildDisplayedDayAlarms('2026-10-20',[]).length,0);
+});
+test('personal preparation persists per departure, survives reimport and stays separate from alarms',()=>{
+  const {ctx,items,messages}=app();ctx.document.getElementById=()=>null;
+  const f={id:'one',flight:'CC102',depApt:'DFW',arrApt:'ICN',departureUtc:'2030-07-19T16:55:00Z',type:'intl'};
+  ctx.detectedFlights=[f];ctx.toggleBriefingTask(0);ctx.saveBriefingNote('Hotel pickup 08:20');
+  assert.ok(ctx.briefingState(f).tasks[0].checkedAt);assert.equal(ctx.briefingState(f).note,'Hotel pickup 08:20');
+  assert.equal(ctx.briefingState({...f,id:'reimported'}).note,'Hotel pickup 08:20');
+  assert.equal(ctx.briefingState({...f,departureUtc:'2030-07-20T16:55:00Z'}).note,'');
+  assert.ok(items.has('crewclock_briefings_v1'));assert.equal(messages.length,0);assert.equal(ctx.alms.length,0);
+  ctx.toggleBriefingTask(0);assert.equal(ctx.briefingState(f).tasks[0].checkedAt,null);
+});
+test('briefing demo and PDF export do not import or register fictional alarms',()=>{
+  const {ctx,items,messages}=app();ctx.document.getElementById=()=>null;ctx.resetDef();
+  ctx.startBriefingDemo();ctx.toggleBriefingTask(1);ctx.saveBriefingNote('Pickup lobby');ctx.exportDutyBriefing();
+  assert.equal(ctx.detectedFlights.length,0);assert.equal(ctx.alms.length,0);assert.equal(items.size,0);
+  assert.equal(messages.length,1);assert.equal(messages[0].type,'EXPORT_DUTY_BRIEFING');
+  assert.ok(messages[0].lines.some(s=>s.includes('FICTIONAL DEMO')));
+  assert.ok(messages[0].lines.some(s=>s.startsWith('Departure UTC:')));
+  assert.ok(messages[0].lines.includes('Pickup lobby'));ctx.closeBriefingDemo();assert.equal(ctx.briefingFlight(),null);
+});
+test('briefing renders three departure clocks and escapes preparation notes',()=>{
+  const {ctx}=app();ctx.resetDef();const wrap={innerHTML:''};ctx.document.getElementById=id=>id==='dutyBriefing'?wrap:null;
+  ctx.detectedFlights=[{flight:'CC102',depApt:'DFW',arrApt:'ICN',type:'intl',date:'2030-07-19',departureUtc:'2030-07-19T16:55:00Z'}];
+  ctx.saveBriefingNote('<script>alert(1)</script>');ctx.renderDutyBriefing();
+  assert.match(wrap.innerHTML,/DFW departure/);assert.match(wrap.innerHTML,/ICN home/);assert.match(wrap.innerHTML,/11:55/);assert.match(wrap.innerHTML,/01:55/);
+  assert.match(wrap.innerHTML,/&lt;script>/);assert.doesNotMatch(wrap.innerHTML,/<script>alert/);
+  assert.match(wrap.innerHTML,/Save \/ share briefing PDF/);
+  wrap.contains=()=>true;ctx.document.activeElement={tagName:'INPUT',type:'checkbox'};
+  ctx.toggleBriefingTask(0);assert.match(wrap.innerHTML,/1 \/ 4 checked/,'checking an item updates its timestamp and progress immediately');
+});
 test('interval reminders commit only after native acknowledgement and survive reload', () => {
   const {ctx,items,messages}=app();
   const fields={intervalLabel:{value:'Squat exercise'},intervalMinutes:{value:'90'}};
