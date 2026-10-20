@@ -561,6 +561,16 @@ body.dark .dl-inp[type=date]{color-scheme:dark}
       </div>
     </div>
     <div id="dalCardWrap"></div>
+    <div class="alarm-card" style="margin-top:16px">
+      <div class="alarm-card-head"><div class="ach-lbl">Interval Reminder</div></div>
+      <div class="alarm-card-body">
+        <div class="dl-row"><label for="intervalLabel">Name</label><input id="intervalLabel" class="dl-inp" maxlength="100" placeholder="e.g. Squat exercise"></div>
+        <div class="dl-row"><label for="intervalMinutes">Every (minutes)</label><input id="intervalMinutes" class="dl-inp" type="number" inputmode="numeric" min="1" max="10080" step="1" value="90"></div>
+        <p class="import-copy">First reminder after one interval, then repeats until paused or deleted. Uses iPhone notifications, including when the app is closed. Allow notification sounds; Silent mode and Focus may silence reminders.</p>
+        <button id="addIntervalButton" class="btn-az" onclick="addIntervalAlarm()">Start repeating reminder</button>
+      </div>
+    </div>
+    <div id="intervalAlarmList"></div>
   </div>
 </div>
 
@@ -958,6 +968,7 @@ var KR_DOM=['ICN','GMP','CJU','PUS','CJJ','TAE','USN','KWJ','KUV','MWX','YNY','H
 
 var baseApt='ICN',baseOffs=[],domOffs=[],intlOffs=[],baseOn={},domOn={},intlOn={},bOc=100,dOc=300,iOc=200;
 var alms=[],detectedFlights=[],flightToggles={},openFlights={},registeredFlights={};
+var intervalAlarms=[],intervalPending=null;
 var aCtx=null,oscs=[];
 var _now=new Date(),drumH_val=_now.getHours(),drumM_val=_now.getMinutes();
 var drumY_val=_now.getFullYear()-2025,drumMo_val=_now.getMonth(),drumD_val=_now.getDate()-1;
@@ -1220,6 +1231,8 @@ function init(){
   now=displayDate(new Date());calYear=now.getFullYear();calMonth=now.getMonth();calSelDate=todayStr();
   drumY_val=now.getFullYear()-2025;drumMo_val=now.getMonth();drumD_val=now.getDate()-1;drumH_val=now.getHours();drumM_val=now.getMinutes();
   loadAlarms();
+  loadIntervalAlarms();
+  setInterval(renderIntervalAlarms,60000);
   if(detectedFlights.length && !window.crewclock){
     initFlightToggles();
     autoRegisterAll();
@@ -1285,6 +1298,7 @@ function switchTab(name,btn){
       if(detectedFlights.length) renderHomeFlightList();
   }
   if(name==='alarm'){
+      renderIntervalAlarms();
       var _n=displayDate(new Date());
       setDrum('drumH',_n.getHours(),true);
       setDrum('drumM',_n.getMinutes(),true);
@@ -2483,6 +2497,43 @@ function dedupeAutoAlarms(){
 }
 
 
+function loadIntervalAlarms(){
+  try{var saved=JSON.parse(localStorage.getItem('crewclock_intervals')||'[]');intervalAlarms=Array.isArray(saved)?saved.filter(function(a){return /^interval_\d+$/.test(a.id)&&Number.isInteger(a.minutes)&&a.minutes>=1&&a.minutes<=10080&&typeof a.label==='string'&&Number.isFinite(a.anchor);}):[];}catch(e){intervalAlarms=[];}
+  renderIntervalAlarms();
+  if(intervalAlarms.length)updateIntervalAlarms(intervalAlarms,'',false);
+}
+function updateIntervalAlarms(next,message,requestPermission){
+  if(intervalPending)return;
+  if(!window.crewclock||typeof window.crewclock.postMessage!=='function'){toast('Repeating reminders require the iPhone app.','er');return;}
+  intervalPending={before:intervalAlarms,message:message};intervalAlarms=next;renderIntervalAlarms();
+  window.crewclock.postMessage(JSON.stringify({type:'SET_INTERVAL_ALARMS',records:next,requestPermission:requestPermission!==false}));
+}
+function intervalSyncResult(ok,error,records){
+  if(!intervalPending)return;
+  var message=intervalPending.message;
+  if(ok){if(Array.isArray(records))intervalAlarms=records;localStorage.setItem('crewclock_intervals',JSON.stringify(intervalAlarms));}
+  else intervalAlarms=intervalPending.before;
+  intervalPending=null;renderIntervalAlarms();
+  if(!ok)toast(error||'Could not save repeating reminders.','er');else if(message)toast(message,'ok');
+}
+function addIntervalAlarm(){
+  var label=document.getElementById('intervalLabel').value.trim(),minutes=Number(document.getElementById('intervalMinutes').value);
+  if(!label){toast('Enter a reminder name.','er');return;}
+  if(!Number.isInteger(minutes)||minutes<1||minutes>10080){toast('Enter a whole interval from 1 to 10080 minutes.','er');return;}
+  if(intervalAlarms.length>=16){toast('Up to 16 repeating reminders can be saved.','er');return;}
+  updateIntervalAlarms(intervalAlarms.concat([{id:'interval_'+uid(),label:label.slice(0,100),minutes:minutes,enabled:true,anchor:Date.now()}]),'Repeating reminder started');
+}
+function toggleIntervalAlarm(id){updateIntervalAlarms(intervalAlarms.map(function(a){return a.id===id?Object.assign({},a,{enabled:!a.enabled,anchor:Date.now()}):a;}),'Repeating reminder updated');}
+function deleteIntervalAlarm(id){updateIntervalAlarms(intervalAlarms.filter(function(a){return a.id!==id;}),'Repeating reminder deleted');}
+function renderIntervalAlarms(){
+  var wrap=document.getElementById('intervalAlarmList');if(!wrap)return;
+  var add=document.getElementById('addIntervalButton');if(add)add.disabled=!!intervalPending;
+  wrap.innerHTML='<div class="dal-wrap">'+intervalAlarms.map(function(a){
+    var step=a.minutes*60000,next=new Date(a.anchor+(Math.floor(Math.max(0,Date.now()-a.anchor)/step)+1)*step);
+    return '<div class="dal-item'+(a.enabled?'':' missed')+'"><div class="dal-info"><div class="dal-lbl">'+escQ(a.label)+'</div><div class="dal-date">Every '+a.minutes+' minutes · '+(a.enabled?'Next '+dayKeyFromDate(next)+' '+fmt(next):'Paused')+'</div></div><button class="dal-dis" '+(intervalPending?'disabled ':'')+'onclick="toggleIntervalAlarm(\''+a.id+'\')">'+(a.enabled?'Pause':'Resume')+'</button><button class="dal-del" '+(intervalPending?'disabled ':'')+'onclick="deleteIntervalAlarm(\''+a.id+'\')" aria-label="Delete repeating reminder">×</button></div>';
+  }).join('')+'</div>';
+}
+
 function addDirectAlarm(){
   var dv=document.getElementById('dDate').value;
   var lbl=(document.getElementById('dLabel').value||'Alarm').trim();
@@ -2788,6 +2839,7 @@ function clearAllData(confirmed){
     localStorage.removeItem('crewclock_toggles');
     localStorage.removeItem('crewclock_registered');
   }catch(e){}
+  if(intervalAlarms.length)updateIntervalAlarms([],'Repeating reminders deleted',false);
   detectedFlights=[];alms=[];flightToggles={};openFlights={};registeredFlights={};
   saveAlarms();
   stopSnd();stopNativeRingingAlarm(false);releaseWakeLock();

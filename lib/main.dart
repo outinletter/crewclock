@@ -106,6 +106,9 @@ class NativeAlarmScheduler {
       return;
     }
 
+    final availableSlots = Platform.isIOS
+        ? await _nativeAlarmChannel.invokeMethod<int>('getAvailableNotificationSlots') ?? 0
+        : 64;
     final now = DateTime.now().toUtc();
     final sorted = records.whereType<Map>().toList()
       ..sort((a, b) =>
@@ -121,7 +124,7 @@ class NativeAlarmScheduler {
       if (!alarmTime.isAfter(now)) continue;
       if (!_asBool(record['armed'])) continue;
       if (_asBool(record['dism']) || _asBool(record['missed'])) continue;
-      if (Platform.isIOS && scheduledCount >= 64) break;
+      if (Platform.isIOS && scheduledCount >= availableSlots) break;
 
       final id = _stableNotificationId(record['id']?.toString() ?? '');
       final label = (record['lbl']?.toString().trim().isNotEmpty ?? false)
@@ -460,6 +463,16 @@ class _CrewClockHomeState extends State<CrewClockHome>
       if (decoded is! Map) return false;
 
       switch (decoded['type']) {
+        case 'SET_INTERVAL_ALARMS':
+          try {
+            if (!Platform.isIOS) throw Exception('Repeating reminders require iPhone.');
+            final records = await NativeAlarmScheduler._nativeAlarmChannel.invokeMethod<List<dynamic>>(
+              'syncIntervalAlarms', {'records': decoded['records'], 'requestPermission': decoded['requestPermission']});
+            await controller.runJavaScript('intervalSyncResult(true,null,${jsonEncode(records)});');
+          } catch (error) {
+            await controller.runJavaScript('intervalSyncResult(false,${jsonEncode(error.toString())},null);');
+          }
+          return true;
         case 'SET_THEME':
           if (mounted) setState(() => _dark = decoded['dark'] == true);
           return true;

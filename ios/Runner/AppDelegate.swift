@@ -30,12 +30,21 @@ import AVFoundation
       Task { @MainActor in
         do {
           switch call.method {
+          case "syncIntervalAlarms":
+            let args = call.arguments as? [String: Any] ?? [:]
+            result(try await CrewIntervalReminders.sync(args["records"] as? [[String: Any]] ?? [],
+              requestPermission: args["requestPermission"] as? Bool == true))
+          case "getAvailableNotificationSlots":
+            let pending = await UNUserNotificationCenter.current().pendingNotificationRequests()
+            result(max(0, 64 - pending.count))
           case "scheduleAlarms":
             let args = call.arguments as? [String: Any] ?? [:]
             let records = args["records"] as? [[String: Any]] ?? []
             if records.isEmpty {
               let center = UNUserNotificationCenter.current()
-              center.removeAllPendingNotificationRequests()
+              let pending = await center.pendingNotificationRequests()
+              center.removePendingNotificationRequests(withIdentifiers: pending.filter {
+                !$0.identifier.hasPrefix("crewclock.interval.") }.map { $0.identifier })
               center.removeAllDeliveredNotifications()
               if #available(iOS 26.0, *), AlarmManager.shared.authorizationState == .authorized {
                 try await CrewSystemAlarms.sync([])
@@ -169,6 +178,72 @@ import AVFoundation
   }
 }
 
+enum CrewIntervalReminders {
+  static let prefix = "crewclock.interval."
+  static func sync(_ records: [[String: Any]], requestPermission: Bool) async throws -> [[String: Any]] {
+    func failure(_ message: String) -> NSError {
+      NSError(domain: "CrewClock", code: 2, userInfo: [NSLocalizedDescriptionKey: message])
+    }
+    guard records.count <= 16 else { throw failure("Up to 16 repeating reminders are allowed.") }
+    var ids = Set<String>()
+    for record in records {
+      guard let id = record["id"] as? String, id.range(of: "^interval_[0-9]+$", options: .regularExpression) != nil,
+        ids.insert(id).inserted, let label = record["label"] as? String,
+        !label.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, label.count <= 100,
+        let minutes = record["minutes"] as? NSNumber,
+        minutes.doubleValue.rounded() == minutes.doubleValue, (1...10080).contains(minutes.intValue),
+        record["enabled"] is Bool else { throw failure("Invalid repeating reminder.") }
+    }
+    let center = UNUserNotificationCenter.current()
+    let active = records.filter { $0["enabled"] as? Bool == true }
+    if !active.isEmpty {
+      if requestPermission { _ = try await center.requestAuthorization(options: [.alert, .sound, .badge]) }
+      let settings = await center.notificationSettings()
+      guard settings.authorizationStatus == .authorized || settings.authorizationStatus == .provisional else {
+        throw failure("Allow CrewClock notifications in iPhone Settings.")
+      }
+    }
+    let pending = await center.pendingNotificationRequests()
+    let existing = pending.filter { $0.identifier.hasPrefix(prefix) }
+    guard pending.count - existing.count + active.count <= 64 else {
+      throw failure("Notification capacity reached. Remove some alarms and try again.")
+    }
+    let previous = UserDefaults.standard.array(forKey: "crewclock.intervals") as? [[String: Any]] ?? []
+    var saved = records
+    var added: [String] = []
+    do {
+      for index in saved.indices where saved[index]["enabled"] as? Bool == true {
+        let record = saved[index], id = record["id"] as! String
+        let identifier = prefix + id
+        if existing.contains(where: { $0.identifier == identifier }),
+          previous.contains(where: { ($0["id"] as? String) == id && ($0["minutes"] as? Int) == (record["minutes"] as? Int) && ($0["label"] as? String) == (record["label"] as? String) }),
+          let old = previous.first(where: { $0["id"] as? String == id }) {
+          saved[index]["anchor"] = old["anchor"]
+          continue
+        }
+        let content = UNMutableNotificationContent()
+        content.title = record["label"] as! String
+        content.body = "Every \(record["minutes"] as! Int) minutes"
+        if let sound = UserDefaults.standard.string(forKey: "crewclock.sound") {
+          content.sound = UNNotificationSound(named: UNNotificationSoundName(rawValue: sound))
+        } else { content.sound = .default }
+        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: Double(record["minutes"] as! Int) * 60, repeats: true)
+        try await center.add(UNNotificationRequest(identifier: identifier, content: content, trigger: trigger))
+        added.append(identifier)
+        saved[index]["anchor"] = Date().timeIntervalSince1970 * 1000
+      }
+    } catch {
+      center.removePendingNotificationRequests(withIdentifiers: added)
+      for old in existing where added.contains(old.identifier) { try? await center.add(old) }
+      throw error
+    }
+    let wanted = Set(active.map { prefix + ($0["id"] as! String) })
+    center.removePendingNotificationRequests(withIdentifiers: existing.filter { !wanted.contains($0.identifier) }.map { $0.identifier })
+    UserDefaults.standard.set(saved, forKey: "crewclock.intervals")
+    return saved
+  }
+}
+
 @available(iOS 26.0, *)
 struct CrewAlarmMetadata: AlarmMetadata { var sourceID: String }
 
@@ -257,7 +332,8 @@ enum CrewSystemAlarms {
       mapping[source] = uuid.uuidString; signatures[source] = signature
       defaults.set(mapping, forKey: "crewclock.alarmIDs")
       defaults.set(signatures, forKey: "crewclock.alarmSignatures")
-      if signatures.count < 64 {
+      let pending = await UNUserNotificationCenter.current().pendingNotificationRequests()
+      if pending.count < 64 || pending.contains(where: { $0.identifier == "alarm." + uuid.uuidString }) {
         let content = UNMutableNotificationContent()
         content.title = label
         content.categoryIdentifier = "crewclock_alarm"

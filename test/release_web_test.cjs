@@ -19,6 +19,37 @@ function app() {
   for (const name of ['renderDirectAlarms', 'renderCal', 'renderDaySchedule', 'renderHomeFlightList', 'toast', 'stopSnd', 'releaseWakeLock']) ctx[name] = () => {};
   return { ctx, items, messages };
 }
+test('interval reminders commit only after native acknowledgement and survive reload', () => {
+  const {ctx,items,messages}=app();
+  const fields={intervalLabel:{value:'Squat exercise'},intervalMinutes:{value:'90'}};
+  ctx.document.getElementById=id=>fields[id] || null;
+  ctx.addIntervalAlarm();
+  assert.equal(messages[0].type,'SET_INTERVAL_ALARMS');
+  assert.equal(messages[0].records[0].minutes,90);
+  assert.equal(items.has('crewclock_intervals'),false);
+  const saved=messages[0].records.map(a=>({...a,anchor:123456789}));
+  ctx.intervalSyncResult(true,null,saved);
+  ctx.loadIntervalAlarms();
+  assert.equal(messages.at(-1).requestPermission,false);
+  assert.equal(messages.at(-1).records[0].anchor,123456789);
+  ctx.intervalSyncResult(true,null,saved);
+  ctx.toggleIntervalAlarm(saved[0].id);
+  assert.equal(messages.at(-1).records[0].enabled,false);
+  ctx.intervalSyncResult(false,'Permission denied',null);
+  assert.equal(ctx.intervalAlarms[0].enabled,true);
+  ctx.deleteIntervalAlarm(saved[0].id);
+  ctx.intervalSyncResult(true,null,[]);
+  assert.equal(JSON.parse(items.get('crewclock_intervals')).length,0);
+});
+test('interval reminders reject empty names and invalid intervals',()=>{
+  const {ctx,messages}=app();
+  const fields={intervalLabel:{value:''},intervalMinutes:{value:'90'}};
+  ctx.document.getElementById=id=>fields[id] || null;
+  ctx.addIntervalAlarm();
+  fields.intervalLabel.value='Exercise';
+  for(const value of ['0','1.5','NaN','10081']){fields.intervalMinutes.value=value;ctx.addIntervalAlarm();}
+  assert.equal(messages.length,0);
+});
 test('restore presets requires native confirmation and preserves personal data', () => {
   const { ctx, messages } = app();
   ctx.alms = [{ id: 'personal', type: 'direct', time: new Date('2030-01-01') }];
