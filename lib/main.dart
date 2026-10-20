@@ -618,10 +618,10 @@ class _CrewClockHomeState extends State<CrewClockHome>
   @override
   Widget build(BuildContext context) {
     return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: _dark ? SystemUiOverlayStyle.light : SystemUiOverlayStyle.dark,
+      value: SystemUiOverlayStyle.light,
       child: Scaffold(
         backgroundColor:
-            _dark ? const Color(0xff0d1f2d) : const Color(0xffdaeefa),
+            _dark ? const Color(0xff08131f) : const Color(0xff10253a),
         body: SafeArea(
           child: WebViewWidget(controller: controller),
         ),

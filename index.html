@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<meta name="theme-color" content="#3b82c4">
+<meta name="theme-color" content="#10253a">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="CrewClock">
@@ -17,29 +17,29 @@
 <title>CREW CLOCK</title>
 <style>
 :root{
-  --bg:#e8f4fd;
-  --white:#f4faff;
-  --blue:#3b82c4;--blue2:#2d6eac;
-  --blue-light:rgba(59,130,196,.10);--blue-mid:rgba(59,130,196,.20);
-  --tx:#1a2e42;--tx2:#4a6a85;--tx3:#8aaec8;
-  --bdr:#c8e0f0;--bdr2:#a8cce4;
-  --grn:#2eaa70;--red:#e0505a;--amb:#e8923a;
-  --purp:#a855f7;
-  --shadow:0 1px 6px rgba(59,130,196,.10),0 1px 2px rgba(0,0,0,.04);
-  --shadow-md:0 4px 20px rgba(59,130,196,.16);
-  --nav-bg:#daeefa;
+  --bg:#f2f5f8;
+  --white:#ffffff;
+  --blue:#087f8c;--blue2:#086773;
+  --blue-light:rgba(8,127,140,.07);--blue-mid:rgba(8,127,140,.15);
+  --tx:#142c42;--tx2:#526476;--tx3:#6f8091;
+  --bdr:#e0e7ed;--bdr2:#c4d0db;
+  --grn:#25815e;--red:#c74351;--amb:#a96713;
+  --purp:#7962b4;--on-accent:#ffffff;
+  --shadow:0 2px 8px rgba(16,37,58,.035);
+  --shadow-md:0 10px 28px rgba(16,37,58,.07);
+  --nav-bg:#10253a;
 }
 body.dark{
-  --bg:#0d1f2d;--white:#162535;
-  --blue:#6aafe8;--blue2:#5a9fd8;
-  --blue-light:rgba(106,175,232,.13);--blue-mid:rgba(106,175,232,.24);
-  --tx:#e0f0fa;--tx2:#7aaac8;--tx3:#4a7090;
-  --bdr:#1e3a50;--bdr2:#2a4d68;
-  --grn:#3dd68c;--red:#f07080;--amb:#f0a84a;
-  --purp:#c084fc;
+  --bg:#0b1520;--white:#142332;
+  --blue:#56c8bc;--blue2:#79d7cd;
+  --blue-light:rgba(86,200,188,.09);--blue-mid:rgba(86,200,188,.18);
+  --tx:#e9eff5;--tx2:#adbdcc;--tx3:#8fa2b5;
+  --bdr:#283b4d;--bdr2:#40566b;
+  --grn:#71d3a2;--red:#f28b99;--amb:#edbb73;
+  --purp:#b8a5e1;--on-accent:#092522;
   --shadow:0 1px 4px rgba(0,0,0,.35),0 1px 2px rgba(0,0,0,.2);
   --shadow-md:0 4px 20px rgba(0,0,0,.45);
-  --nav-bg:#0d1f2d;
+  --nav-bg:#08131f;
 }
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
 html{height:auto;min-height:100%;overflow-x:hidden;overflow-y:visible;}
@@ -500,6 +500,59 @@ body.dark .dl-inp[type=date]{color-scheme:dark}
   text-align:center;line-height:1.4;box-shadow:0 8px 24px rgba(0,0,0,.2)}
 .toast.show{transform:translateX(-50%) translateY(0)}
 .toast.ok{background:var(--grn)}.toast.er{background:var(--red)}.toast.in{background:var(--blue)}
+
+/* CrewClock aviation theme: clear departure hierarchy and quiet preparation rows. */
+body,input,button,select,textarea{font-family:-apple-system,BlinkMacSystemFont,'Inter',sans-serif}
+.top-nav{box-shadow:none;border-bottom:1px solid rgba(255,255,255,.08)}
+.nav-title{cursor:default}
+.nav-title h1,.nav-title:hover h1{color:#f7fafc;letter-spacing:3.2px}
+.nav-title p{color:#a8bdce;font-size:8px;letter-spacing:1.8px}
+.page-tabs{background:var(--white)}
+.ptab{font-size:14px;font-weight:600;padding:13px 8px;min-height:44px}
+.ptab.active{background:var(--blue-light);border-bottom-width:3px}
+.cal-card,.day-card,.alarm-card,.settings-section{border:1px solid var(--bdr);border-radius:16px}
+.cal-nav{padding:16px 16px 10px}
+.cal-month{font-size:16px;font-weight:750}
+.cal-nav-btn{width:34px;height:34px;background:var(--bg);border:1px solid var(--bdr);color:var(--tx2)}
+.cal-day{height:44px}
+.cal-day-num{width:30px;height:30px;font-variant-numeric:tabular-nums}
+.day-header{padding-top:16px}
+.day-title{color:var(--tx);letter-spacing:-.2px}
+.day-more{padding:8px 10px;border-radius:8px;background:var(--blue-light)}
+.dfr{border-color:var(--bdr);padding:12px;border-radius:10px}
+.dfr-time,.fal-deptime,.atog-time,.dal-time{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-variant-numeric:tabular-nums;letter-spacing:-.5px}
+.fal-item.today,.fal-item.next-flight{background:var(--white);box-shadow:var(--shadow);border-color:var(--blue)}
+.fal-item.next-flight{border-width:1.5px}
+.fal-badge.next-badge{background:var(--blue-light);border-color:var(--bdr2)}
+.duty-briefing{padding:20px;margin:18px 14px 14px;border-radius:18px}
+.briefing-top:first-child{margin:-20px -20px 18px;padding:20px;background:var(--nav-bg);color:#f7fafc;border-radius:17px 17px 0 0}
+.briefing-top:first-child .briefing-kicker{color:#86d9cc}
+.briefing-top:first-child .briefing-sub{color:#b9cbd9}
+.briefing-top:first-child .dal-dis{color:#f3c68c;border-color:rgba(243,198,140,.4);background:rgba(243,198,140,.06)}
+.briefing-title{font-size:24px;font-weight:780;line-height:1.2;letter-spacing:-.7px}
+.briefing-kicker{font-size:10px;letter-spacing:1.25px}
+.briefing-clocks{gap:8px;margin:16px 0}
+.briefing-clock{padding:12px 9px;border:1px solid var(--bdr);border-radius:11px;background:var(--bg)}
+.briefing-clock:first-child{background:var(--blue);border-color:var(--blue);color:var(--on-accent)}
+.briefing-clock:first-child small,.briefing-clock:first-child span{color:inherit;opacity:.9}
+.briefing-clock strong{font-size:22px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:-.7px;margin-bottom:3px}
+.briefing-clock small{font-size:10px;font-weight:600}
+.briefing-step{position:relative;margin-left:4px;padding:12px 0 12px 16px;border-left:2px solid var(--bdr);border-bottom:1px dashed var(--bdr);gap:8px}
+.briefing-step::before{content:'';position:absolute;width:7px;height:7px;left:-4.5px;top:16px;border-radius:50%;background:var(--blue)}
+.briefing-step span:first-child{flex:1;min-width:0;line-height:1.5}
+.briefing-step span:last-child{font-variant-numeric:tabular-nums;font-size:11px;white-space:nowrap;align-self:center;color:var(--tx2)}
+.briefing-check{padding:12px 0;border-bottom:1px solid var(--bdr);line-height:1.5}
+.briefing-check input:checked+span{color:var(--tx2)}
+.duty-briefing .dal-del{background:transparent;border:0;color:var(--tx3)}
+.duty-briefing .dal-del:hover{color:var(--red);background:var(--bg)}
+.briefing-note{background:var(--bg);border-width:1px;border-radius:11px}
+.dl-inp{border-width:1px;min-height:44px}
+.alarm-card-head{background:var(--bg)}
+.btn-az:not(.btn-outline),.briefing-actions button,.cal-day.today .cal-day-num,.fab{color:var(--on-accent)}
+.btn-az:hover{box-shadow:0 4px 12px var(--blue-light)}
+.dal-item{background:var(--white);border-color:var(--bdr);box-shadow:var(--shadow)}
+button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible{outline:2px solid var(--blue);outline-offset:3px}
+@media(max-width:350px){.duty-briefing{padding:16px}.briefing-top:first-child{margin:-16px -16px 16px;padding:16px}.briefing-title{font-size:21px}.briefing-clock{padding:10px 6px}.briefing-clock strong{font-size:20px}.briefing-step{font-size:11px}}
 </style>
 </head>
 <body>
