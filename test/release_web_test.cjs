@@ -500,6 +500,38 @@ test('confirming manual date and time registers once and rejects past times', ()
   assert.equal(ctx.alms.length, 1);
 });
 
+test('November roster imports Prague legs and keeps departure-local alarm instants', () => {
+  const {ctx}=app();
+  ctx.Date=class extends Date { constructor(...args) { super(...(args.length ? args : ['2026-10-21T00:00:00Z'])); } };
+  const legs=[
+    ['20261102T135500','20261102T200500','KE 955 ICN - IST'],
+    ['20261104T215500','20261105T135500','KE 956 IST - ICN'],
+    ['20261111T105000','20261111T162000','KE 969 ICN - PRG'],
+    ['20261113T183000','20261114T135000','KE 970 PRG - ICN'],
+    ['20261120T105000','20261120T162000','KE 969 ICN - PRG'],
+    ['20261121T183000','20261122T135000','KE 970 PRG - ICN']
+  ];
+  const events=legs.map(([start,end,summary])=>`BEGIN:VEVENT\r\nDTSTART:${start}\r\nDTEND:${end}\r\nSUMMARY:${summary}\r\nEND:VEVENT`);
+  events.push('BEGIN:VEVENT\r\nDTSTART;VALUE=DATE:20261101\r\nSUMMARY:RESERVE - ICN\r\nEND:VEVENT');
+  events.push('BEGIN:VEVENT\r\nDTSTART:20261126T090000\r\nDTEND:20261126T103000\r\nSUMMARY:KCRM1.5 - GMP\r\nEND:VEVENT');
+  const flights=ctx.parseICS('BEGIN:VCALENDAR\r\n'+events.join('\r\n')+'\r\nEND:VCALENDAR');
+  assert.equal(flights.length,6);
+  const prague=flights.find(f=>f.flight==='KE970');
+  assert.equal(prague.depTime,'18:30');
+  assert.equal(prague.date,'2026-11-13');
+  assert.equal(prague.departureUtc,'2026-11-13T17:30:00.000Z');
+  assert.equal(prague.arrivalUtc,'2026-11-14T04:50:00.000Z');
+  assert.equal(ctx.dayKeyFromCivilDate(ctx.dateAtZone(new Date(prague.departureUtc),'Asia/Seoul')),'2026-11-14');
+  ctx.detectedFlights=flights;
+  ctx.document.getElementById=()=>null;
+  ctx.resetDef();
+  ctx.initFlightToggles();ctx.autoRegisterAll();
+  const wake=ctx.alms.find(a=>a.id===prague.id+'_i1');
+  assert.equal(wake.time.toISOString(),'2026-11-13T14:30:00.000Z');
+  assert.equal(ctx.alarmTimeText(wake,wake.time),'15:30');
+  assert.equal(ctx.parseICSDate('20260715T183000',ctx.airportZone('PRG')).toISOString(),'2026-07-15T16:30:00.000Z');
+});
+
 test('today and future schedule alarms stay vivid while past dates are dimmed', () => {
   const { ctx } = app();
   let now = new Date(2030, 0, 1, 12);
