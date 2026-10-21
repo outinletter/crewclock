@@ -597,7 +597,7 @@ button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-vis
     <div class="cal-grid" id="calGrid"></div>
   </div>
   <p id="stayTimeZoneGuide" style="margin:8px 20px;color:var(--tx2);font-size:11px"></p>
-  <div class="day-card">
+  <div class="day-card" id="dayCard" style="display:none">
     <div class="day-header">
       <div class="day-heading">
         <div class="day-title" id="dayTitle">---</div>
@@ -1953,6 +1953,8 @@ function renderDaySchedule(dk,target){
   
   var flights=detectedFlights.filter(function(f){return f.date === dk || f.arrDate === dk;});
   var dayAlms=buildDisplayedDayAlarms(dk,flights);
+  var dayCard=document.getElementById(target+'Card');
+  if(dayCard)dayCard.style.display=dayAlms.length?'block':'none';
 
   var hInfoEl = document.getElementById(target+'FlightHeaderInfo');
   if(hInfoEl) {

@@ -513,6 +513,7 @@ test('today and future schedule alarms stay vivid while past dates are dimmed', 
   vm.runInContext(script.slice(script.indexOf('function renderDaySchedule('), script.indexOf('function renderHomeFlightList(')), ctx);
   ctx.renderDaySchedule('2030-01-01');
   assert.equal(elements.nextDayCard.style.display, 'block');
+  assert.equal(elements.dayCard.style.display, 'block');
   assert.match(elements.dayFlights.innerHTML, /Today alarm/);
   assert.equal(elements.nextDayTitle.textContent, '01/03 Thu');
   assert.equal(elements.nextDayTitle.title, '2030-01-03');
@@ -522,8 +523,17 @@ test('today and future schedule alarms stay vivid while past dates are dimmed', 
   assert.doesNotMatch(elements.nextDayFlights.innerHTML, /<small|ICN local/);
   assert.match(elements.nextDayFlights.innerHTML, /\(-4h30m\)/);
   assert.doesNotMatch(elements.nextDayFlights.innerHTML, /opacity:0.45/);
+  ctx.alms=[];
+  ctx.renderDaySchedule('2030-01-01');
+  assert.equal(elements.dayCard.style.display, 'none', 'empty selected date does not leave a blank card');
+  assert.equal(elements.nextDayCard.style.display, 'block', 'upcoming alarms remain visible');
+  ctx.flightToggles.next.b1=false;
+  ctx.renderDaySchedule('2030-01-01');
+  assert.equal(elements.nextDayCard.style.display, 'none', 'an upcoming date without alarms is also hidden');
+  ctx.flightToggles.next.b1=true;
   now = new Date(2030, 0, 3, 0, 1);
   ctx.renderDaySchedule('2030-01-03');
+  assert.equal(elements.dayCard.style.display, 'block', 'selecting a date with alarms restores its card');
   assert.equal(elements.nextDayCard.style.display, 'none');
   assert.match(elements.dayFlights.innerHTML, /Prepare for Duty/);
   assert.doesNotMatch(elements.dayFlights.innerHTML, /opacity:0.45/);
