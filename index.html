@@ -522,6 +522,11 @@ body,input,button,select,textarea{font-family:-apple-system,BlinkMacSystemFont,'
 .day-header{padding-top:16px}
 .day-title{color:var(--tx);letter-spacing:-.2px}
 .day-more{padding:8px 10px;border-radius:8px;background:var(--blue-light)}
+.day-header{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px 12px;align-items:center}
+.day-heading{display:contents}
+.day-title{grid-column:1;grid-row:1;font-size:12px;white-space:nowrap;font-weight:650;color:var(--tx2)}
+.day-more{grid-column:2;grid-row:1;white-space:nowrap;min-height:40px;display:flex;align-items:center;justify-content:center}
+.day-flight-info{grid-column:1/-1;grid-row:2;min-width:0;padding:10px 12px;border-radius:10px;background:var(--blue-light);color:var(--blue);font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:16px;font-weight:750;line-height:1.5;overflow-wrap:anywhere}
 .dfr{border-color:var(--bdr);padding:12px;border-radius:10px}
 .dfr-time,.fal-deptime,.atog-time,.dal-time{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-variant-numeric:tabular-nums;letter-spacing:-.5px}
 .fal-item.today,.fal-item.next-flight{background:var(--white);box-shadow:var(--shadow);border-color:var(--blue)}
@@ -591,9 +596,9 @@ button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-vis
   <p id="stayTimeZoneGuide" style="margin:8px 20px;color:var(--tx2);font-size:11px"></p>
   <div class="day-card">
     <div class="day-header">
-      <div style="display:flex; align-items:center; gap:8px;">
+      <div class="day-heading">
         <div class="day-title" id="dayTitle">---</div>
-        <div id="dayFlightHeaderInfo" style="display:none; font-size:11px; font-weight:700; color:var(--blue); background:var(--blue-light); padding:2px 6px; border-radius:4px; font-family:'Share Tech Mono',monospace;"></div>
+        <div id="dayFlightHeaderInfo" class="day-flight-info" style="display:none"></div>
       </div>
       <div class="day-more" onclick="openUploadSheet()">+ Add </div>
     </div>
@@ -602,9 +607,9 @@ button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-vis
   </div>  
   <div class="day-card" id="nextDayCard" style="display:none">
     <div class="day-header">
-      <div style="display:flex; align-items:center; gap:8px;">
+      <div class="day-heading">
         <div class="day-title" id="nextDayTitle">---</div>
-        <div id="nextDayFlightHeaderInfo" style="display:none; font-size:11px; font-weight:700; color:var(--blue); background:var(--blue-light); padding:2px 6px; border-radius:4px; font-family:'Share Tech Mono',monospace;"></div>
+        <div id="nextDayFlightHeaderInfo" class="day-flight-info" style="display:none"></div>
       </div>
       <div class="day-more" onclick="openUploadSheet()">+ Add </div>
     </div>
@@ -1939,7 +1944,9 @@ function renderDaySchedule(dk,target){
   }
   var D=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   var dp=dk.split('-');var d=new Date(+dp[0],+dp[1]-1,+dp[2]);
-  document.getElementById(target+'Title').textContent=dk+' ('+D[d.getDay()]+')';
+  var dayTitle=document.getElementById(target+'Title');
+  dayTitle.textContent=dp[1]+'/'+dp[2]+' '+D[d.getDay()];
+  dayTitle.title=dk;
   
   var flights=detectedFlights.filter(function(f){return f.date === dk || f.arrDate === dk;});
   var dayAlms=buildDisplayedDayAlarms(dk,flights);
@@ -1949,7 +1956,7 @@ function renderDaySchedule(dk,target){
      if(flights.length > 0) {
          hInfoEl.innerHTML = flights.map(function(f){
              var isArrivalDay = (f.arrDate === dk && f.date !== dk);
-             var arrTxt = (f.arrApt && f.arrApt !== '???') ? '->' + f.arrApt : '';
+             var arrTxt = (f.arrApt && f.arrApt !== '???') ? '→' + f.arrApt : '';
              if (arrTxt && f.arrTime) {
                  arrTxt += ' ' + f.arrTime;
              }

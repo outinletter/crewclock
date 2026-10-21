@@ -514,7 +514,8 @@ test('today shows the next schedule alarm list and promotes it on its date', () 
   ctx.renderDaySchedule('2030-01-01');
   assert.equal(elements.nextDayCard.style.display, 'block');
   assert.match(elements.dayFlights.innerHTML, /Today alarm/);
-  assert.match(elements.nextDayTitle.textContent, /2030-01-03/);
+  assert.equal(elements.nextDayTitle.textContent, '01/03 Thu');
+  assert.equal(elements.nextDayTitle.title, '2030-01-03');
   assert.match(elements.nextDayFlightHeaderInfo.innerHTML, /KE031/);
   assert.match(elements.nextDayFlights.innerHTML, /Prepare for Duty/);
   assert.match(elements.nextDayFlights.innerHTML, /opacity:0.45/);
