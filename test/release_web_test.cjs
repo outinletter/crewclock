@@ -500,7 +500,7 @@ test('confirming manual date and time registers once and rejects past times', ()
   assert.equal(ctx.alms.length, 1);
 });
 
-test('today shows the next schedule alarm list and promotes it on its date', () => {
+test('today and future schedule alarms stay vivid while past dates are dimmed', () => {
   const { ctx } = app();
   let now = new Date(2030, 0, 1, 12);
   ctx.Date = class extends Date { constructor(...args) { super(...(args.length ? args : [now.getTime()])); } };
@@ -521,7 +521,7 @@ test('today shows the next schedule alarm list and promotes it on its date', () 
   assert.match(elements.nextDayFlights.innerHTML, /04:50\(L\)/);
   assert.doesNotMatch(elements.nextDayFlights.innerHTML, /<small|ICN local/);
   assert.match(elements.nextDayFlights.innerHTML, /\(-4h30m\)/);
-  assert.match(elements.nextDayFlights.innerHTML, /opacity:0.45/);
+  assert.doesNotMatch(elements.nextDayFlights.innerHTML, /opacity:0.45/);
   now = new Date(2030, 0, 3, 0, 1);
   ctx.renderDaySchedule('2030-01-03');
   assert.equal(elements.nextDayCard.style.display, 'none');
