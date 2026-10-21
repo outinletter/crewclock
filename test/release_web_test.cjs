@@ -523,4 +523,8 @@ test('today shows the next schedule alarm list and promotes it on its date', () 
   assert.equal(elements.nextDayCard.style.display, 'none');
   assert.match(elements.dayFlights.innerHTML, /Prepare for Duty/);
   assert.doesNotMatch(elements.dayFlights.innerHTML, /opacity:0.45/);
+  now = new Date(2030, 0, 4, 12);
+  ctx.renderDaySchedule('2030-01-03');
+  assert.match(elements.dayFlights.innerHTML, /Prepare for Duty/);
+  assert.match(elements.dayFlights.innerHTML, /opacity:0.45/, 'selecting a past schedule also dims its preview alarms');
 });
