@@ -33,6 +33,11 @@ test('departure-local alarm dates and times remain fixed after arrival in Korea'
   ctx.resetDef();ctx.detectedFlights=[f];ctx.alms=[a];
   assert.ok(ctx.buildDisplayedDayAlarms('2026-10-19',[f]).some(row=>row.id===a.id));
   assert.equal(ctx.buildDisplayedDayAlarms('2026-10-20',[]).length,0);
+  a.dism=true;
+  ctx.document.getElementById=()=>null;
+  ctx.initFlightToggles();
+  ctx.autoRegisterAll();
+  assert.equal(ctx.alms.length,0,'returning to Korea must not register the previous US flight alarms again');
 });
 test('personal preparation persists per departure, survives reimport and stays separate from alarms',()=>{
   const {ctx,items,messages}=app();ctx.document.getElementById=()=>null;
@@ -498,6 +503,44 @@ test('confirming manual date and time registers once and rejects past times', ()
   ctx.drumY_val = 0;
   ctx.confirmDate();
   assert.equal(ctx.alms.length, 1);
+});
+
+test('worldwide airport time zones are bundled and recognized without a network request', () => {
+  const {ctx}=app();
+  assert.equal(Object.keys(ctx.AIRPORT_ZONES).length,7884);
+  const zones=new Set(Object.values(ctx.AIRPORT_ZONES));
+  assert.equal(zones.size,359);
+  for(const zone of zones)assert.doesNotThrow(()=>new Intl.DateTimeFormat('en',{timeZone:zone}).format(new Date()));
+  const cases=[
+    ['DSS','20300115T090000','2030-01-15T09:00:00.000Z'],
+    ['CPT','20300115T090000','2030-01-15T07:00:00.000Z'],
+    ['GRU','20300115T090000','2030-01-15T12:00:00.000Z'],
+    ['YYT','20300115T090000','2030-01-15T12:30:00.000Z'],
+    ['KTM','20300115T090000','2030-01-15T03:15:00.000Z'],
+    ['MRU','20300115T090000','2030-01-15T05:00:00.000Z'],
+    ['ADL','20300115T090000','2030-01-14T22:30:00.000Z'],
+    ['ADL','20300715T090000','2030-07-14T23:30:00.000Z'],
+    ['SCL','20300115T090000','2030-01-15T12:00:00.000Z'],
+    ['SCL','20300715T090000','2030-07-15T13:00:00.000Z']
+  ];
+  for(const [airport,local,utc] of cases){
+    const zone=ctx.airportZone(airport);
+    assert.ok(zone,airport);
+    assert.equal(ctx.parseICSDate(local,zone).toISOString(),utc,airport+' '+local);
+  }
+  assert.equal(ctx.airportZone('zzz'),null);
+});
+
+test('date-line flights preserve opposite local dates and half-hour DST ambiguity is rejected', () => {
+  const {ctx}=app();
+  const f=ctx.parseICS('BEGIN:VEVENT\nDTSTART:20300115T113000Z\nDTEND:20300115T120000Z\nSUMMARY:XX101 APW-PPG\nEND:VEVENT')[0];
+  assert.equal(f.date,'2030-01-16');
+  assert.equal(f.depTime,'00:30');
+  assert.equal(f.arrDate,'2030-01-15');
+  assert.equal(f.arrTime,'01:00');
+  assert.equal(f.departureUtc,'2030-01-15T11:30:00.000Z');
+  assert.throws(()=>ctx.parseICSDate('20260405T014500',ctx.airportZone('LDH')),/ambiguous/);
+  assert.throws(()=>ctx.parseICSDate('20261004T021500',ctx.airportZone('LDH')),/nonexistent/);
 });
 
 test('November roster imports Prague legs and keeps departure-local alarm instants', () => {
