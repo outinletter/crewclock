@@ -522,12 +522,15 @@ body,input,button,select,textarea{font-family:-apple-system,BlinkMacSystemFont,'
 .day-header{padding-top:16px}
 .day-title{color:var(--tx);letter-spacing:-.2px}
 .day-more{padding:8px 10px;border-radius:8px;background:var(--blue-light)}
-.day-header{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px 12px;align-items:center}
+.day-header{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:4px;align-items:center;padding:10px 10px 0}
 .day-heading{display:contents}
-.day-title{grid-column:1;grid-row:1;font-size:12px;white-space:nowrap;font-weight:650;color:var(--tx2)}
-.day-more{grid-column:2;grid-row:1;white-space:nowrap;min-height:40px;display:flex;align-items:center;justify-content:center}
-.day-flight-info{grid-column:1/-1;grid-row:2;min-width:0;padding:10px 12px;border-radius:10px;background:var(--blue-light);color:var(--blue);font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:clamp(10px,3.7vw,16px);font-weight:750;line-height:1.5;white-space:nowrap}
-.dfr{border-color:var(--bdr);padding:12px;border-radius:10px}
+.day-title{grid-column:1;grid-row:1;font-size:clamp(9px,2.6vw,11px);white-space:nowrap;font-weight:650;color:var(--tx2)}
+.day-more{grid-column:3;grid-row:1;white-space:nowrap;min-height:36px;padding:4px;font-size:10px;display:flex;align-items:center;justify-content:center}
+.day-flight-info{grid-column:2;grid-row:1;min-width:0;padding:5px 4px;border-radius:6px;background:var(--blue-light);color:var(--blue);font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:clamp(9px,3vw,13px);font-weight:750;line-height:1.4;white-space:nowrap}
+.dfr{border-color:var(--bdr);padding:8px;gap:6px;border-radius:10px}
+.dfr-time{font-size:14px;white-space:nowrap}
+.dfr-info{display:block;overflow:hidden}
+.dfr-route{display:block;font-size:clamp(10px,2.9vw,12px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .dfr-time,.fal-deptime,.atog-time,.dal-time{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-variant-numeric:tabular-nums;letter-spacing:-.5px}
 .fal-item.today,.fal-item.next-flight{background:var(--white);box-shadow:var(--shadow);border-color:var(--blue)}
 .fal-item.next-flight{border-width:1.5px}
@@ -1991,9 +1994,9 @@ function renderDaySchedule(dk,target){
             var h = Math.floor(diff / 60);
             var m = diff % 60;
             var offTxt = '';
-            if(h > 0 && m > 0) offTxt = '('+h+'h '+m+'m before)';
-            else if(h > 0) offTxt = '('+h+'h before)';
-            else offTxt = '('+m+'m before)';
+            if(h > 0 && m > 0) offTxt = '(-'+h+'h'+m+'m)';
+            else if(h > 0) offTxt = '(-'+h+'h)';
+            else offTxt = '(-'+m+'m)';
             routeHtml += ' <span style="font-size:10px; color:var(--tx3); font-weight:500; margin-left:4px;">'+offTxt+'</span>';
         }
     }
@@ -2002,7 +2005,7 @@ function renderDaySchedule(dk,target){
     var opac = (a.dism || a.missed) ? 'opacity:0.5;' : (displayTime && alarmDay(a,displayTime)!==dayKeyFromCivilDate(dateAtZone(new Date(),alarmZone(a))) ? 'opacity:0.45;' : '');
 
     var h='<div class="'+rowCls+'" style="'+opac+'">'
-      +'<div class="dfr-time">'+alarmTimeText(a,displayTime)+'<small style="display:block;font-size:9px">'+escQ(a.type==='direct'?'':a.depApt+' local')+'</small></div>'
+      +'<div class="dfr-time">'+alarmTimeText(a,displayTime)+(a.type==='direct'?'':'(L)')+'</div>'
       +'<div class="dfr-info"><div class="dfr-route">'+routeHtml+'</div></div>'
       +'</div>';
     rows.push({s:displayTime.getTime(), html:h});

@@ -518,6 +518,9 @@ test('today shows the next schedule alarm list and promotes it on its date', () 
   assert.equal(elements.nextDayTitle.title, '2030-01-03');
   assert.match(elements.nextDayFlightHeaderInfo.innerHTML, /KE031/);
   assert.match(elements.nextDayFlights.innerHTML, /Prepare for Duty/);
+  assert.match(elements.nextDayFlights.innerHTML, /04:50\(L\)/);
+  assert.doesNotMatch(elements.nextDayFlights.innerHTML, /<small|ICN local/);
+  assert.match(elements.nextDayFlights.innerHTML, /\(-4h30m\)/);
   assert.match(elements.nextDayFlights.innerHTML, /opacity:0.45/);
   now = new Date(2030, 0, 3, 0, 1);
   ctx.renderDaySchedule('2030-01-03');
