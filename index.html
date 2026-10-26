@@ -339,8 +339,9 @@ body.import-open #notifBanner,body.import-open #pwaBanner,body.import-open #iosG
 .dl-inp{width:100%;padding:10px 12px;background:var(--bg);border:1.5px solid var(--bdr);
   border-radius:9px;color:var(--tx);font-family:'Inter',sans-serif;font-size:13px;outline:none;transition:border-color .2s}
 .dl-inp:focus{border-color:var(--blue)}
-.interval-fields{display:grid;grid-template-columns:minmax(0,1fr);gap:10px;margin-bottom:10px}
+.interval-fields{display:grid;grid-template-columns:minmax(0,1fr) 100px;gap:10px;margin-bottom:10px}
 .interval-fields .dl-row{min-width:0;margin-bottom:0}
+.interval-fields .dl-inp{font-size:16px}
 .alarm-fields{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.2fr);gap:10px;margin-bottom:10px}
 .alarm-fields .dl-row{min-width:0;margin-bottom:0}
 .alarm-fields .dl-inp{height:54px}
@@ -655,11 +656,7 @@ button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-vis
       <div class="alarm-card-body">
         <div class="interval-fields">
           <div class="dl-row"><label for="intervalLabel">Name</label><input id="intervalLabel" class="dl-inp" maxlength="100" placeholder="e.g. Squat exercise"></div>
-          <div class="dl-row"><label>Every</label><div class="drum-row">
-            <div class="drum-col"><div class="dc-label">HR</div><div class="drum" id="intervalH"><div class="drum-line"></div><div class="drum-inner" id="intervalH-inner"></div></div></div>
-            <div class="drum-sep">:</div>
-            <div class="drum-col"><div class="dc-label">MIN</div><div class="drum" id="intervalM"><div class="drum-line"></div><div class="drum-inner" id="intervalM-inner"></div></div></div>
-          </div></div>
+          <div class="dl-row"><label for="intervalMinutes">Every (min)</label><input id="intervalMinutes" class="dl-inp" type="number" inputmode="numeric" min="1" max="10080" step="1" value="90"></div>
         </div>
         <p class="import-copy">Rings on the lock screen, even in Silent mode or Focus. Requires iOS 26 and alarm permission. Tap Stop to schedule the next interval; Pause here to end reminders.</p>
         <button id="addIntervalButton" class="btn-az" onclick="addIntervalAlarm()">Start reminder</button>
@@ -2710,8 +2707,6 @@ function dedupeAutoAlarms(){
 
 
 function loadIntervalAlarms(){
-  buildDrum('intervalH',169,1);
-  buildDrum('intervalM',60,30);
   try{var saved=JSON.parse(localStorage.getItem('crewclock_intervals')||'[]');intervalAlarms=Array.isArray(saved)?saved.filter(function(a){return /^interval_\d+$/.test(a.id)&&Number.isInteger(a.minutes)&&a.minutes>=1&&a.minutes<=10080&&typeof a.label==='string'&&Number.isFinite(a.anchor);}):[];}catch(e){intervalAlarms=[];}
   renderIntervalAlarms();
   if(intervalAlarms.length)updateIntervalAlarms(intervalAlarms,'',false);
@@ -2731,9 +2726,9 @@ function intervalSyncResult(ok,error,records){
   if(!ok)toast(error||'Could not save repeating reminders.','er');else if(message)toast(message,'ok');
 }
 function addIntervalAlarm(){
-  var label=document.getElementById('intervalLabel').value.trim(),minutes=Number(document.getElementById('intervalH').getAttribute('aria-valuenow'))*60+Number(document.getElementById('intervalM').getAttribute('aria-valuenow'));
+  var label=document.getElementById('intervalLabel').value.trim(),minutes=Number(document.getElementById('intervalMinutes').value);
   if(!label){toast('Enter a reminder name.','er');return;}
-  if(!Number.isInteger(minutes)||minutes<1||minutes>10080){toast('Choose an interval from 0 hr 1 min to 168 hr 0 min.','er');return;}
+  if(!Number.isInteger(minutes)||minutes<1||minutes>10080){toast('Enter a whole interval from 1 to 10080 minutes.','er');return;}
   if(intervalAlarms.length>=16){toast('Up to 16 repeating reminders can be saved.','er');return;}
   updateIntervalAlarms(intervalAlarms.concat([{id:'interval_'+uid(),label:label.slice(0,100),minutes:minutes,enabled:true,anchor:Date.now()}]),'Repeating reminder started');
 }
@@ -3302,7 +3297,7 @@ function buildDrum(id,count,initVal){
   var inner=document.getElementById(id+'-inner');var items='';var pad=5;
   drum.tabIndex=0;
   drum.setAttribute('role','spinbutton');
-  drum.setAttribute('aria-label',({drumH:'Hour',drumM:'Minute',drumY:'Year',drumMo:'Month',drumD:'Day',intervalH:'Interval hours',intervalM:'Interval minutes'})[id]);
+  drum.setAttribute('aria-label',({drumH:'Hour',drumM:'Minute',drumY:'Year',drumMo:'Month',drumD:'Day'})[id]);
   drum.setAttribute('aria-valuemin','0');
   drum.setAttribute('aria-valuemax',String(count-1));
   drum.dataset.count=count;
@@ -3326,7 +3321,6 @@ function setDrum(id,val,animate){
   inner.style.transition=animate?'transform .18s cubic-bezier(.25,.46,.45,.94)':'none';
   inner.style.transform='translateY('+y+'px)';
   inner.querySelectorAll('.drum-item').forEach(function(el){el.classList.toggle('sel',+el.dataset.v===val);});
-  if(id==='intervalH'||id==='intervalM')return;
   if(id==='drumH')drumH_val=val;
   else if(id==='drumM')drumM_val=val;
   else if(id==='drumY')drumY_val=val;
@@ -3337,7 +3331,6 @@ function attachDrumEvents(id){
   var drum=document.getElementById(id);
   var lastY,rafId=0,velocity=0,pixelOffset=0;
   function getVal(){
-    if(id==='intervalH'||id==='intervalM')return Number(drum.getAttribute('aria-valuenow'));
     if(id==='drumH')return drumH_val;if(id==='drumM')return drumM_val;
     if(id==='drumY')return drumY_val;if(id==='drumMo')return drumMo_val;
     if(id==='drumD')return drumD_val;
@@ -3398,7 +3391,6 @@ function attachDrumEvents(id){
   },{passive:false});
 }
 function updateDrumValGlobal(id,nv){
-  if(id==='intervalH'||id==='intervalM'){document.getElementById(id).setAttribute('aria-valuenow',String(nv));return;}
   if(id==='drumH')drumH_val=nv;else if(id==='drumM')drumM_val=nv;
   else if(id==='drumY')drumY_val=nv;else if(id==='drumMo')drumMo_val=nv;else if(id==='drumD')drumD_val=nv;
 }
