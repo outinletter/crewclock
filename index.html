@@ -2727,7 +2727,7 @@ function intervalSyncResult(ok,error,records){
 }
 function addIntervalAlarm(){
   var label=document.getElementById('intervalLabel').value.trim(),minutes=Number(document.getElementById('intervalMinutes').value);
-  if(!label){toast('Enter a reminder name.','er');return;}
+  if(!label)label='Interval Reminder';
   if(!Number.isInteger(minutes)||minutes<1||minutes>10080){toast('Enter a whole interval from 1 to 10080 minutes.','er');return;}
   if(intervalAlarms.length>=16){toast('Up to 16 repeating reminders can be saved.','er');return;}
   updateIntervalAlarms(intervalAlarms.concat([{id:'interval_'+uid(),label:label.slice(0,100),minutes:minutes,enabled:true,anchor:Date.now()}]),'Repeating reminder started');
