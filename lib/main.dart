@@ -23,6 +23,7 @@ class NativeAlarmScheduler {
   bool _initialized = false;
   bool systemAlarmEnabled = false;
   String? _iosSound;
+  bool privateLabels = false;
 
   Future<void> init() async {
     if (_initialized) return;
@@ -50,6 +51,7 @@ class NativeAlarmScheduler {
       ),
     );
 
+    if (Platform.isIOS) privateLabels = await _nativeAlarmChannel.invokeMethod<bool>('getAlarmPrivacy') ?? false;
     _initialized = true;
   }
 
@@ -127,10 +129,10 @@ class NativeAlarmScheduler {
       if (Platform.isIOS && scheduledCount >= availableSlots) break;
 
       final id = _stableNotificationId(record['id']?.toString() ?? '');
-      final label = (record['lbl']?.toString().trim().isNotEmpty ?? false)
+      final label = privateLabels ? 'CrewClock reminder' : (record['lbl']?.toString().trim().isNotEmpty ?? false)
           ? record['lbl'].toString()
           : 'CrewClock Alarm';
-      final route = _routeText(record);
+      final route = privateLabels ? '' : _routeText(record);
       final body = route.isEmpty
           ? 'Scheduled for ${_formatLocal(alarmTime)}'
           : '$route\n${_formatLocal(alarmTime)}';
@@ -362,6 +364,7 @@ class _CrewClockHomeState extends State<CrewClockHome>
         _bridgeQueue.then((_) => action()).catchError((Object e) async {
       debugPrint('[CrewClock] $e');
       if (!mounted) return;
+      await controller.runJavaScript('markAlarmSchedulingError();');
       await controller.runJavaScript(
         'toast(${jsonEncode(e is PlatformException ? e.message ?? 'Could not schedule alarms.' : 'Could not update alarms. Please try again.')}, "er");',
       );
@@ -383,8 +386,10 @@ class _CrewClockHomeState extends State<CrewClockHome>
             .invokeMethod<int>('getQueuedAlarmCount') ??
         0;
     final sound = _alarmScheduler._iosSound == null ? 'Default' : 'Beep';
+    final status = await NativeAlarmScheduler._nativeAlarmChannel.invokeMethod<Map<dynamic, dynamic>>('getAlarmStatus', await AppDatabase.instance.getAlarmsState()) ?? {};
     await controller.runJavaScript(
       'window.crewclockSystemAlarm = $system;'
+      'applyNativeAlarmStatus(${jsonEncode(status)});'
       'document.getElementById("alarmSoundChoice").textContent = ${jsonEncode(sound)};'
       'document.getElementById("platformAlarmGuide").textContent = ${jsonEncode(system ? 'System alarm enabled. Use Stop or Snooze on the lock screen.${queued > 0 ? " $queued later alarms are waiting and are not yet scheduled. Reopen CrewClock regularly to schedule them as space becomes available." : ""}' : 'Notification reminders only. iOS 26 or later and alarm permission are required for lock-screen alarms. Silent mode and Focus may silence notification sounds.')};',
     );
@@ -398,7 +403,7 @@ class _CrewClockHomeState extends State<CrewClockHome>
         NavigationDelegate(
           onNavigationRequest: (request) async {
             if (request.url ==
-                'https://outinletter.github.io/privacy-policy/') {
+                'https://outinletter.github.io/crewclock/privacy.html') {
               try {
                 if (!await launchUrl(
                   Uri.parse(request.url),
@@ -463,6 +468,13 @@ class _CrewClockHomeState extends State<CrewClockHome>
       if (decoded is! Map) return false;
 
       switch (decoded['type']) {
+        case 'REFRESH_ALARM_STATUS':
+          if (Platform.isIOS) await _syncIOSAlarmUI();
+          return true;
+        case 'SET_ALARM_PRIVACY':
+          _alarmScheduler.privateLabels = decoded['enabled'] == true;
+          if (Platform.isIOS) await NativeAlarmScheduler._nativeAlarmChannel.invokeMethod<void>('setAlarmPrivacy', _alarmScheduler.privateLabels);
+          return true;
         case 'EXPORT_DUTY_BRIEFING':
           try {
             if (!Platform.isIOS) throw Exception('PDF export requires iPhone.');
@@ -475,9 +487,11 @@ class _CrewClockHomeState extends State<CrewClockHome>
         case 'SET_INTERVAL_ALARMS':
           try {
             if (!Platform.isIOS) throw Exception('Repeating reminders require iPhone.');
+            await NativeAlarmScheduler._nativeAlarmChannel.invokeMethod<void>('setAlarmPrivacy', decoded['privateLabels'] == true);
             final records = await NativeAlarmScheduler._nativeAlarmChannel.invokeMethod<List<dynamic>>(
               'syncIntervalAlarms', {'records': decoded['records'], 'requestPermission': decoded['requestPermission']});
             await controller.runJavaScript('intervalSyncResult(true,null,${jsonEncode(records)});');
+            await _syncIOSAlarmUI();
           } catch (error) {
             await controller.runJavaScript('intervalSyncResult(false,${jsonEncode(error.toString())},null);');
           }
@@ -581,26 +595,7 @@ class _CrewClockHomeState extends State<CrewClockHome>
           await controller.runJavaScript('''
             (function() {
               try {
-              var newFlights = parseICS($safeContent);
-
-              if (newFlights && newFlights.length) {
-                var addedCount = replaceMonthFlights(newFlights);
-
-                if (addedCount > 0) {
-                  initFlightToggles();
-                  autoRegisterAll();
-                  saveFlights();
-                  renderHomeFlightList();
-                  renderSheetFalWrap();
-                  renderCal();
-                  renderDaySchedule(calSelDate);
-                  toast('Schedule updated! ' + addedCount + ' flights applied', 'ok');
-                }
-              } else {
-                toast('No valid flights found', 'er');
-              }
-
-              closeUploadSheet();
+              previewICSContent($safeContent);
               } catch (error) {
                 toast('Could not import calendar: ' + error.message, 'er');
               }
