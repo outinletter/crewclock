@@ -573,7 +573,11 @@ html{-webkit-text-size-adjust:100%;font: -apple-system-body}
 body{font-family:-apple-system,BlinkMacSystemFont,'Inter',sans-serif}
 input:not([type=checkbox]),textarea,select{font-size:16px!important}
 button{min-height:44px;touch-action:manipulation}
-.dal-del,.cal-nav-btn,.tog,.fal-drop-btn{min-width:44px;min-height:44px}
+.dal-del,.cal-nav-btn{min-width:44px;min-height:44px}
+.tog{min-width:36px;min-height:20px;padding:0;overflow:visible}
+.tog::before{content:'';position:absolute;inset:-12px -4px}
+.fal-drop-btn{position:relative;min-width:26px;min-height:26px;padding:0;overflow:visible}
+.fal-drop-btn::before{content:'';position:absolute;inset:-9px}
 .briefing-sub,.briefing-step,.atog-lbl,.dal-lbl,.reservation-state{font-size:14px;line-height:1.5}
 .atog-offset,.dc-label,.dal-date,.briefing-clock small,.briefing-clock span{font-size:12px;line-height:1.5}
 .next-action{padding:14px;background:var(--blue-light);border-radius:12px;margin:14px 0}
