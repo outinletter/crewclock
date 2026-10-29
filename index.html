@@ -565,6 +565,25 @@ body,input,button,select,textarea{font-family:-apple-system,BlinkMacSystemFont,'
 .dal-item{background:var(--white);border-color:var(--bdr);box-shadow:var(--shadow)}
 button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible{outline:2px solid var(--blue);outline-offset:3px}
 @media(max-width:350px){.duty-briefing{padding:16px}.briefing-top:first-child{margin:-16px -16px 16px;padding:16px}.briefing-title{font-size:21px}.briefing-clock{padding:10px 6px}.briefing-clock strong{font-size:20px}.briefing-step{font-size:11px}}
+
+/* Readable preparation controls and keyboard-accessible navigation. */
+.cal-day{font:inherit;border:0;background:transparent;color:inherit;min-width:0;padding:0}
+.page-tabs .ptab{min-width:0}
+html{-webkit-text-size-adjust:100%;font: -apple-system-body}
+body{font-family:-apple-system,BlinkMacSystemFont,'Inter',sans-serif}
+input:not([type=checkbox]),textarea,select{font-size:16px!important}
+button{min-height:44px;touch-action:manipulation}
+.dal-del,.cal-nav-btn,.tog,.fal-drop-btn{min-width:44px;min-height:44px}
+.briefing-sub,.briefing-step,.atog-lbl,.dal-lbl,.reservation-state{font-size:14px;line-height:1.5}
+.atog-offset,.dc-label,.dal-date,.briefing-clock small,.briefing-clock span{font-size:12px;line-height:1.5}
+.next-action{padding:14px;background:var(--blue-light);border-radius:12px;margin:14px 0}
+.next-action p{margin:8px 0;line-height:1.5}.next-action button{font:inherit;color:var(--blue);background:var(--white);border:1px solid var(--bdr);border-radius:8px;padding:8px 12px}
+.briefing-step{gap:12px;align-items:flex-start}.briefing-step span:last-child{text-align:right;overflow-wrap:anywhere;max-width:65%}
+.dal-info{min-width:0}.reservation-state{color:var(--tx2);overflow-wrap:anywhere}
+.drum{width:64px}.drum-item{font-size:16px}.drum-item.sel{font-size:20px}
+@media(max-width:380px){.briefing-clocks{grid-template-columns:1fr}.briefing-step{flex-direction:column}.briefing-step span:last-child{text-align:left}.interval-fields{grid-template-columns:minmax(0,1fr) 110px}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
+
 </style>
 </head>
 <body>
@@ -647,6 +666,10 @@ button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-vis
         </div>
         </div>
         <small id="manualAlarmZone" style="color:var(--tx2)"></small>
+        <label class="import-label" for="manualZoneChoice">Calendar and personal alarm time zone</label>
+        <select id="manualZoneChoice" class="import-field"><option value="auto">Infer from roster (check your actual location)</option><option value="device">Device time zone</option><option value="airport">Choose airport</option></select>
+        <input id="manualZoneAirport" class="import-field" maxlength="3" placeholder="Airport code, e.g. ICN" aria-label="Personal alarm airport code">
+        <button type="button" class="btn-az btn-outline" onclick="saveManualZone()">Apply time zone</button>
         <button class="btn-az" onclick="addDirectAlarm()" style="margin-top: 15px;">Add Alarm</button>
       </div>
     </div>
@@ -659,6 +682,7 @@ button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-vis
           <div class="dl-row"><label for="intervalMinutes">Every (min)</label><input id="intervalMinutes" class="dl-inp" type="number" inputmode="numeric" min="1" max="10080" step="1" value="90"></div>
         </div>
         <p class="import-copy">Rings on the lock screen, even in Silent mode or Focus. Requires iOS 26 and alarm permission. Tap Stop to schedule the next interval; Pause here to end reminders.</p>
+        <p class="import-copy">Before starting: the next interval is reserved after you tap Stop. If an alert is left unanswered, reopen the app to check the next reservation.</p>
         <button id="addIntervalButton" class="btn-az" onclick="addIntervalAlarm()">Start reminder</button>
       </div>
     </div>
@@ -725,13 +749,15 @@ button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-vis
     
     <details style="padding:14px;line-height:1.6;font-size:13px">
       <summary>Alarm and time zone guide</summary>
-      <p>Times use a 24-hour clock. Flight dates and times use their airports' local time zones, including daylight saving. UTC, TZID and calendar time-zone values retain their scheduled instant. Today's date and manual alarms use the roster-inferred stay time zone shown on screen, or the device time zone when no stay is known. Check this against your actual location and official roster before enabling alarms.</p>
+      <p>Times use a 24-hour clock. Flight dates and times use their airports' local time zones, including daylight saving. UTC, TZID and calendar time-zone values retain their scheduled instant. Today's date and manual alarms use the selected time-zone mode. Roster inference is a suggestion; choose your actual airport or device time zone in the Alarm tab. Check this against your actual location and official roster before enabling alarms.</p>
       <p id="platformAlarmGuide">Background alerts require notification permission. Check your device notification and sound settings.</p>
       <p>Set your home base and domestic airport codes before importing a schedule. Review the departure reminder offsets for each flight.</p>
     </details>
     <details style="padding:14px;line-height:1.6;font-size:13px">
       <summary>Privacy and stored data</summary>
-      <p><a href="https://outinletter.github.io/privacy-policy/">Privacy Policy</a></p>
+      <label><input type="checkbox" id="privateAlarmLabels" onchange="saveAlarmPrivacy(this.checked)"> Hide flight details in future alarm titles</label>
+      <p>Only generic titles are used when enabled. Reopen the app after changing this setting to verify reservations. Existing preparation notes and PDFs are unchanged.</p>
+      <p><a href="https://outinletter.github.io/crewclock/privacy.html">Privacy Policy</a></p>
       <p>CrewClock stores imported schedules, alarm labels, and settings on this device. Calendar files are read to import flight events. The app does not require an account.</p>
       <p>Use Delete All Flights and Alarms to remove schedule and alarm data. Preferences remain saved. System backups may retain app data according to your device settings. Alarm labels and routes may appear on your lock screen; control previews in system notification settings.</p>
     </details>
@@ -784,7 +810,7 @@ button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-vis
       <p class="import-copy">Paste the text copied from your monthly roster. Date headings apply to the flights below them. Departure and arrival entries on separate days are joined. Days off, reserve, layovers and training entries are excluded, as with flight calendar imports.</p>
       <label class="import-label" for="manualMonth">Schedule month and year</label>
       <input type="month" id="manualMonth" class="import-field" oninput="clearManualReview()">
-      <p class="import-copy" style="margin-top:8px">If the calendar title was not copied, select the correct year and month here. Date headings are station-local dates. Known airports use their local time zones; verify unknown airports against the device time zone.</p>
+      <p class="import-copy" style="margin-top:8px">If the calendar title was not copied, select the correct year and month here. Date headings are station-local dates. Known airports use their local time zones. Confirm time zones for unknown airports before registering.</p>
       <div id="manualReview" style="margin-top:16px" tabindex="-1" aria-live="polite"></div>
     </section>
   </div>
@@ -1227,7 +1253,16 @@ Object.keys(AIRPORT_ZONE_GROUPS).forEach(function(zone){
   AIRPORT_ZONE_GROUPS[zone].split(" ").forEach(function(code){AIRPORT_ZONES[code]=zone;});
 });
 // END GENERATED AIRPORT TIMEZONES
-function airportZone(code){return AIRPORT_ZONES[(code||'').toUpperCase()]||null;}
+var airportZoneOverrides={};
+try{airportZoneOverrides=JSON.parse(localStorage.getItem('crewclock_airport_zones')||'{}')||{};}catch(e){}
+function airportZone(code){var key=(code||'').toUpperCase(),zone=AIRPORT_ZONES[key]||airportZoneOverrides[key];if(!zone)return null;try{new Intl.DateTimeFormat('en',{timeZone:zone});return zone;}catch(e){return null;}}
+function manualZoneSetting(){try{return localStorage.getItem('crewclock_manual_zone')||'auto';}catch(e){return 'auto';}}
+function saveManualZone(){
+  var choice=document.getElementById('manualZoneChoice').value,code=document.getElementById('manualZoneAirport').value.trim().toUpperCase();
+  if(choice==='airport'&&!airportZone(code)){toast('Choose a known airport code or confirm its time zone when importing.','er');return;}
+  localStorage.setItem('crewclock_manual_zone',choice==='airport'?code:choice);tickClock();updateDateDisplay();renderDirectAlarms();renderCal();renderDutyBriefing();
+  toast('Time zone saved. Existing alarm instants are unchanged.','ok');
+}
 function dateAtZone(dt,zone){
   if(!zone)return new Date(dt);
   var p={};new Intl.DateTimeFormat('en-GB',{timeZone:zone,year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23'}).formatToParts(dt).forEach(function(t){p[t.type]=t.value;});
@@ -1242,7 +1277,7 @@ function stayAirport(){
   });
   return landed?landed.arrApt:(next&&Date.parse(next.departureUtc)-now<3*86400000?next.depApt:null);
 }
-function appZone(){return airportZone(stayAirport());}
+function appZone(){var choice=manualZoneSetting();return choice==='device'?null:airportZone(choice==='auto'?stayAirport():choice);}
 function displayDate(dt){return dateAtZone(dt,appZone());}
 function todayStr(){var n=displayDate(new Date());return n.getFullYear()+'-'+p2(n.getMonth()+1)+'-'+p2(n.getDate());}
 function buildDate(ds,h,m){var dp=(ds||todayStr()).split('-');return zonedCalendarDate(+dp[0],+dp[1],+dp[2],h,m,0,appZone());}
@@ -1275,6 +1310,7 @@ function saveBriefingState(f,state){
   try{var saved=JSON.parse(localStorage.getItem('crewclock_briefings_v1')||'{}')||{};if(typeof saved!=='object'||Array.isArray(saved))saved={};saved[briefingKey(f)]=state;localStorage.setItem('crewclock_briefings_v1',JSON.stringify(saved));return true;}
   catch(e){toast('Could not save preparation notes on this device.','er');return false;}
 }
+function openBriefingAlarms(){var f=briefingFlight();if(!f||briefingDemo){toast('Use Import roster to save a real schedule. Demo alarms are never scheduled.','in');return;}openFlights[f.id]=true;renderHomeFlightList();var el=document.getElementById('fali-'+f.id);if(el)el.scrollIntoView({behavior:'smooth',block:'start'});}
 function chooseBriefing(key){briefingSelected=key;renderDutyBriefing();}
 function toggleBriefingTask(index){var f=briefingFlight();if(!f)return;var s=briefingState(f);if(!s.tasks[index])return;s.tasks[index].checkedAt=s.tasks[index].checkedAt?null:new Date().toISOString();saveBriefingState(f,s);renderDutyBriefing();}
 function addBriefingTask(){var input=document.getElementById('briefingNewTask'),label=input.value.trim(),f=briefingFlight();if(!f||!label)return;var s=briefingState(f);if(s.tasks.length>=12){toast('Up to 12 preparation items per flight.','er');return;}s.tasks.push({label:label.slice(0,100),checkedAt:null});if(saveBriefingState(f,s))input.value='';input.blur();renderDutyBriefing();}
@@ -1305,6 +1341,18 @@ function exportDutyBriefing(){
   if(!window.crewclock||typeof window.crewclock.postMessage!=='function'){toast('PDF export is available in the iPhone app.','in');return;}
   window.crewclock.postMessage(JSON.stringify({type:'EXPORT_DUTY_BRIEFING',title:'CrewClock Flight Preparation',lines:briefingExportLines(f,briefingState(f))}));
 }
+var nativeAlarmStatus={},nativeStatusReady=false;
+function alarmStatusText(a){
+  if(a.missed)return 'Missed';if(a.dism)return 'Dismissed';if(a.armed===false||a.enabled===false)return 'Paused';
+  if(a.type&&a.type!=='direct'&&!airportZone(a.depApt))return 'Time zone required — not scheduled';
+  var state=nativeAlarmStatus[String(a.id)];
+  return ({scheduled:'Scheduled',alerting:'Ringing',notification:'Notification only — sound depends on settings',waiting:'Waiting — not scheduled',permission:'Alarm permission required',error:'Scheduling failed — retry in app'})[state&&state.state]||((window.crewclock&&typeof window.crewclock.postMessage==='function')?'Checking reservation…':'App must stay open — no system alarm');
+}
+function markAlarmSchedulingError(){alms.forEach(function(a){nativeAlarmStatus[String(a.id)]={state:'error'};});renderDutyBriefing();renderHomeFlightList();renderDirectAlarms();}
+function applyNativeAlarmStatus(status){nativeAlarmStatus=status||{};nativeStatusReady=true;renderDutyBriefing();renderHomeFlightList();renderDirectAlarms();renderIntervalAlarms();}
+function refreshAlarmStatus(){if(window.crewclock)window.crewclock.postMessage(JSON.stringify({type:'REFRESH_ALARM_STATUS'}));}
+function flightReminderStatus(f,o){var at=+parseFlightDate(f)-(o.h*60+o.m)*60000;var a=alms.find(function(a){return a.id===f.id+'_'+o.id||sameFlightAlarm(f,a)&&a.lbl===o.lbl;});return a?alarmStatusText(a):(at<=Date.now()?'Time passed':(!airportZone(f.depApt)?'Time zone required — not scheduled':'Not scheduled'));}
+
 function renderDutyBriefing(){
   var wrap=document.getElementById('dutyBriefing');if(!wrap)return;
   if(document.activeElement&&wrap.contains(document.activeElement)&&(document.activeElement.tagName==='TEXTAREA'||(document.activeElement.tagName==='INPUT'&&document.activeElement.type!=='checkbox')))return;
@@ -1312,12 +1360,15 @@ function renderDutyBriefing(){
   if(!f){wrap.innerHTML='<div class="briefing-kicker">Pilot workflow</div><h2 class="briefing-title">Your next duty, in one place.</h2><p class="briefing-sub">Import your roster to connect departure-local alarms, time-zone checks and a personal preparation list.</p><div class="briefing-actions"><button onclick="openUploadSheet()">Import roster</button><button onclick="startBriefingDemo()">Explore flight briefing</button></div>';return;}
   var state=briefingState(f),departure=parseFlightDate(f),zone=airportZone(f.depApt),done=state.tasks.filter(function(t){return t.checkedAt;}).length;
   var minutes=Math.ceil((departure-Date.now())/60000),countdown=minutes>0?'Departs in '+Math.floor(minutes/60)+'h '+minutes%60+'m':'Departure has passed';
-  function clock(label,z){var d=dateAtZone(departure,z);return '<div class="briefing-clock"><small>'+escQ(label)+'</small><strong>'+fmtAtZone(departure,z)+'</strong><span>'+dayKeyFromCivilDate(d)+'</span></div>';}
+  function clock(label,z){var d=dateAtZone(departure,z);return '<div class="briefing-clock"><small>'+escQ(label)+'</small><strong>'+fmtAtZone(departure,z)+'</strong><span>'+dayKeyFromCivilDate(d)+'<br>'+escQ(z||'Device time zone')+'</span></div>';}
   var html='<div class="briefing-top"><div><div class="briefing-kicker">'+(briefingDemo?'Fictional demo · no alarms scheduled':'Flight preparation')+'</div><h2 class="briefing-title">'+escQ(f.flight)+' · '+escQ(f.depApt)+' → '+escQ(f.arrApt)+'</h2><div class="briefing-sub">'+countdown+'</div></div>'+(briefingDemo?'<button class="dal-dis" onclick="closeBriefingDemo()">Exit demo</button>':'')+'</div>';
   if(!briefingDemo&&detectedFlights.length>1)html+='<label class="briefing-sub" for="briefingFlight">Flight</label><select id="briefingFlight" class="dl-inp" onchange="chooseBriefing(this.value)">'+detectedFlights.slice().sort(function(a,b){return parseFlightDate(a)-parseFlightDate(b);}).map(function(other){var key=briefingKey(other);return '<option value="'+escQ(key)+'"'+(key===briefingKey(f)?' selected':'')+'>'+escQ(other.date+' '+other.flight+' '+other.depApt+' → '+other.arrApt)+'</option>';}).join('')+'</select>';
   html+='<div class="briefing-clocks">'+clock(f.depApt+' departure',zone)+clock(baseApt+' home',airportZone(baseApt))+clock('UTC','UTC')+'</div><p class="briefing-sub">Same departure instant in three time zones. Flight reminders stay on '+escQ(f.depApt)+' local time when you travel.</p>';
+  var next=getOffsetsForFlight(f).map(function(o){return {o:o,at:new Date(+departure-(o.h*60+o.m)*60000)};}).filter(function(x){return x.at>Date.now();}).sort(function(a,b){return a.at-b.at;})[0];
+  var pendingTask=state.tasks.find(function(t){return !t.checkedAt;});
+  html+='<div class="next-action" role="status"><strong>Next preparation</strong><p>'+(next?escQ(next.o.lbl)+' · '+dayKeyFromCivilDate(dateAtZone(next.at,zone))+' '+fmtAtZone(next.at,zone)+' '+escQ(f.depApt):'No upcoming preparation times for this flight.')+'</p><p>'+escQ(pendingTask?'To do: '+pendingTask.label:'Personal preparation complete')+'</p><button type="button" onclick="openBriefingAlarms()">Review flight alarms</button></div>';
   html+='<div class="briefing-kicker" style="margin-top:16px">Departure preparation timeline</div>';
-  html+=getOffsetsForFlight(f).map(function(o){var at=new Date(+departure-(o.h*60+o.m)*60000);var enabled=!!(flightToggles[f.id]&&flightToggles[f.id][o.id]);return '<div class="briefing-step"><span>'+escQ(o.lbl)+'</span><span>'+fmtAtZone(at,zone)+' '+escQ(f.depApt)+' · '+(briefingDemo?'Preview':(enabled?'On':'Off'))+'</span></div>';}).join('');
+  html+=getOffsetsForFlight(f).map(function(o){var at=new Date(+departure-(o.h*60+o.m)*60000);var enabled=!!(flightToggles[f.id]&&flightToggles[f.id][o.id]);return '<div class="briefing-step"><span>'+escQ(o.lbl)+'</span><span>'+fmtAtZone(at,zone)+' '+escQ(f.depApt)+' · '+(briefingDemo?'Preview':(enabled?flightReminderStatus(f,o):'Paused'))+'</span></div>';}).join('');
   html+='<div class="briefing-top" style="margin-top:18px"><div class="briefing-kicker">Personal preparation</div><span class="briefing-sub">'+done+' / '+state.tasks.length+' checked</span></div>';
   html+=state.tasks.map(function(t,index){return '<div style="display:flex;align-items:center;gap:8px"><label class="briefing-check" style="flex:1"><input type="checkbox" '+(t.checkedAt?'checked ':'')+'onchange="toggleBriefingTask('+index+')"><span>'+escQ(t.label)+(t.checkedAt?'<small>Checked '+dayKeyFromCivilDate(dateAtZone(new Date(t.checkedAt),zone))+' '+fmtAtZone(t.checkedAt,zone)+' '+escQ(f.depApt)+'</small>':'')+'</span></label><button class="dal-del" aria-label="Delete preparation item" onclick="deleteBriefingTask('+index+')">×</button></div>';}).join('');
   html+='<div class="briefing-actions"><input id="briefingNewTask" class="dl-inp" aria-label="New preparation item" placeholder="Add your own preparation item" maxlength="100"><button onclick="addBriefingTask()">Add</button></div><label class="briefing-sub" for="briefingNote" style="display:block;margin-top:14px">Layover / pickup note · saved on this device</label><textarea id="briefingNote" class="dl-inp briefing-note" placeholder="Hotel pickup, terminal or personal reminder" maxlength="1000" oninput="saveBriefingNote(this.value)">'+escQ(state.note||'')+'</textarea><p class="briefing-sub" style="margin-top:10px">Personal organization only. Use your airline’s official operational procedures and roster.</p>';
@@ -1325,7 +1376,11 @@ function renderDutyBriefing(){
   wrap.innerHTML=html;
 }
 
+function saveAlarmPrivacy(enabled){localStorage.setItem('crewclock_private_alarms',enabled?'true':'false');if(window.crewclock)window.crewclock.postMessage(JSON.stringify({type:'SET_ALARM_PRIVACY',enabled:enabled}));saveAlarms();if(intervalAlarms.length)updateIntervalAlarms(intervalAlarms,'Alarm privacy updated',false);}
 function loadSettings(){
+  var privateLabels=document.getElementById('privateAlarmLabels');if(privateLabels)privateLabels.checked=localStorage.getItem('crewclock_private_alarms')==='true';
+  var choice=manualZoneSetting(),choiceEl=document.getElementById('manualZoneChoice'),airportEl=document.getElementById('manualZoneAirport');
+  if(choiceEl)choiceEl.value=choice==='auto'||choice==='device'?choice:'airport';if(airportEl)airportEl.value=choice==='auto'||choice==='device'?'':choice;
   try{
     var s=localStorage.getItem('crewclock_v5');
     if(s){
@@ -1523,10 +1578,7 @@ function openUploadSheet(){
   document.getElementById('uploadSheet').classList.add('open');
   resetImportMode();
 }
-function openICSImport(){
-  chooseICSFile();
-  closeUploadSheet();
-}
+function openICSImport(){setImportMode('ics');chooseICSFile();}
 function chooseICSFile(){
   var input=document.getElementById('icsIn');
   input.value='';
@@ -1545,6 +1597,7 @@ function setImportMode(mode){
   document.querySelector('#uploadSheet .sheet-body').scrollTop=0;
 }
 function closeUploadSheet(){
+  pendingICSImport=null;icsReadToken++;
   document.body.classList.remove('import-open');
   document.getElementById('sheetOverlay').classList.remove('show');
   document.getElementById('uploadSheet').classList.remove('open');
@@ -1559,7 +1612,7 @@ document.addEventListener('keydown',function(event){
   if(!sheet.classList.contains('open'))return;
   if(event.key==='Escape'){event.preventDefault();closeUploadSheet();return;}
   if(event.key!=='Tab')return;
-  var controls=Array.from(sheet.querySelectorAll('button:not(:disabled),input:not([type="hidden"]),textarea,[tabindex="0"]')).filter(function(el){return el.getClientRects().length>0;});
+  var controls=Array.from(sheet.querySelectorAll('button:not(:disabled),input:not([type="hidden"]),select,textarea,[tabindex="0"]')).filter(function(el){return el.getClientRects().length>0;});
   if(!controls.length)return;
   var first=controls[0],last=controls[controls.length-1];
   if(event.shiftKey&&(document.activeElement===first||!controls.includes(document.activeElement))){event.preventDefault();last.focus();}
@@ -1567,7 +1620,7 @@ document.addEventListener('keydown',function(event){
 });
 
 
-function replaceMonthFlights(newFlights) {
+function planMonthFlights(newFlights) {
   if(!newFlights || newFlights.length === 0) return 0;
   
   var monthCounts = {};
@@ -1589,30 +1642,44 @@ function replaceMonthFlights(newFlights) {
       }
   });
 
-  detectedFlights = detectedFlights.filter(function(f) {
-      var ym = f.date.substring(0, 7);
+  var nextFlights = detectedFlights.filter(function(f) {
+      var ym = (f.date||'').substring(0, 7);
       if (ym === targetMonth) return false;
       if (crossoverMap[f.date + "_" + f.flight]) return false;
       return true; 
   });
 
   var seenIds = {};
-  detectedFlights.forEach(function(f){ seenIds[f.id] = true; });
+  nextFlights.forEach(function(f){ seenIds[f.id] = true; });
   
   var actuallyAdded = 0;
   newFlights.forEach(function(nf) {
       if(!seenIds[nf.id]) {
           seenIds[nf.id] = true;
-          detectedFlights.push(nf);
+          nextFlights.push(nf);
           actuallyAdded++;
       }
   });
 
-  detectedFlights.sort(function(a,b){return parseFlightDate(a)-parseFlightDate(b);});
-
-  return actuallyAdded; 
+  nextFlights.sort(function(a,b){return parseFlightDate(a)-parseFlightDate(b);});
+  return {flights:nextFlights,month:targetMonth,added:actuallyAdded};
 }
 
+
+function replaceMonthFlights(newFlights){
+  if(!newFlights||!newFlights.length)return 0;
+  var plan=planMonthFlights(newFlights),records={};try{records=JSON.parse(localStorage.getItem('crewclock_briefings_v1')||'{}')||{};}catch(e){}
+  newFlights.forEach(function(f){
+    var old=detectedFlights.filter(function(before){return before.date===f.date&&before.flight===f.flight&&before.depApt===f.depApt;});
+    var matches=newFlights.filter(function(after){return after.date===f.date&&after.flight===f.flight&&after.depApt===f.depApt;});
+    if(old.length!==1||matches.length!==1)return;
+    var previousKey=briefingKey(old[0]),nextKey=briefingKey(f);
+    if(records[previousKey]&&!records[nextKey])records[nextKey]=records[previousKey];
+    if(flightToggles[old[0].id]&&!flightToggles[f.id])flightToggles[f.id]=Object.assign({},flightToggles[old[0].id]);
+  });
+  localStorage.setItem('crewclock_briefings_v1',JSON.stringify(records));
+  detectedFlights=plan.flights;return plan.added;
+}
 
 function showManualEntryFallback(){
   setImportMode('text');
@@ -1707,9 +1774,35 @@ function parseManualSchedule(raw,month){
   flights.forEach(function(f){if(!f.arrTime)errors.push(f.flight+' on '+f.date+': missing arrival entry/time.');});
   flights.forEach(function(f){try{pinFlightInstants(f);}catch(e){errors.push(f.flight+': '+e.message);}});
   // Keep roster calendar dates: a lower arrival clock time can cross the date line.
-  if(/\bSLT\b/i.test(text))warnings.push('SLT means station local times. Known airports use their local time zones, including daylight saving. Unknown airports use the device time zone; verify them before registering.');
+  if(/\bSLT\b/i.test(text))warnings.push('SLT means station local times. Known airports use their local time zones, including daylight saving. Unknown airports need a confirmed IANA time zone before alarms can be registered.');
   return {flights:flights,warnings:warnings,errors:errors};
 }
+
+var pendingICSImport=null,icsReadToken=0;
+function importChanges(flights){
+  var plan=planMonthFlights(flights),key=function(f){return [f.date,f.flight,f.depApt].join('|');},signature=function(f){return [f.arrApt,f.departureUtc||f.depTime,f.arrivalUtc||f.arrTime].join('|');};
+  var before=new Map(detectedFlights.map(function(f){return [key(f),f];})),after=new Map(plan.flights.map(function(f){return [key(f),f];}));
+  var changes={added:[],changed:[],removed:[],alarms:0,month:plan.month};
+  after.forEach(function(f,k){if(!before.has(k))changes.added.push(f);else if(signature(f)!==signature(before.get(k)))changes.changed.push(f);});
+  before.forEach(function(f,k){if(!after.has(k))changes.removed.push(f);});
+  flights.forEach(function(f){getOffsetsForFlight(f).forEach(function(o){if((f.type==='intl'?intlOn:f.type==='dom'?domOn:baseOn)[o.id]!==false&&+parseFlightDate(f)-(o.h*60+o.m)*60000>Date.now())changes.alarms++;});});return changes;
+}
+function importSummaryHTML(flights){
+  var change=importChanges(flights),unknown=Array.from(new Set(flights.flatMap(function(f){return [f.depApt,f.arrApt];}).filter(function(code){return !airportZone(code);})));
+  var html='<h3>Review roster changes</h3><p>'+change.added.length+' added · '+change.changed.length+' changed · '+change.removed.length+' removed. Main month: '+escQ(change.month)+'.</p><p>Up to '+change.alarms+' future flight alarms will be requested using your presets. System permission and capacity determine which are scheduled.</p>';
+  ['added','changed','removed'].forEach(function(kind){if(change[kind].length)html+='<details><summary>'+kind+' flights ('+change[kind].length+')</summary>'+change[kind].map(function(f){return '<p>'+escQ([f.date,f.flight,f.depApt+' → '+f.arrApt,f.depTime].join(' · '))+'</p>';}).join('')+'</details>';});
+  html+=unknown.map(function(code){return '<label class="import-label">Time zone for '+escQ(code)+' (required)<input class="import-field" data-airport-zone="'+escQ(code)+'" placeholder="IANA time zone, e.g. Asia/Seoul" autocapitalize="none" spellcheck="false"></label>';}).join('');
+  return html+'<p>Existing preparation records are retained. Nothing changes until you confirm.</p>';
+}
+function confirmImportZones(container,flights){
+  var zones=Object.assign({},airportZoneOverrides);try{
+    var el=document.getElementById(container);if(el&&el.querySelectorAll)el.querySelectorAll('[data-airport-zone]').forEach(function(input){var value=input.value.trim();if(!value)throw Error('Enter the time zone for '+input.dataset.airportZone);new Intl.DateTimeFormat('en',{timeZone:value});zones[input.dataset.airportZone]=value;});
+    var missing=flights.some(function(f){return [f.depApt,f.arrApt].some(function(code){return !airportZone(code)&&!zones[code];});});if(missing)throw Error('Confirm all airport time zones before importing.');
+    localStorage.setItem('crewclock_airport_zones',JSON.stringify(zones));airportZoneOverrides=zones;
+    flights.forEach(function(f){pinFlightInstants(f);f.needsZoneConfirmation=false;});return true;
+  }catch(e){toast(e.message||'Check the IANA time zone names.','er');return false;}
+}
+function confirmICSImport(){if(!pendingICSImport)return;if(!confirmImportZones('icsResultWrap',pendingICSImport))return;var flights=pendingICSImport;pendingICSImport=null;commitICSImport(flights);}
 
 var manualImportDraft=null;
 function clearManualReview(){
@@ -1736,7 +1829,7 @@ function parseManualEntry(){
     document.getElementById('manualStatus').textContent='Not registered. Check the issues above and review again.';
     focusManualReview();return;
   }
-  html+='<p class="import-copy">Confirm the dates, routes and times. Importing replaces flights in the main schedule month and updates their alarms.</p>';
+  html+=importSummaryHTML(result.flights);
   document.getElementById('manualReview').innerHTML=html;
   manualImportDraft={raw:raw,month:month,flights:result.flights};
   document.getElementById('manualConfirm').disabled=false;
@@ -1747,6 +1840,7 @@ function confirmManualImport(){
   if(!manualImportDraft)return;
   if(manualImportDraft.raw!==document.getElementById('manualFlightInput').value||manualImportDraft.month!==document.getElementById('manualMonth').value){clearManualReview();toast('Text changed. Review the schedule again.','er');return;}
   var flights=manualImportDraft.flights;
+  if(!confirmImportZones('manualReview',flights))return;
   clearManualReview();
   
   var addedCount = replaceMonthFlights(flights);
@@ -1829,9 +1923,9 @@ function renderCal(){
     for(var di=0;di<fc;di++)dots+='<div class="cal-dot b"></div>';
     for(var ai=0;ai<ac;ai++)dots+='<div class="cal-dot g"></div>';
 
-    cells+='<div class="'+cls+'" onclick="calSelectDay(\''+dk+'\')">'
+    cells+='<button type="button" aria-label="'+dk+'" aria-pressed="'+isSel+'" class="'+cls+'" onclick="calSelectDay(\''+dk+'\')">'
       +'<div class="cal-day-num">'+day+'</div>'
-      +(dots?'<div class="cal-dots">'+dots+'</div>':'')+'</div>';
+      +(dots?'<div class="cal-dots">'+dots+'</div>':'')+'</button>';
   }
   grid.innerHTML=cells;
 
@@ -2134,16 +2228,29 @@ function handleICS(e){
   var rw=document.getElementById('icsResultWrap');
   if(rw)rw.innerHTML='<div style="text-align:center;padding:12px;font-size:12px;color:var(--tx2)">Reading file...</div>';
 
+  pendingICSImport=null;var readToken=++icsReadToken;
+  setImportMode('ics');
   var r=new FileReader();
   r.onload=function(ev){
+    if(readToken!==icsReadToken)return;
     try{
-      var newFlights=parseICS(ev.target.result);
+      previewICSContent(ev.target.result);
 
-      if(!newFlights.length){
-        toast('No flight events found. Check that the file contains flight legs.','er');
-        return;
-      }
+    }catch(err){
+      if(rw)rw.innerHTML='<div class="empty-state" style="color:var(--red)">Parse error: '+escQ(err.message)+'</div>';
+      toast('ICS parse error','er');
+      console.error('[ICS]',err);
+    }
+  };
+  r.readAsText(f,'UTF-8');
+}
 
+function previewICSContent(text){
+  pendingICSImport=null;var flights=parseICS(text);if(!flights.length){toast('No flight events found. Existing roster unchanged.','er');return;}
+  pendingICSImport=flights;setImportMode('ics');var wrap=document.getElementById('icsResultWrap');
+  if(wrap)wrap.innerHTML=importSummaryHTML(flights)+'<button type="button" class="btn-az" onclick="confirmICSImport()">Confirm changes and request alarms</button>';
+}
+function commitICSImport(newFlights){
       var addedCount = replaceMonthFlights(newFlights);
 
       if(addedCount > 0){
@@ -2179,13 +2286,6 @@ function handleICS(e){
         switchTab('calendar',null);
       },600);
 
-    }catch(err){
-      if(rw)rw.innerHTML='<div class="empty-state" style="color:var(--red)">Parse error: '+escQ(err.message)+'</div>';
-      toast('ICS parse error','er');
-      console.error('[ICS]',err);
-    }
-  };
-  r.readAsText(f,'UTF-8');
 }
 
 function parseICS(text){
@@ -2364,7 +2464,7 @@ function parseICS(text){
       finalFlights.push(f);
   });
   finalFlights.forEach(function(f){
-    if(!f.departureUtc&&!airportZone(f.depApt))throw new Error('Unknown departure time zone for '+f.depApt+'. Export this flight with UTC or TZID.');
+    if(!f.departureUtc&&!airportZone(f.depApt))f.needsZoneConfirmation=true;
     pinFlightInstants(f);
   });
   return finalFlights;
@@ -2500,11 +2600,11 @@ function renderFalItem(f,extraCls){
       +'<div class="atog-info">'
       +'<div class="atog-lbl-wrap">'
       +'<span class="atog-lbl">'+escQ(o.lbl)+'</span>'
-      +'<span class="atog-offset">'+offTxt+'</span>'
+      +'<span class="atog-offset">'+offTxt+' · '+escQ(on?flightReminderStatus(f,o):'Paused')+'</span>'
       +'</div>'
       +'</div>'
       +'<span class="atog-time">'+fmtAtZone(at,airportZone(f.depApt))+'<small style="display:block;font-size:9px">'+escQ(f.depApt)+' local</small></span>'
-      +'<button class="'+togCls+'" onclick="togFA(\''+f.id+'\',\''+o.id+'\')" ></button>'
+      +'<button role="switch" aria-checked="'+on+'" aria-label="'+escQ(o.lbl+' for '+f.flight)+'" class="'+togCls+'" onclick="togFA(\''+f.id+'\',\''+o.id+'\')" ></button>'
       +'</div>';
   }).join('');
 
@@ -2629,6 +2729,7 @@ function autoRegisterAll(){
   var validAutoAlarmKeys = {};
 
   detectedFlights.forEach(function(f){
+    if(!airportZone(f.depApt)||!airportZone(f.arrApt))return;
     var depDt=parseFlightDate(f);
     
 
@@ -2714,8 +2815,8 @@ function loadIntervalAlarms(){
 function updateIntervalAlarms(next,message,requestPermission){
   if(intervalPending)return;
   if(!window.crewclock||typeof window.crewclock.postMessage!=='function'){toast('Repeating reminders require the iPhone app.','er');return;}
-  intervalPending={before:intervalAlarms,message:message};intervalAlarms=next;renderIntervalAlarms();
-  window.crewclock.postMessage(JSON.stringify({type:'SET_INTERVAL_ALARMS',records:next,requestPermission:requestPermission!==false}));
+  intervalPending={before:intervalAlarms,message:message};next.forEach(function(a){delete nativeAlarmStatus[a.id];});intervalAlarms=next;renderIntervalAlarms();
+  window.crewclock.postMessage(JSON.stringify({type:'SET_INTERVAL_ALARMS',records:next,privateLabels:localStorage.getItem('crewclock_private_alarms')==='true',requestPermission:requestPermission!==false}));
 }
 function intervalSyncResult(ok,error,records){
   if(!intervalPending)return;
@@ -2738,8 +2839,8 @@ function renderIntervalAlarms(){
   var wrap=document.getElementById('intervalAlarmList');if(!wrap)return;
   var add=document.getElementById('addIntervalButton');if(add)add.disabled=!!intervalPending;
   wrap.innerHTML='<div class="dal-wrap">'+intervalAlarms.map(function(a){
-    var step=a.minutes*60000,next=new Date(a.anchor+(Math.floor(Math.max(0,Date.now()-a.anchor)/step)+1)*step);
-    return '<div class="dal-item'+(a.enabled?'':' missed')+'"><div class="dal-info"><div class="dal-lbl">'+escQ(a.label)+'</div><div class="dal-date">Every '+a.minutes+' minutes · '+(a.enabled?'Next '+dayKeyFromDate(next)+' '+fmt(next):'Paused')+'</div></div><button class="dal-dis" '+(intervalPending?'disabled ':'')+'onclick="toggleIntervalAlarm(\''+a.id+'\')">'+(a.enabled?'Pause':'Resume')+'</button><button class="dal-del" '+(intervalPending?'disabled ':'')+'onclick="deleteIntervalAlarm(\''+a.id+'\')" aria-label="Delete repeating reminder">×</button></div>';
+    var step=a.minutes*60000;
+    return '<div class="dal-item'+(a.enabled?'':' missed')+'"><div class="dal-info"><div class="dal-lbl">'+escQ(a.label)+'</div><div class="dal-date">Every '+a.minutes+' minutes · '+escQ(alarmStatusText(a))+((nativeAlarmStatus[a.id]&&nativeAlarmStatus[a.id].next)?' · Next '+dayKeyFromDate(new Date(nativeAlarmStatus[a.id].next))+' '+fmt(new Date(nativeAlarmStatus[a.id].next)):'')+'</div></div><button class="dal-dis" '+(intervalPending?'disabled ':'')+'onclick="toggleIntervalAlarm(\''+a.id+'\')">'+(a.enabled?'Pause':'Resume')+'</button><button class="dal-del" '+(intervalPending?'disabled ':'')+'onclick="deleteIntervalAlarm(\''+a.id+'\')" aria-label="Delete repeating reminder">×</button></div>';
   }).join('')+'</div>';
 }
 
@@ -2811,7 +2912,7 @@ function renderDirectAlarms(){
       +'<div class="dal-dot"></div><div class="dal-info">'
       +'<div class="dal-date-row"><span class="dal-date">'+dateStr+'</span>'+fInfo+(isTod?'<span class="dal-today" style="margin-left:4px">TODAY</span>':'')+'</div>'
       +'<div class="dal-lbl">'+escQ(a.lbl)+'</div>'
-      +'<div class="dal-cd" id="dcd-'+a.id+'">'+cdTxt+'</div></div>'
+      +'<div class="dal-cd" id="dcd-'+a.id+'">'+cdTxt+'</div><div class="reservation-state">'+escQ(alarmStatusText(a))+'</div></div>'
       +'<div class="dal-time">'+timeStr+'</div>'+act+'</div>';
   }).join('')+'</div>';
 }
@@ -2874,7 +2975,7 @@ function tickClock(){
   var nowToday = todayStr();
   var zone=appZone(),station=stayAirport();
   var guide=document.getElementById('stayTimeZoneGuide'),manualGuide=document.getElementById('manualAlarmZone');
-  var zoneText=zone?'Roster-inferred stay: '+station+' · '+zone+' · '+nowToday:'Using device time zone · '+nowToday;
+  var choice=manualZoneSetting();var zoneText=zone?(choice==='auto'?'Roster-inferred stay: '+station:'Selected airport: '+choice)+' · '+zone+' · '+nowToday:'Using device time zone · '+nowToday;
   if(detectedFlights.some(function(f){return f.summary&&!f.timingVersion;}))zoneText+=' · Re-import older ICS if dates are incorrect.';
   if(guide)guide.textContent=zoneText;
   if(manualGuide)manualGuide.textContent=zoneText;
@@ -3108,7 +3209,7 @@ function stopAllRingingAlarms(){
 }
 function saveSettingsUI(){
   var v=(document.getElementById('baseAptInput').value||'').trim().toUpperCase().slice(0,3);
-  if(!/^[A-Z]{3}$/.test(v)){toast('Enter a three-letter IATA airport code','er');return;}
+  if(!/^[A-Z]{3}$/.test(v)||!airportZone(v)){toast('Choose a known home-base airport code or confirm its time zone when importing.','er');return;}
   syncAllPresets();
   var codes=document.getElementById('domesticAptsInput').value.toUpperCase().split(/[,\s]+/).filter(Boolean);
   if(codes.some(function(code){return !/^[A-Z]{3}$/.test(code);})){toast('Use three-letter airport codes separated by commas','er');return;}
@@ -3507,6 +3608,7 @@ function toast(msg,type){var t=document.getElementById('toast');t.textContent=ms
 
 function saveAlarms(){
   try{
+    alms.forEach(function(a){delete nativeAlarmStatus[String(a.id)];});
     var data=alms.map(function(a){
       return {
         id:a.id,
