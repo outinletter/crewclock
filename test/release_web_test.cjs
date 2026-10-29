@@ -90,11 +90,13 @@ test('interval reminders commit only after native acknowledgement and survive re
   ctx.intervalSyncResult(true,null,[]);
   assert.equal(JSON.parse(items.get('crewclock_intervals')).length,0);
 });
-test('interval reminders reject empty names and invalid intervals',()=>{
+test('interval reminders accept empty names and reject invalid intervals',()=>{
   const {ctx,messages}=app();
   const fields={intervalLabel:{value:''},intervalMinutes:{value:'90'}};
   ctx.document.getElementById=id=>fields[id] || null;
   ctx.addIntervalAlarm();
+  assert.equal(messages[0].records[0].label,'Interval Reminder');
+  ctx.intervalSyncResult(true,null,messages[0].records);messages.length=0;
   fields.intervalLabel.value='Exercise';
   for(const value of ['0','1.5','NaN','10081']){fields.intervalMinutes.value=value;ctx.addIntervalAlarm();}
   assert.equal(messages.length,0);
@@ -183,14 +185,14 @@ test('alarm month title restores today while keeping time; app title has no navi
   assert.ok(html.includes('onclick="resetAlarmDate()"'));
   assert.ok(html.includes('<div class="nav-title">'));
 });
-test('ICS import opens the picker and closes the sheet without the legacy step', () => {
+test('ICS import opens a review sheet and picker without committing changes', () => {
   const { ctx } = app();
   const calls = [];
-  ctx.setImportMode = () => assert.fail('Legacy ICS step must not open');
+  ctx.setImportMode = mode => calls.push(mode);
   ctx.chooseICSFile = () => calls.push('picker');
   ctx.closeUploadSheet = () => calls.push('close');
   ctx.openICSImport();
-  assert.deepEqual(calls, ['picker', 'close']);
+  assert.deepEqual(calls, ['ics', 'picker']);
 });
 test('native DB arrays and legacy JSON strings both restore alarms', () => {
   const { ctx, items } = app();
@@ -471,7 +473,7 @@ test('sample roster previews future flights without saving or changing existing 
   ctx.document.getElementById = id => elements[id] ||= { value: '', focus() {}, scrollIntoView() {}, style: {} };
   ctx.setImportMode = () => {};
   ctx.alms = [{ id: 'existing' }];
-  ctx.detectedFlights = [{ id: 'existing-flight' }];
+  ctx.detectedFlights = [{ id: 'existing-flight',date:'2030-11-01',flight:'CC001',depApt:'ICN',arrApt:'NRT',depTime:'09:00' }];
   const fixed = new Date(2030, 11, 31, 12);
   ctx.Date = class extends Date { constructor(...args) { super(...(args.length ? args : [fixed.getTime()])); } };
   ctx.previewSampleRoster();
@@ -616,4 +618,49 @@ test('today and future schedule alarms stay vivid while past dates are dimmed', 
   ctx.renderDaySchedule('2030-01-03');
   assert.match(elements.dayFlights.innerHTML, /Prepare for Duty/);
   assert.match(elements.dayFlights.innerHTML, /opacity:0.45/, 'selecting a past schedule also dims its preview alarms');
+});
+
+
+test('roster preview shows added changed removed without mutating storage or alarms',()=>{
+  const {ctx,items,messages}=app();ctx.resetDef();
+  const old={id:'old',date:'2030-07-01',flight:'CC1',depApt:'ICN',arrApt:'NRT',depTime:'09:00',arrTime:'11:00',type:'base'};
+  const removed={...old,id:'gone',flight:'CC2',date:'2030-07-02'};
+  ctx.detectedFlights=[old,removed];ctx.alms=[{id:'keep',type:'direct'}];
+  const updated={...old,id:'new',depTime:'10:00'},added={...old,id:'added',flight:'CC3',date:'2030-07-03'};
+  const plan=ctx.importChanges([updated,added]);
+  assert.equal(plan.added.length,1);assert.equal(plan.changed.length,1);assert.equal(plan.removed.length,1);
+  assert.equal(ctx.detectedFlights[0].id,'old');assert.equal(ctx.alms[0].id,'keep');assert.equal(items.size,0);assert.equal(messages.length,0);
+});
+test('changed departure carries preparation notes and explicit alarm choices',()=>{
+  const {ctx}=app();ctx.document.getElementById=()=>null;
+  const old={id:'old',date:'2030-07-01',flight:'CC1',depApt:'ICN',arrApt:'NRT',depTime:'09:00',type:'base'};ctx.pinFlightInstants(old);ctx.detectedFlights=[old];ctx.saveBriefingNote('Lobby pickup');ctx.flightToggles.old={b1:false};
+  const changed={...old,id:'new',depTime:'10:00'};delete changed.departureUtc;ctx.pinFlightInstants(changed);ctx.replaceMonthFlights([changed]);
+  assert.equal(ctx.briefingState(changed).note,'Lobby pickup');assert.equal(ctx.flightToggles.new.b1,false);
+});
+test('enabled switches never claim a native reservation until the OS confirms it',()=>{
+  const {ctx}=app();const a={id:'one',type:'direct',armed:true};
+  assert.match(ctx.alarmStatusText(a),/Checking/);ctx.nativeAlarmStatus.one={state:'waiting'};assert.match(ctx.alarmStatusText(a),/not scheduled/);
+  ctx.nativeAlarmStatus.one={state:'scheduled'};assert.equal(ctx.alarmStatusText(a),'Scheduled');a.armed=false;assert.equal(ctx.alarmStatusText(a),'Paused');
+});
+test('unknown airports cannot create flight alarms until their time zones are confirmed',()=>{
+  const {ctx}=app();ctx.document.getElementById=()=>null;ctx.resetDef();
+  const f={id:'unknown',date:'2030-07-01',flight:'CC9',depApt:'ZZZ',arrApt:'ICN',depTime:'12:00',type:'intl'};ctx.detectedFlights=[f];ctx.initFlightToggles();ctx.autoRegisterAll();assert.equal(ctx.alms.length,0);
+  ctx.airportZoneOverrides.ZZZ='Asia/Seoul';ctx.pinFlightInstants(f);ctx.autoRegisterAll();assert.ok(ctx.alms.length>0);
+});
+test('manual time-zone override changes interpretation but not saved alarm instants',()=>{
+  const {ctx,items}=app();ctx.detectedFlights=[{departureUtc:'2030-07-01T00:00:00Z',depApt:'ICN',arrApt:'NRT'}];
+  const at='2030-07-01T04:00:00.000Z';ctx.alms=[{id:'manual',type:'direct',time:new Date(at)}];
+  items.set('crewclock_manual_zone','LHR');assert.equal(ctx.appZone(),'Europe/London');assert.equal(ctx.alms[0].time.toISOString(),at);
+  items.set('crewclock_manual_zone','device');assert.equal(ctx.appZone(),null);
+});
+test('ICS preview and cancelling do not replace the current roster',()=>{
+  const {ctx,messages}=app();ctx.resetDef();ctx.document.getElementById=()=>({innerHTML:''});ctx.setImportMode=()=>{};
+  ctx.detectedFlights=[];ctx.previewICSContent('BEGIN:VEVENT\nDTSTART:20300715T000000Z\nDTEND:20300715T023000Z\nSUMMARY:CC1 ICN-NRT\nEND:VEVENT');
+  assert.equal(ctx.pendingICSImport.length,1);assert.equal(ctx.detectedFlights.length,0);assert.equal(messages.length,0);
+  ctx.pendingICSImport=null;ctx.confirmICSImport();assert.equal(ctx.detectedFlights.length,0);
+});
+test('interval list shows only the next time actually reported by the operating system',()=>{
+  const {ctx}=app();const wrap={innerHTML:''};ctx.document.getElementById=id=>id==='intervalAlarmList'?wrap:null;
+  ctx.intervalAlarms=[{id:'interval_1',label:'Break',minutes:90,enabled:true,anchor:0}];ctx.renderIntervalAlarms();assert.doesNotMatch(wrap.innerHTML,/Next /);
+  ctx.nativeAlarmStatus.interval_1={state:'scheduled',next:Date.parse('2030-07-01T04:00:00Z')};ctx.renderIntervalAlarms();assert.match(wrap.innerHTML,/Scheduled/);assert.match(wrap.innerHTML,/Next /);
 });
