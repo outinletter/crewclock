@@ -664,3 +664,17 @@ test('interval list shows only the next time actually reported by the operating 
   ctx.intervalAlarms=[{id:'interval_1',label:'Break',minutes:90,enabled:true,anchor:0}];ctx.renderIntervalAlarms();assert.doesNotMatch(wrap.innerHTML,/Next /);
   ctx.nativeAlarmStatus.interval_1={state:'scheduled',next:Date.parse('2030-07-01T04:00:00Z')};ctx.renderIntervalAlarms();assert.match(wrap.innerHTML,/Scheduled/);assert.match(wrap.innerHTML,/Next /);
 });
+
+test('existing airport transit preparation becomes Passport & VISA without losing completion', () => {
+  const {ctx, items} = app();
+  ctx.briefingKey = () => 'saved-flight';
+  const checkedAt = '2026-10-30T01:00:00Z';
+  items.set('crewclock_briefings_v1', JSON.stringify({'saved-flight': {
+    tasks: [{label: 'Airport transport arranged', checkedAt}, {label: 'My pickup note', checkedAt: null}], note: 'Keep this note'
+  }}));
+  const state = ctx.briefingState({});
+  assert.equal(state.tasks[0].label, 'Passport & VISA');
+  assert.equal(state.tasks[0].checkedAt, checkedAt);
+  assert.equal(state.tasks[1].label, 'My pickup note');
+  assert.equal(state.note, 'Keep this note');
+});

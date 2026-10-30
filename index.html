@@ -1209,8 +1209,8 @@ function briefingState(f){
   if(briefingDemo)return briefingDemo.state;
   var saved={};try{saved=JSON.parse(localStorage.getItem('crewclock_briefings_v1')||'{}')||{};}catch(e){}
   var state=saved[briefingKey(f)];
-  if(state&&Array.isArray(state.tasks)&&state.tasks.length<=12&&state.tasks.every(function(t){return t&&typeof t.label==='string'&&t.label.length<=100&&(!t.checkedAt||Number.isFinite(Date.parse(t.checkedAt)));}))return state;
-  return {tasks:['Roster and departure time checked','Crew documents packed','Airport transport arranged','Personal bag ready'].map(function(label){return {label:label,checkedAt:null};}),note:''};
+  if(state&&Array.isArray(state.tasks)&&state.tasks.length<=12&&state.tasks.every(function(t){return t&&typeof t.label==='string'&&t.label.length<=100&&(!t.checkedAt||Number.isFinite(Date.parse(t.checkedAt)));})){state.tasks.forEach(function(t){if(['airport transport arranged','airport transit'].indexOf(t.label.trim().toLowerCase())!==-1)t.label='Passport & VISA';});return state;}
+  return {tasks:['Roster and departure time checked','Crew documents packed','Passport & VISA','Personal bag ready'].map(function(label){return {label:label,checkedAt:null};}),note:''};
 }
 function saveBriefingState(f,state){
   if(briefingDemo){briefingDemo.state=state;return true;}
@@ -1227,7 +1227,7 @@ function startBriefingDemo(){
   var civil=dateAtZone(new Date(),'America/Chicago');civil.setDate(civil.getDate()+2);
   var departure=zonedCalendarDate(civil.getFullYear(),civil.getMonth()+1,civil.getDate(),11,55,0,'America/Chicago');
   var f={flight:'CC102',depApt:'DFW',arrApt:'ICN',type:'intl',departureUtc:departure.toISOString(),arrivalUtc:new Date(+departure+14*3600000).toISOString()};refreshFlightLocalTimes(f);
-  briefingDemo={flight:f,state:{tasks:['Roster and departure time checked','Crew documents packed','Airport transport arranged','Personal bag ready'].map(function(label){return {label:label,checkedAt:null};}),note:''}};renderDutyBriefing();
+  briefingDemo={flight:f,state:{tasks:['Roster and departure time checked','Crew documents packed','Passport & VISA','Personal bag ready'].map(function(label){return {label:label,checkedAt:null};}),note:''}};renderDutyBriefing();
 }
 function closeBriefingDemo(){briefingDemo=null;renderDutyBriefing();}
 function briefingExportLines(f,state){
@@ -1260,7 +1260,7 @@ function nativeBriefingSnapshot(key){
   var next=steps.filter(function(s){return Date.parse(s.at)>Date.now();}).sort(function(a,b){return Date.parse(a.at)-Date.parse(b.at);})[0]||null;
   return {dark:document.body.classList.contains('dark'),demo:!!briefingDemo,key:briefingKey(f),
     flight:{number:f.flight,from:f.depApt,to:f.arrApt,departure:dep.toISOString()},
-    flights:briefingDemo?[]:detectedFlights.slice().sort(function(a,b){return parseFlightDate(a)-parseFlightDate(b);}).map(function(x){return {key:briefingKey(x),label:x.date+' '+x.flight+' '+x.depApt+' → '+x.arrApt};}),
+    flights:briefingDemo?[]:detectedFlights.slice().sort(function(a,b){return parseFlightDate(a)-parseFlightDate(b);}).map(function(x){return {key:briefingKey(x),label:x.date+' '+x.flight+' '+x.depApt+' → '+x.arrApt,date:x.date,number:x.flight,from:x.depApt,to:x.arrApt};}),
     clocks:[clock(f.depApt+' departure',zone),clock(baseApt+' home',airportZone(baseApt)),clock('UTC','UTC')],
     next:next,steps:steps,tasks:state.tasks.map(function(t){return {label:t.label,checkedAt:t.checkedAt,checkedText:t.checkedAt?stamp(new Date(t.checkedAt),zone)+' '+f.depApt:null};}),note:state.note||''};
 }

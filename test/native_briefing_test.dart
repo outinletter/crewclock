@@ -54,6 +54,8 @@ void main() {
         (key) async => sample(key ?? 'CC101'), (_, __, ___) async {});
     await tester.pumpAndSettle();
     expect(find.text('CC101 · DFW → ICN'), findsOneWidget);
+    expect(tester.widget<Text>(find.text('Next flight').first).textAlign,
+        TextAlign.center);
     expect(find.text('America/Chicago'), findsOneWidget);
     expect(find.text('Asia/Seoul'), findsOneWidget);
     final heights = ['DFW departure', 'ICN home', 'UTC']
@@ -79,9 +81,10 @@ void main() {
         home: CrewClockShell(
             briefing: bridge, tools: const Text('Roster tools'))));
     await tester.pumpAndSettle();
-    await tester.tap(find.byType(DropdownButtonFormField<String>));
+    await tester.tap(find.byKey(const ValueKey('choose-flight')));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('CC102 DFW → ICN').last);
+    expect(find.text('Choose flight'), findsOneWidget);
+    await tester.tap(find.text('CC102 DFW → ICN').first);
     await tester.pumpAndSettle();
     expect(find.text('CC102 · DFW → ICN'), findsOneWidget);
     await tester.scrollUntilVisible(find.text('Review flight alarms'), 250,

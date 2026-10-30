@@ -156,6 +156,110 @@ class _CrewClockShellState extends State<CrewClockShell>
         ),
       );
 
+  Future<void> _chooseFlight(List choices, String currentKey) async {
+    final key = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      backgroundColor: _colors.surface,
+      constraints: const BoxConstraints(maxWidth: 640),
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28))),
+      builder: (sheetContext) => Theme(
+        data: ThemeData(colorScheme: _colors, useMaterial3: true),
+        child: SafeArea(
+            top: false,
+            child: SizedBox(
+              height: MediaQuery.sizeOf(sheetContext).height * .7,
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Padding(
+                        padding: const EdgeInsets.fromLTRB(24, 0, 12, 16),
+                        child: Row(children: [
+                          Expanded(
+                              child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                const Text('Choose flight',
+                                    style: TextStyle(
+                                        fontSize: 24,
+                                        fontWeight: FontWeight.w700)),
+                                const SizedBox(height: 4),
+                                Text(
+                                    '${choices.length} flights · Departure date order'),
+                              ])),
+                          IconButton(
+                              tooltip: 'Close flight list',
+                              onPressed: () => Navigator.pop(sheetContext),
+                              icon: const Icon(Icons.close)),
+                        ])),
+                    Expanded(
+                        child: ListView.separated(
+                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+                      itemCount: choices.length,
+                      separatorBuilder: (_, __) => const SizedBox(height: 10),
+                      itemBuilder: (context, index) {
+                        final f = choices[index] as Map;
+                        final selected = f['key'] == currentKey;
+                        return Material(
+                          color: selected
+                              ? _colors.primaryContainer
+                              : _colors.surfaceContainerLow,
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(18),
+                              side: BorderSide(
+                                  color:
+                                      selected ? _teal : _colors.outlineVariant,
+                                  width: selected ? 1.5 : 1)),
+                          clipBehavior: Clip.antiAlias,
+                          child: ListTile(
+                            selected: selected,
+                            contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 10),
+                            leading: CircleAvatar(
+                                backgroundColor: selected
+                                    ? _teal
+                                    : _colors.surfaceContainerHighest,
+                                child: Icon(Icons.flight_takeoff,
+                                    color: selected
+                                        ? Colors.white
+                                        : _colors.onSurfaceVariant)),
+                            title: Text(
+                                f['number'] == null
+                                    ? '${f['label']}'
+                                    : '${f['number']} · ${f['from']} → ${f['to']}',
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.w700)),
+                            subtitle: Padding(
+                                padding: const EdgeInsets.only(top: 5),
+                                child: Text(
+                                    '${f['date'] ?? f['label']}${selected ? ' · Selected' : ''}')),
+                            trailing: Icon(
+                                selected
+                                    ? Icons.check_circle
+                                    : Icons.chevron_right,
+                                color: selected
+                                    ? _teal
+                                    : _colors.onSurfaceVariant),
+                            onTap: () =>
+                                Navigator.pop(sheetContext, f['key'] as String),
+                          ),
+                        );
+                      },
+                    )),
+                  ]),
+            )),
+      ),
+    );
+    if (!mounted || key == null || key == currentKey) return;
+    if (_note.text != (_data?['note'] ?? '')) {
+      if (!await _act('note', _note.text)) return;
+    }
+    _selected = key;
+    await _refresh();
+  }
+
   Widget _briefing(Map<String, dynamic> data) {
     final flight = data['flight'] as Map;
     final choices = data['flights'] as List;
@@ -201,26 +305,29 @@ class _CrewClockShellState extends State<CrewClockShell>
       ),
       if (choices.length > 1) ...[
         _title('Flight'),
-        DropdownButtonFormField<String>(
-          key: ValueKey(data['key']),
-          initialValue: data['key'] as String,
-          isExpanded: true,
-          decoration: const InputDecoration(border: OutlineInputBorder()),
-          items: choices
-              .map((f) => DropdownMenuItem<String>(
-                  value: f['key'] as String,
-                  child: Text('${f['label']}',
-                      maxLines: 2, overflow: TextOverflow.ellipsis)))
-              .toList(),
-          onChanged: _busy
+        OutlinedButton(
+          key: const ValueKey('choose-flight'),
+          style: OutlinedButton.styleFrom(
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            side: BorderSide(color: _colors.outlineVariant),
+            foregroundColor: _colors.onSurface,
+          ),
+          onPressed: _busy
               ? null
-              : (key) async {
-                  if (_note.text != (_data?['note'] ?? '')) {
-                    if (!await _act('note', _note.text)) return;
-                  }
-                  _selected = key;
-                  await _refresh();
-                },
+              : () => _chooseFlight(choices, data['key'] as String),
+          child: Row(children: [
+            const Icon(Icons.flight_takeoff, color: _teal),
+            const SizedBox(width: 12),
+            Expanded(
+                child: Text(
+                    '${choices.firstWhere((f) => f['key'] == data['key'])['label']}',
+                    style: const TextStyle(fontSize: 16),
+                    textAlign: TextAlign.start)),
+            const SizedBox(width: 8),
+            const Icon(Icons.unfold_more),
+          ]),
         ),
       ],
       const SizedBox(height: 20),
@@ -343,6 +450,7 @@ class _CrewClockShellState extends State<CrewClockShell>
             padding: const EdgeInsets.all(20),
             children: [
               const Text('Next flight',
+                  textAlign: TextAlign.center,
                   style: TextStyle(fontSize: 30, fontWeight: FontWeight.w700)),
               const SizedBox(height: 20),
               if (_error != null)
