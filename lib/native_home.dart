@@ -133,6 +133,7 @@ class _CrewClockShellState extends State<CrewClockShell>
       brightness: _data?['dark'] == true ? Brightness.dark : Brightness.light);
 
   Widget _clock(Map clock, bool accent) => Container(
+        key: ValueKey('briefing-clock-${clock['label']}'),
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
           color: accent ? _teal : _colors.surfaceContainerHighest,
@@ -224,12 +225,24 @@ class _CrewClockShellState extends State<CrewClockShell>
       ],
       const SizedBox(height: 20),
       LayoutBuilder(builder: (context, size) {
-        final width =
-            size.maxWidth >= 320 ? (size.maxWidth - 16) / 3 : size.maxWidth;
-        return Wrap(spacing: 8, runSpacing: 8, children: [
-          for (var i = 0; i < clocks.length; i++)
-            SizedBox(width: width, child: _clock(clocks[i] as Map, i == 0)),
-        ]);
+        if (size.maxWidth < 320) {
+          return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                for (var i = 0; i < clocks.length; i++) ...[
+                  if (i > 0) const SizedBox(height: 8),
+                  _clock(clocks[i] as Map, i == 0),
+                ],
+              ]);
+        }
+        return IntrinsicHeight(
+          child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            for (var i = 0; i < clocks.length; i++) ...[
+              if (i > 0) const SizedBox(width: 8),
+              Expanded(child: _clock(clocks[i] as Map, i == 0)),
+            ],
+          ]),
+        );
       }),
       const SizedBox(height: 14),
       Text(

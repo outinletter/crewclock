@@ -56,6 +56,13 @@ void main() {
     expect(find.text('CC101 · DFW → ICN'), findsOneWidget);
     expect(find.text('America/Chicago'), findsOneWidget);
     expect(find.text('Asia/Seoul'), findsOneWidget);
+    final heights = ['DFW departure', 'ICN home', 'UTC']
+        .map((label) => tester
+            .getSize(find.byKey(ValueKey('briefing-clock-$label')))
+            .height)
+        .toList();
+    expect(heights[1], heights[0]);
+    expect(heights[2], heights[0]);
     await tester.scrollUntilVisible(find.text('Next preparation'), 300,
         scrollable: find.byType(Scrollable).first);
     expect(find.text('To do: Documents packed'), findsOneWidget);
