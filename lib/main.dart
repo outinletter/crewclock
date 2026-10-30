@@ -12,6 +12,7 @@ import 'package:timezone/data/latest_all.dart' as tz_data;
 import 'package:timezone/timezone.dart' as tz;
 
 import 'db/database.dart';
+import 'native_home.dart';
 
 class NativeAlarmScheduler {
   NativeAlarmScheduler();
@@ -307,7 +308,7 @@ class CrewClockApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return const MaterialApp(
-      home: CrewClockHome(),
+      home: CrewClockShell(tools: CrewClockHome()),
       debugShowCheckedModeBanner: false,
     );
   }
