@@ -4,8 +4,6 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:webview_flutter/webview_flutter.dart';
-import 'package:webview_flutter_android/webview_flutter_android.dart';
-import 'package:file_picker/file_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/data/latest_all.dart' as tz_data;
@@ -31,8 +29,6 @@ class NativeAlarmScheduler {
 
     tz_data.initializeTimeZones();
 
-    const androidSettings =
-        AndroidInitializationSettings('@mipmap/ic_launcher');
     final darwinSettings = DarwinInitializationSettings(
       requestAlertPermission: false,
       requestBadgePermission: false,
@@ -46,13 +42,15 @@ class NativeAlarmScheduler {
 
     await _notifications.initialize(
       InitializationSettings(
-        android: androidSettings,
         iOS: darwinSettings,
-        macOS: darwinSettings,
       ),
     );
 
-    if (Platform.isIOS) privateLabels = await _nativeAlarmChannel.invokeMethod<bool>('getAlarmPrivacy') ?? false;
+    if (Platform.isIOS) {
+      privateLabels =
+          await _nativeAlarmChannel.invokeMethod<bool>('getAlarmPrivacy') ??
+              false;
+    }
     _initialized = true;
   }
 
@@ -96,21 +94,10 @@ class NativeAlarmScheduler {
       await _notifications.cancelAll();
     }
 
-    if (requestExactPermissions && records.isNotEmpty) {
-      await _requestNotificationPermissions();
-      await _requestAlarmPermissions();
-    }
-
-    if (Platform.isAndroid) {
-      await _nativeAlarmChannel.invokeMethod<void>(
-        'scheduleAlarms',
-        jsonEncode(records),
-      );
-      return;
-    }
-
     final availableSlots = Platform.isIOS
-        ? await _nativeAlarmChannel.invokeMethod<int>('getAvailableNotificationSlots') ?? 0
+        ? await _nativeAlarmChannel
+                .invokeMethod<int>('getAvailableNotificationSlots') ??
+            0
         : 64;
     final now = DateTime.now().toUtc();
     final sorted = records.whereType<Map>().toList()
@@ -130,9 +117,11 @@ class NativeAlarmScheduler {
       if (Platform.isIOS && scheduledCount >= availableSlots) break;
 
       final id = _stableNotificationId(record['id']?.toString() ?? '');
-      final label = privateLabels ? 'CrewClock reminder' : (record['lbl']?.toString().trim().isNotEmpty ?? false)
-          ? record['lbl'].toString()
-          : 'CrewClock Alarm';
+      final label = privateLabels
+          ? 'CrewClock reminder'
+          : (record['lbl']?.toString().trim().isNotEmpty ?? false)
+              ? record['lbl'].toString()
+              : 'CrewClock Alarm';
       final route = privateLabels ? '' : _routeText(record);
       final body = route.isEmpty
           ? 'Scheduled for ${_formatLocal(alarmTime)}'
@@ -158,19 +147,6 @@ class NativeAlarmScheduler {
   }) async {
     final scheduledAt = tz.TZDateTime.from(alarmTimeUtc, tz.UTC);
     final details = NotificationDetails(
-      android: const AndroidNotificationDetails(
-        'crewclock_alarm_channel_continuous',
-        'CrewClock Alarms',
-        channelDescription: 'Flight and direct alarm notifications',
-        importance: Importance.max,
-        priority: Priority.max,
-        category: AndroidNotificationCategory.alarm,
-        audioAttributesUsage: AudioAttributesUsage.alarm,
-        playSound: true,
-        enableVibration: true,
-        visibility: NotificationVisibility.public,
-        fullScreenIntent: true,
-      ),
       iOS: DarwinNotificationDetails(
         presentAlert: true,
         presentBadge: true,
@@ -178,85 +154,41 @@ class NativeAlarmScheduler {
         sound: _iosSound,
         categoryIdentifier: 'crewclock_alarm',
       ),
-      macOS: const DarwinNotificationDetails(
-        presentAlert: true,
-        presentBadge: true,
-        presentSound: true,
-      ),
     );
 
-    try {
-      await _notifications.zonedSchedule(
-        id,
-        title,
-        body,
-        scheduledAt,
-        details,
-        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-        uiLocalNotificationDateInterpretation:
-            UILocalNotificationDateInterpretation.absoluteTime,
-        payload: payload,
-      );
-    } catch (_) {
-      await _notifications.zonedSchedule(
-        id,
-        title,
-        body,
-        scheduledAt,
-        details,
-        androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
-        uiLocalNotificationDateInterpretation:
-            UILocalNotificationDateInterpretation.absoluteTime,
-        payload: payload,
-      );
-    }
+    await _notifications.zonedSchedule(
+      id,
+      title,
+      body,
+      scheduledAt,
+      details,
+      uiLocalNotificationDateInterpretation:
+          UILocalNotificationDateInterpretation.absoluteTime,
+      payload: payload,
+    );
   }
 
   Future<void> _requestNotificationPermissions() async {
-    final android = _notifications.resolvePlatformSpecificImplementation<
-        AndroidFlutterLocalNotificationsPlugin>();
-    await android?.requestNotificationsPermission();
-
     await _notifications
         .resolvePlatformSpecificImplementation<
             IOSFlutterLocalNotificationsPlugin>()
         ?.requestPermissions(alert: true, badge: true, sound: true);
-    await _notifications
-        .resolvePlatformSpecificImplementation<
-            MacOSFlutterLocalNotificationsPlugin>()
-        ?.requestPermissions(alert: true, badge: true, sound: true);
-  }
-
-  Future<void> _requestAlarmPermissions() async {
-    final android = _notifications.resolvePlatformSpecificImplementation<
-        AndroidFlutterLocalNotificationsPlugin>();
-    await android?.requestExactAlarmsPermission();
-    await android?.requestFullScreenIntentPermission();
-
-    if (Platform.isAndroid) {
-      const channel = MethodChannel('crewclock/battery_optimization');
-      try {
-        await channel.invokeMethod('requestIgnoreBatteryOptimizations');
-      } catch (e) {
-        debugPrint('Battery optimization request failed: $e');
-      }
-    }
   }
 
   Future<bool> chooseAlarmSound() async {
-    if (!Platform.isAndroid && !Platform.isIOS) return false;
+    if (!Platform.isIOS) return false;
     final selected =
         await _nativeAlarmChannel.invokeMethod<String>('chooseAlarmSound');
     return selected != null;
   }
 
   Future<void> stopRingingAlarm() async {
-    if (!Platform.isAndroid && !Platform.isIOS) return;
+    if (!Platform.isIOS) return;
     await _nativeAlarmChannel.invokeMethod<void>('stopAlarm');
   }
 
   Future<void> reconcileDismissals() async {
-    if (!Platform.isAndroid && !Platform.isIOS) return;
+    if (!Platform.isIOS) return;
     final ids = await _nativeAlarmChannel
         .invokeListMethod<String>('getDismissedAlarmIds');
     if (ids == null || ids.isEmpty) return;
@@ -307,15 +239,18 @@ class CrewClockApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const MaterialApp(
-      home: CrewClockShell(tools: CrewClockHome()),
+    final briefing = CrewClockBriefingBridge();
+    return MaterialApp(
+      home: CrewClockShell(
+          briefing: briefing, tools: CrewClockHome(briefing: briefing)),
       debugShowCheckedModeBanner: false,
     );
   }
 }
 
 class CrewClockHome extends StatefulWidget {
-  const CrewClockHome({super.key});
+  const CrewClockHome({super.key, this.briefing});
+  final CrewClockBriefingBridge? briefing;
 
   @override
   State<CrewClockHome> createState() => _CrewClockHomeState();
@@ -387,7 +322,10 @@ class _CrewClockHomeState extends State<CrewClockHome>
             .invokeMethod<int>('getQueuedAlarmCount') ??
         0;
     final sound = _alarmScheduler._iosSound == null ? 'Default' : 'Beep';
-    final status = await NativeAlarmScheduler._nativeAlarmChannel.invokeMethod<Map<dynamic, dynamic>>('getAlarmStatus', await AppDatabase.instance.getAlarmsState()) ?? {};
+    final status = await NativeAlarmScheduler._nativeAlarmChannel
+            .invokeMethod<Map<dynamic, dynamic>>('getAlarmStatus',
+                await AppDatabase.instance.getAlarmsState()) ??
+        {};
     await controller.runJavaScript(
       'window.crewclockSystemAlarm = $system;'
       'applyNativeAlarmStatus(${jsonEncode(status)});'
@@ -430,6 +368,22 @@ class _CrewClockHomeState extends State<CrewClockHome>
           },
           onPageFinished: (String url) async {
             _pageReady = true;
+            await controller
+                .runJavaScript("document.body.classList.add('native-shell');");
+            widget.briefing?.connect(
+              (key) async {
+                final result = await controller.runJavaScriptReturningResult(
+                  'JSON.stringify(nativeBriefingSnapshot(${jsonEncode(key)}))',
+                );
+                dynamic decoded =
+                    result is String ? jsonDecode(result) : result;
+                if (decoded is String) decoded = jsonDecode(decoded);
+                return Map<String, dynamic>.from(decoded as Map);
+              },
+              (action, key, value) => controller.runJavaScript(
+                'nativeBriefingAction(${jsonEncode(action)},${jsonEncode(key)},${jsonEncode(value)});',
+              ),
+            );
             _enqueue(() async {
               await _alarmScheduler.reconcileDismissals();
               final data = await AppDatabase.instance.getAlarmsState();
@@ -459,8 +413,6 @@ class _CrewClockHomeState extends State<CrewClockHome>
         },
       )
       ..loadFlutterAsset('index.html');
-
-    _initFilePicker();
   }
 
   Future<bool> _handleCrewClockCommand(String raw) async {
@@ -474,27 +426,40 @@ class _CrewClockHomeState extends State<CrewClockHome>
           return true;
         case 'SET_ALARM_PRIVACY':
           _alarmScheduler.privateLabels = decoded['enabled'] == true;
-          if (Platform.isIOS) await NativeAlarmScheduler._nativeAlarmChannel.invokeMethod<void>('setAlarmPrivacy', _alarmScheduler.privateLabels);
+          if (Platform.isIOS) {
+            await NativeAlarmScheduler._nativeAlarmChannel.invokeMethod<void>(
+                'setAlarmPrivacy', _alarmScheduler.privateLabels);
+          }
           return true;
         case 'EXPORT_DUTY_BRIEFING':
           try {
             if (!Platform.isIOS) throw Exception('PDF export requires iPhone.');
             await NativeAlarmScheduler._nativeAlarmChannel.invokeMethod<void>(
-              'shareDutyBriefing', {'title': decoded['title'], 'lines': decoded['lines']});
+                'shareDutyBriefing',
+                {'title': decoded['title'], 'lines': decoded['lines']});
           } catch (error) {
-            await controller.runJavaScript('toast(${jsonEncode(error.toString())},"er");');
+            await controller
+                .runJavaScript('toast(${jsonEncode(error.toString())},"er");');
           }
           return true;
         case 'SET_INTERVAL_ALARMS':
           try {
-            if (!Platform.isIOS) throw Exception('Repeating reminders require iPhone.');
-            await NativeAlarmScheduler._nativeAlarmChannel.invokeMethod<void>('setAlarmPrivacy', decoded['privateLabels'] == true);
-            final records = await NativeAlarmScheduler._nativeAlarmChannel.invokeMethod<List<dynamic>>(
-              'syncIntervalAlarms', {'records': decoded['records'], 'requestPermission': decoded['requestPermission']});
-            await controller.runJavaScript('intervalSyncResult(true,null,${jsonEncode(records)});');
+            if (!Platform.isIOS) {
+              throw Exception('Repeating reminders require iPhone.');
+            }
+            await NativeAlarmScheduler._nativeAlarmChannel.invokeMethod<void>(
+                'setAlarmPrivacy', decoded['privateLabels'] == true);
+            final records = await NativeAlarmScheduler._nativeAlarmChannel
+                .invokeMethod<List<dynamic>>('syncIntervalAlarms', {
+              'records': decoded['records'],
+              'requestPermission': decoded['requestPermission']
+            });
+            await controller.runJavaScript(
+                'intervalSyncResult(true,null,${jsonEncode(records)});');
             await _syncIOSAlarmUI();
           } catch (error) {
-            await controller.runJavaScript('intervalSyncResult(false,${jsonEncode(error.toString())},null);');
+            await controller.runJavaScript(
+                'intervalSyncResult(false,${jsonEncode(error.toString())},null);');
           }
           return true;
         case 'SET_THEME':
@@ -570,44 +535,6 @@ class _CrewClockHomeState extends State<CrewClockHome>
       }
     } on FormatException {
       return false;
-    }
-  }
-
-  void _initFilePicker() {
-    final platformController = controller.platform;
-
-    if (platformController is AndroidWebViewController) {
-      platformController.setOnShowFileSelector((params) async {
-        try {
-          FilePickerResult? result = await FilePicker.platform.pickFiles(
-            type: FileType.custom,
-            allowedExtensions: ['ics', 'ical', 'txt'],
-          );
-
-          if (result == null || result.files.single.path == null) {
-            return [];
-          }
-
-          final file = File(result.files.single.path!);
-          final content = await file.readAsString();
-
-          final safeContent = jsonEncode(content);
-
-          await controller.runJavaScript('''
-            (function() {
-              try {
-              previewICSContent($safeContent);
-              } catch (error) {
-                toast('Could not import calendar: ' + error.message, 'er');
-              }
-            })();
-          ''');
-        } catch (e) {
-          debugPrint("FilePicker error: $e");
-        }
-
-        return [];
-      });
     }
   }
 

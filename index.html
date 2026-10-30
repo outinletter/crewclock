@@ -7,7 +7,6 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="CrewClock">
-<link rel="manifest" href="./manifest.webmanifest">
 <link rel="apple-touch-icon" href="./app_icon.png">
 <link rel="icon" type="image/png" href="./app_icon.png">
 
@@ -346,6 +345,7 @@ body.import-open #notifBanner,body.import-open #pwaBanner,body.import-open #iosG
 .alarm-fields .dl-row{min-width:0;margin-bottom:0}
 .alarm-fields .dl-inp{height:54px}
 #dDateText{min-width:0;text-align:left;line-height:1.3;font-variant-numeric:tabular-nums}
+.native-shell #dutyBriefing{display:none}
 .duty-briefing{margin:16px 16px 12px;padding:18px;border-radius:18px;background:var(--white);border:1px solid var(--bdr);box-shadow:var(--shadow-md)}
 .briefing-top{display:flex;justify-content:space-between;gap:12px;align-items:center;margin-bottom:12px}
 .briefing-kicker{font-size:10px;letter-spacing:1.5px;color:var(--blue);font-weight:700;text-transform:uppercase}
@@ -477,25 +477,6 @@ body.dark .dl-inp[type=date]{color-scheme:dark}
   white-space:nowrap;font-family:Inter,sans-serif;flex-shrink:0}
 .notif-banner .nb-close{background:transparent;border:none;color:#fff;
   font-size:18px;cursor:pointer;opacity:.7;padding:0 4px;flex-shrink:0}
-
-
-.pwa-banner{
-  position:fixed;bottom:0;left:0;right:0;
-  background:var(--white);border-top:1px solid var(--bdr);
-  padding:14px 16px;display:none;align-items:center;gap:12px;
-  box-shadow:0 -4px 20px rgba(59,130,196,.12);z-index:140;
-}
-.pwa-banner.show{display:flex}
-.pwa-banner .pb-ico{width:40px;height:40px;border-radius:10px;background:var(--blue);
-  display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
-.pwa-banner .pb-body{flex:1}
-.pwa-banner .pb-title{font-size:13px;font-weight:700;color:var(--tx)}
-.pwa-banner .pb-sub{font-size:10px;color:var(--tx2);margin-top:1px}
-.pwa-banner .pb-btn{background:var(--blue);border:none;border-radius:8px;
-  color:#fff;padding:8px 14px;font-size:12px;font-weight:700;cursor:pointer;
-  white-space:nowrap;font-family:Inter,sans-serif;flex-shrink:0}
-.pwa-banner .pb-close{background:transparent;border:none;color:var(--tx3);
-  font-size:20px;cursor:pointer;padding:0 4px;flex-shrink:0}
 
 
 .toast{position:fixed;top:18px;left:50%;transform:translateX(-50%) translateY(calc(-100% - 24px));
@@ -849,16 +830,6 @@ button{min-height:44px;touch-action:manipulation}
 </div>
 
 
-<div class="pwa-banner" id="pwaBanner">
-  <div class="pb-ico">Flight</div>
-  <div class="pb-body">
-    <div class="pb-title">Add to Home Screen</div>
-    <div class="pb-sub">Add quick access to your schedule</div>
-  </div>
-  <button class="pb-btn" id="pwaInstallBtn" onclick="installPWA()">Install</button>
-  <button class="pb-close" onclick="dismissPWA()">&#x2715;</button>
-</div>
-
 <div class="sheet-overlay" id="dateSheetOverlay" onclick="closeDateSheet()"></div>
 <div class="sheet" id="dateSheet">
   <div class="sheet-handle"></div>
@@ -892,7 +863,6 @@ button{min-height:44px;touch-action:manipulation}
 
 var swReg=null;
 var wakeLock=null;
-var deferredInstallPrompt=null;
 
 
 var keepAliveAudio = null;
@@ -912,23 +882,6 @@ function startKeepAlive(){
 document.addEventListener('touchstart', startKeepAlive, {once:true});
 document.addEventListener('click', startKeepAlive, {once:true});
 
-function scheduleNotificationsViaSW(){
-  try{
-    if(!swReg||!swReg.active)return;
-    var upcoming=alms.filter(function(a){
-      if(!(a.time instanceof Date))a.time=new Date(a.time);
-      return !a.dism&&a.time>new Date();
-    });
-    swReg.active.postMessage({
-      type:'SCHEDULE_ALARMS',
-      alarms:upcoming.map(function(a){
-        var nlbl = a.lbl + (a.fnum ? ' (' + a.fnum + ')' : '');
-        return {id:a.id,time:a.time.toISOString(),lbl:nlbl,
-          dep:a.dep?(a.dep instanceof Date?a.dep.toISOString():a.dep):null};
-      })
-    });
-  }catch(e){console.warn('[SW sync]',e);}
-}
 
 function acquireWakeLock(){
   if(!('wakeLock' in navigator))return;
@@ -985,7 +938,7 @@ function requestNotifPermission(){
   dismissNotifBanner();
   if(!('Notification' in window)){toast('Notifications not supported','er');return;}
   Notification.requestPermission().then(function(r){
-    if(r==='granted'){toast('Alarm notifications enabled','ok');scheduleNotificationsViaSW();}
+    if(r==='granted'){toast('Alarm notifications enabled','ok');}
     else toast('Notifications blocked','er');
   });
 }
@@ -1029,56 +982,6 @@ function showIOSInstallGuide(){
   el.querySelector('div').appendChild(closeBtn);
   document.body.appendChild(el);
 }
-
-
-function initSW(){
-  if(!('serviceWorker' in navigator)) return;
-  if(location.protocol!=='https:'&&location.hostname!=='localhost') return;
-  try {
-    navigator.serviceWorker.register('./sw.js',{scope:'./',updateViaCache:'none'})
-      .then(function(reg){
-        swReg = reg;
-        if(reg.waiting) reg.waiting.postMessage({type:'SKIP_WAITING'});
-        reg.addEventListener('updatefound', function(){
-          var nw = reg.installing;
-          if(!nw) return;
-          nw.addEventListener('statechange', function(){
-            if(nw.state==='installed' && navigator.serviceWorker.controller)
-              nw.postMessage({type:'SKIP_WAITING'});
-          });
-        });
-        setTimeout(scheduleNotificationsViaSW, 500);
-      })
-      .catch(function(err){
-        console.warn('[SW] failed:', err.message);
-      });
-  } catch(e) {
-    console.warn('[SW] registration error:', e);
-  }
-}
-
-function installPWA(){
-  if(!deferredInstallPrompt)return;
-  deferredInstallPrompt.prompt();
-  deferredInstallPrompt.userChoice.then(function(r){
-    if(r.outcome==='accepted')toast('Installing CrewClock...','ok');
-    deferredInstallPrompt=null;dismissPWA();
-  });
-}
-function dismissPWA(){
-  var el=document.getElementById('pwaBanner');
-  if(el)el.classList.remove('show');
-  try{localStorage.setItem('crewclock_pwa_dismissed','1');}catch(e){}
-}
-window.addEventListener('beforeinstallprompt',function(e){
-  e.preventDefault();deferredInstallPrompt=e;
-  if(!localStorage.getItem('crewclock_pwa_dismissed')){
-    setTimeout(function(){var b=document.getElementById('pwaBanner');if(b)b.classList.add('show');},3000);
-  }
-});
-window.addEventListener('appinstalled',function(){
-  dismissPWA();toast('App installed! Background alarms enabled','ok');
-});
 
 
 var DEF_BASE=[{id:'b1',h:4,m:30,lbl:'Prepare for Duty'},{id:'b2',h:4,m:0,lbl:'Depart for Airport'},{id:'b3',h:0,m:40,lbl:'Boarding time'}];
@@ -1345,6 +1248,40 @@ function exportDutyBriefing(){
   if(!window.crewclock||typeof window.crewclock.postMessage!=='function'){toast('PDF export is available in the iPhone app.','in');return;}
   window.crewclock.postMessage(JSON.stringify({type:'EXPORT_DUTY_BRIEFING',title:'CrewClock Flight Preparation',lines:briefingExportLines(f,briefingState(f))}));
 }
+// Native briefing uses the same roster, time-zone rules and saved preparation state.
+function nativeBriefingSnapshot(key){
+  if(key)briefingSelected=key;
+  var f=briefingFlight();
+  if(!f)return {flight:null,flights:[],dark:document.body.classList.contains('dark')};
+  var dep=parseFlightDate(f),zone=airportZone(f.depApt),state=briefingState(f);
+  function stamp(at,z){return dayKeyFromCivilDate(dateAtZone(at,z))+' '+fmtAtZone(at,z);}
+  function clock(label,z){return {label:label,time:fmtAtZone(dep,z),date:dayKeyFromCivilDate(dateAtZone(dep,z)),zone:z||'Device time zone'};}
+  var steps=getOffsetsForFlight(f).map(function(o){var at=new Date(+dep-(o.h*60+o.m)*60000);return {label:o.lbl,at:at.toISOString(),time:stamp(at,zone)+' '+f.depApt,status:briefingDemo?'Preview':((flightToggles[f.id]&&flightToggles[f.id][o.id])?flightReminderStatus(f,o):'Paused')};});
+  var next=steps.filter(function(s){return Date.parse(s.at)>Date.now();}).sort(function(a,b){return Date.parse(a.at)-Date.parse(b.at);})[0]||null;
+  return {dark:document.body.classList.contains('dark'),demo:!!briefingDemo,key:briefingKey(f),
+    flight:{number:f.flight,from:f.depApt,to:f.arrApt,departure:dep.toISOString()},
+    flights:briefingDemo?[]:detectedFlights.slice().sort(function(a,b){return parseFlightDate(a)-parseFlightDate(b);}).map(function(x){return {key:briefingKey(x),label:x.date+' '+x.flight+' '+x.depApt+' → '+x.arrApt};}),
+    clocks:[clock(f.depApt+' departure',zone),clock(baseApt+' home',airportZone(baseApt)),clock('UTC','UTC')],
+    next:next,steps:steps,tasks:state.tasks.map(function(t){return {label:t.label,checkedAt:t.checkedAt,checkedText:t.checkedAt?stamp(new Date(t.checkedAt),zone)+' '+f.depApt:null};}),note:state.note||''};
+}
+function nativeBriefingAction(action,key,value){
+  if(key)briefingSelected=key;
+  if(action==='demo'){startBriefingDemo();return;}
+  if(action==='exitDemo'){closeBriefingDemo();return;}
+  if(action==='import'){switchTab('calendar',document.getElementById('ptab-calendar'));openUploadSheet();return;}
+  var f=briefingFlight();if(!f)throw new Error('Flight no longer available');
+  if(key&&briefingKey(f)!==key)throw new Error('Flight changed. Please try again.');
+  if(action==='review'){switchTab('calendar',document.getElementById('ptab-calendar'));openBriefingAlarms();return;}
+  if(action==='export'){exportDutyBriefing();return;}
+  var state=briefingState(f);
+  if(action==='toggle'&&state.tasks[value])state.tasks[value].checkedAt=state.tasks[value].checkedAt?null:new Date().toISOString();
+  else if(action==='delete')state.tasks.splice(value,1);
+  else if(action==='add'){var label=String(value||'').trim();if(!label||label.length>100||state.tasks.length>=12)throw new Error('Use up to 12 items, each within 100 characters.');state.tasks.push({label:label,checkedAt:null});}
+  else if(action==='note')state.note=String(value||'').slice(0,1000);
+  else throw new Error('Invalid preparation action');
+  if(!saveBriefingState(f,state))throw new Error('Unable to save preparation on this device.');
+  renderDutyBriefing();
+}
 var nativeAlarmStatus={},nativeStatusReady=false;
 function alarmStatusText(a){
   if(a.missed)return 'Missed';if(a.dism)return 'Dismissed';if(a.armed===false||a.enabled===false)return 'Paused';
@@ -1501,7 +1438,7 @@ function init(){
     autoRegisterAll();
   }
   renderCal();renderBasePresets();renderDomPresets();renderIntlPresets();initDrums();updateDateDisplay();
-  initSW();initNotifications();
+  initNotifications();
   initCalSwipe(); 
   
   if(detectedFlights.length){ renderHomeFlightList(); }
@@ -2792,7 +2729,7 @@ function autoRegisterAll(){
   });
 
   alms.sort(function(a,b){return a.time-b.time;});
-  saveAlarms();scheduleNotificationsViaSW();
+  saveAlarms();
   return added;
 }
 
@@ -2857,7 +2794,7 @@ function addDirectAlarm(){
   if(alms.find(function(a){return !a.dism&&Math.abs(a.time-at)<2000;})){toast('An alarm already exists at this time','er');return;}
   alms.push({id:uid(),time:at,dep:null,lbl:lbl,type:'direct',armed:true,ring:false,dism:false, missed:false});
   alms.sort(function(a,b){return a.time-b.time;});
-  saveAlarms();scheduleNotificationsViaSW();
+  saveAlarms();
   renderDirectAlarms();renderCal();renderDaySchedule(calSelDate);
   toast('"'+lbl+'" '+p2(h)+':'+p2(m),'ok');
   document.getElementById('dLabel').value='';
@@ -3127,7 +3064,7 @@ function snoozeOv(minutes){
   }
   alms.sort(function(a,b){return a.time-b.time;});
   saveAlarms();
-  scheduleNotificationsViaSW();
+
   stopSnd();
   stopNativeRingingAlarm(false);
   releaseWakeLock();
@@ -3161,7 +3098,6 @@ function clearAllData(confirmed){
   stopSnd();stopNativeRingingAlarm(false);releaseWakeLock();
   document.getElementById('ro').classList.remove('show');
   renderHomeFlightList();renderDirectAlarms();renderCal();renderDaySchedule(calSelDate);
-  if(swReg&&swReg.active) swReg.active.postMessage({type:'CANCEL_ALL'});
   toast('Flights and alarms deleted','ok');
 }
 
@@ -3237,7 +3173,7 @@ function saveSettingsUI(){
     renderCal();
     renderDaySchedule(calSelDate);
     saveAlarms();
-    scheduleNotificationsViaSW();
+
     toast('Settings saved - '+added+' alarms updated','ok');
   } else {
     toast('Settings saved','ok');
