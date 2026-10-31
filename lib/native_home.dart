@@ -607,6 +607,7 @@ class _CrewClockShellState extends State<CrewClockShell>
                 appBar: const CrewClockHeader(),
                 body: PageView(
                   key: const ValueKey('crewclock-pages'),
+                  physics: const _DeliberatePagePhysics(),
                   controller: _pages,
                   onPageChanged: (index) {
                     setState(() => _tab = index);
@@ -661,4 +662,17 @@ class _RetainedPageState extends State<_RetainedPage>
     super.build(context);
     return widget.child;
   }
+}
+
+class _DeliberatePagePhysics extends PageScrollPhysics {
+  const _DeliberatePagePhysics({super.parent});
+  @override
+  _DeliberatePagePhysics applyTo(ScrollPhysics? ancestor) =>
+      _DeliberatePagePhysics(parent: buildParent(ancestor));
+  @override
+  double get minFlingDistance => 96;
+  @override
+  double get minFlingVelocity => 1200;
+  @override
+  double get dragStartDistanceMotionThreshold => 32;
 }

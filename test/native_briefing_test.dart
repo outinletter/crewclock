@@ -202,6 +202,14 @@ void main() {
             .items
             .length,
         4);
+    await tester.fling(find.byKey(const ValueKey('crewclock-pages')),
+        const Offset(-60, 0), 1500);
+    await tester.pumpAndSettle();
+    expect(
+        tester
+            .widget<CupertinoTabBar>(find.byType(CupertinoTabBar))
+            .currentIndex,
+        0);
     await tester.tap(find.text('Settings'));
     await tester.pumpAndSettle();
     expect(find.text('Settings content'), findsOneWidget);

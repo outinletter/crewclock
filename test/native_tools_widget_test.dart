@@ -1,4 +1,5 @@
 import 'package:crewclock/native_roster.dart';
+import 'package:crewclock/widgets/crewclock_header.dart';
 import 'package:crewclock/services/crewclock_store.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
@@ -211,6 +212,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Enter flight manually'));
     await tester.pumpAndSettle();
+    expect(find.byType(CrewClockHeader), findsNothing);
     await tester.enterText(
         find.widgetWithText(TextFormField, 'Flight number'), 'KE955');
     await tester.enterText(
@@ -220,6 +222,43 @@ void main() {
     await tester.tap(find.text('Save flight and request alarms'));
     await tester.pumpAndSettle();
     expect(store.imported?.single['flight'], 'KE955');
+    await tester.pumpWidget(const SizedBox());
+  });
+  testWidgets('roster reminder rows do not open an editor', (tester) async {
+    final store = await open(tester);
+    final at = store.parser
+        .localInstant(store.date(DateTime.now()), '23:55', 'Asia/Seoul');
+    store.flights = [
+      {
+        'id': 'readonly',
+        'flight': 'KE955',
+        'depApt': 'ICN',
+        'arrApt': 'IST',
+        'departureUtc': at.toIso8601String()
+      }
+    ];
+    store.alarms = [
+      {
+        'id': 'readonly-alarm',
+        'fnum': 'KE955',
+        'depApt': 'ICN',
+        'arrApt': 'IST',
+        'dep': at.toIso8601String(),
+        'time': at.subtract(const Duration(hours: 1)).toIso8601String(),
+        'lbl': 'Prepare for Duty',
+        'armed': true,
+        'type': 'base'
+      }
+    ];
+    store.notifyListeners();
+    await tester.pumpAndSettle();
+    final row = find.byKey(const ValueKey('alarm-readonly-alarm'));
+    await tester.ensureVisible(row);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Prepare for Duty'));
+    await tester.pumpAndSettle();
+    expect(find.byType(BottomSheet), findsNothing);
+    expect(find.widgetWithText(TextField, 'Hours'), findsNothing);
     await tester.pumpWidget(const SizedBox());
   });
 }

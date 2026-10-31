@@ -3,7 +3,6 @@ import 'package:url_launcher/url_launcher.dart';
 import 'services/crewclock_store.dart';
 import 'services/alarm_scheduler.dart';
 import 'widgets/inline_reminder_editor.dart';
-import 'widgets/crewclock_header.dart';
 import 'widgets/crewclock_theme.dart';
 import 'widgets/alarm_status_badge.dart';
 
@@ -387,41 +386,26 @@ class _NativeRosterPageState extends State<NativeRosterPage> {
                         ]),
               ])));
     }
-    return InlineReminderEditor(
-      key: ValueKey('alarm-${a['id']}'),
-      summary: true,
-      compact: true,
-      label: '${a['lbl']}',
-      heading: '${store.clock(local)} (L)',
-      minutesBefore: store.departure(flight).difference(at).inMinutes,
-      date: store.date(local),
-      time: store.clock(local),
-      zone: zone,
-      enabled: store.flag(a['armed']) && !store.flag(a['dism']),
-      busy: store.busy,
-      status: store.status(a),
-      onSave: (label, minutes, date, time) async {
-        final instant =
-            store.departure(flight).subtract(Duration(minutes: minutes!));
-        if (!instant.isAfter(DateTime.now())) {
-          throw const FormatException('Choose a future reminder time.');
-        }
-        await store.saveAlarm({
-          ...a,
-          'lbl': label,
-          'time': instant.toUtc().toIso8601String(),
-          'dism': false,
-          'missed': false
-        });
-      },
-      onToggle: (value) => store.toggleAlarm(a, value),
-      onDelete: () async {
-        if (await _confirm(
-            'Delete alarm?', 'This reminder will be cancelled.')) {
-          await store.deleteAlarm(a);
-        }
-      },
-    );
+    final offset = store.departure(flight).difference(at).inMinutes;
+    return Card.outlined(
+        key: ValueKey('alarm-${a['id']}'),
+        margin: const EdgeInsets.only(top: 8),
+        child: ListTile(
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+          leading: Text('${store.clock(local)} (L)',
+              style: TextStyle(
+                  color: Theme.of(context).colorScheme.primary,
+                  fontSize: 19,
+                  fontWeight: FontWeight.w700)),
+          title: Text('${a['lbl']}',
+              style: const TextStyle(fontWeight: FontWeight.w600)),
+          subtitle:
+              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('${offset ~/ 60}h ${offset % 60}m before departure'),
+            AlarmStatusBadge(label: store.status(a)),
+          ]),
+        ));
   }
 
   Widget _roster() {
@@ -741,12 +725,14 @@ class _NativeRosterPageState extends State<NativeRosterPage> {
                   padding: const EdgeInsets.all(8),
                   child: Text(store.migrationNotice!)),
             if (store.busy) const LinearProgressIndicator(),
+            const SizedBox(height: 10),
             Expanded(
-                child: _tab == 0
-                    ? _roster()
-                    : _tab == 1
-                        ? _alarms()
-                        : _settings()),
+                child: ClipRect(
+                    child: _tab == 0
+                        ? _roster()
+                        : _tab == 1
+                            ? _alarms()
+                            : _settings())),
           ])));
 }
 
@@ -768,14 +754,13 @@ class _TextRosterEditorState extends State<TextRosterEditor> {
   Widget build(BuildContext context) => SafeArea(
       child: Padding(
           padding: EdgeInsets.fromLTRB(
-              20, 0, 20, MediaQuery.viewInsetsOf(context).bottom + 20),
+              20, 8, 20, MediaQuery.viewInsetsOf(context).bottom + 20),
           child: SingleChildScrollView(
               keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
               child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    const CrewClockHeader(),
                     const Text('Paste roster',
                         style: TextStyle(
                             fontSize: 24, fontWeight: FontWeight.bold)),
@@ -951,13 +936,12 @@ class _FlightEditorState extends State<FlightEditor> {
       child: SingleChildScrollView(
           keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
           padding: EdgeInsets.fromLTRB(
-              20, 0, 20, MediaQuery.viewInsetsOf(context).bottom + 20),
+              20, 8, 20, MediaQuery.viewInsetsOf(context).bottom + 20),
           child: Form(
               key: _form,
               child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    const CrewClockHeader(),
                     Text(widget.flight == null ? 'Add flight' : 'Edit flight',
                         style: const TextStyle(
                             fontSize: 24, fontWeight: FontWeight.bold)),
@@ -983,6 +967,7 @@ class _FlightEditorState extends State<FlightEditor> {
                       Text(error!,
                           style: TextStyle(
                               color: Theme.of(context).colorScheme.error)),
+                    const SizedBox(height: 12),
                     FilledButton(
                         onPressed: save,
                         child: const Text('Save flight and request alarms'))
@@ -1008,11 +993,10 @@ class AlarmEditor extends StatelessWidget {
         child: SingleChildScrollView(
             keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
             padding: EdgeInsets.fromLTRB(
-                20, 0, 20, MediaQuery.viewInsetsOf(context).bottom + 20),
+                20, 8, 20, MediaQuery.viewInsetsOf(context).bottom + 20),
             child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const CrewClockHeader(),
                   Text(alarm == null ? 'Add alarm' : 'Edit alarm',
                       style: const TextStyle(
                           fontSize: 24, fontWeight: FontWeight.bold)),
@@ -1066,10 +1050,9 @@ class IntervalEditor extends StatelessWidget {
       child: SingleChildScrollView(
           keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
           padding: EdgeInsets.fromLTRB(
-              20, 0, 20, MediaQuery.viewInsetsOf(context).bottom + 20),
+              20, 8, 20, MediaQuery.viewInsetsOf(context).bottom + 20),
           child:
               Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            const CrewClockHeader(),
             const Text('Repeating reminder',
                 style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
             InlineReminderEditor(

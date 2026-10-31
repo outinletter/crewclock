@@ -383,9 +383,15 @@ class _InlineReminderEditorState extends State<InlineReminderEditor> {
                         onChanged: changed),
                   ] else ...[
                     SizedBox(
-                        height: 132,
+                        height: MediaQuery.textScalerOf(context).scale(1) > 1.3
+                            ? 144
+                            : 120,
                         child: CupertinoDatePicker(
                           mode: CupertinoDatePickerMode.dateAndTime,
+                          itemExtent:
+                              MediaQuery.textScalerOf(context).scale(1) > 1.3
+                                  ? 36
+                                  : 28,
                           use24hFormat: true,
                           initialDateTime:
                               DateTime.tryParse('${date.text}T${time.text}') ??
@@ -415,6 +421,7 @@ class _InlineReminderEditorState extends State<InlineReminderEditor> {
                         child: Text(error!,
                             style: TextStyle(
                                 color: Theme.of(context).colorScheme.error))),
+                  const SizedBox(height: 14),
                   Wrap(
                       alignment: WrapAlignment.spaceBetween,
                       crossAxisAlignment: WrapCrossAlignment.center,
