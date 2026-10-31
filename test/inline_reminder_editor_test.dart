@@ -111,4 +111,33 @@ void main() {
     expect(find.textContaining('at least 1 minute'), findsOneWidget);
     await tester.pumpWidget(const SizedBox());
   });
+  testWidgets(
+      'personal alarms allow an empty title while flight reminders require one',
+      (tester) async {
+    String? saved;
+    await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+            body: InlineReminderEditor(
+                key: const ValueKey('personal'),
+                label: '',
+                date: '2099-11-02',
+                time: '13:55',
+                onSave: (label, _, __, ___) async => saved = label))));
+    await tester.tap(find.text('Save changes'));
+    await tester.pumpAndSettle();
+    expect(saved, 'Personal alarm');
+    saved = null;
+    await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+            body: InlineReminderEditor(
+                key: const ValueKey('flight'),
+                label: '',
+                minutesBefore: 60,
+                onSave: (label, _, __, ___) async => saved = label))));
+    await tester.tap(find.text('Save changes'));
+    await tester.pumpAndSettle();
+    expect(saved, isNull);
+    expect(find.textContaining('Enter a label'), findsOneWidget);
+    await tester.pumpWidget(const SizedBox());
+  });
 }

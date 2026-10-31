@@ -10,6 +10,14 @@ import 'package:timezone/data/latest_all.dart' as tz_data;
 class ToolsStore extends CrewClockStore {
   Map<String, dynamic>? savedAlarm;
   List<Map<String, dynamic>>? imported;
+  List<Map<String, dynamic>>? savedIntervals;
+  @override
+  Future<void> saveIntervals(List<Map<String, dynamic>> next) async {
+    savedIntervals = next;
+    intervals = next;
+    notifyListeners();
+  }
+
   @override
   Future<void> saveSettings(Map<String, dynamic> next) async {
     settings = next;
@@ -83,7 +91,7 @@ void main() {
         (w.key as ValueKey<String>).value.startsWith('new-personal-'));
     final label = find.descendant(
         of: personal,
-        matching: find.widgetWithText(TextField, 'Reminder label'));
+        matching: find.widgetWithText(TextField, 'Reminder label (optional)'));
     await tester.ensureVisible(label);
     await tester.enterText(label, 'Passport check');
     final save =
@@ -304,6 +312,29 @@ void main() {
         find.text(
             '${store.date(store.zoned(at, 'Asia/Seoul'))} · Departure-airport local dates'),
         findsOneWidget);
+    await tester.pumpWidget(const SizedBox());
+  });
+  testWidgets(
+      'unnamed repeating alarm sends a valid iOS identifier and duration',
+      (tester) async {
+    final store = await open(tester);
+    await tester.tap(find.text('Alarms').last);
+    await tester.pumpAndSettle();
+    final form = find.byWidgetPredicate((w) =>
+        w.key is ValueKey<String> &&
+        (w.key as ValueKey<String>).value.startsWith('new-interval-'));
+    final button =
+        find.descendant(of: form, matching: find.text('Add reminder'));
+    await tester.ensureVisible(button);
+    await tester.pumpAndSettle();
+    await tester.tap(button);
+    await tester.pumpAndSettle();
+    final record = store.savedIntervals!.single;
+    expect(record['id'], matches(RegExp(r'^interval_[0-9]+$')));
+    expect(record['label'], 'Repeating reminder');
+    expect(record['minutes'], 60);
+    expect(record['enabled'], isTrue);
+    expect(find.textContaining('Invalid repeating reminder'), findsNothing);
     await tester.pumpWidget(const SizedBox());
   });
 }

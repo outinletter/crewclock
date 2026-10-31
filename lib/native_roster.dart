@@ -25,7 +25,7 @@ class _NativeRosterPageState extends State<NativeRosterPage> {
   void initState() {
     super.initState();
     _personalId = store.id();
-    _intervalId = store.id();
+    _intervalId = 'interval_${store.id()}';
     if (widget.section == 0) store.openTools = _open;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted && widget.section == 0 && store.pendingToolsAction != null) {
@@ -606,7 +606,9 @@ class _NativeRosterPageState extends State<NativeRosterPage> {
                       'anchor': DateTime.now().millisecondsSinceEpoch
                     }
                   ]);
-                  if (mounted) setState(() => _intervalId = store.id());
+                  if (mounted) {
+                    setState(() => _intervalId = 'interval_${store.id()}');
+                  }
                 }),
           ]);
   Widget _heading(String text) => Padding(

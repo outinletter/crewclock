@@ -3,6 +3,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
 
+String _reminderError(Object error) {
+  if (error is FormatException) return error.message.toString();
+  if (error is PlatformException) {
+    return error.message ?? 'Could not reserve this alarm. Please try again.';
+  }
+  return 'Could not save changes. Please try again.';
+}
+
 typedef SaveReminder = Future<void> Function(
     String label, int? minutes, String? date, String? time);
 
@@ -151,8 +159,13 @@ class _InlineReminderEditorState extends State<InlineReminderEditor> {
     FocusScope.of(context).unfocus();
     try {
       final entered = label.text.trim();
-      final text =
-          widget.repeat && entered.isEmpty ? 'Repeating reminder' : entered;
+      final text = entered.isNotEmpty
+          ? entered
+          : widget.repeat
+              ? 'Repeating reminder'
+              : widget.minutesBefore == null
+                  ? 'Personal alarm'
+                  : '';
       if (text.isEmpty || text.length > 100) {
         throw const FormatException('Enter a label within 100 characters.');
       }
@@ -170,7 +183,7 @@ class _InlineReminderEditorState extends State<InlineReminderEditor> {
         });
       }
     } catch (e) {
-      if (mounted) setState(() => error = '$e');
+      if (mounted) setState(() => error = _reminderError(e));
     } finally {
       if (mounted) setState(() => saving = false);
     }
@@ -181,7 +194,7 @@ class _InlineReminderEditorState extends State<InlineReminderEditor> {
     try {
       await action();
     } catch (e) {
-      if (mounted) setState(() => error = '$e');
+      if (mounted) setState(() => error = _reminderError(e));
     } finally {
       if (mounted) setState(() => saving = false);
     }
@@ -369,9 +382,10 @@ class _InlineReminderEditorState extends State<InlineReminderEditor> {
                       enabled: !disabled,
                       onChanged: (_) => changed(),
                       decoration: InputDecoration(
-                          labelText: widget.repeat
-                              ? 'Reminder label (optional)'
-                              : 'Reminder label',
+                          labelText:
+                              widget.repeat || widget.minutesBefore == null
+                                  ? 'Reminder label (optional)'
+                                  : 'Reminder label',
                           border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(16),
                               borderSide: BorderSide.none))),
@@ -569,7 +583,9 @@ class _PreparationPresetRowState extends State<PreparationPresetRow> {
         });
       }
     } catch (e) {
-      if (mounted && version == revision) setState(() => error = '$e');
+      if (mounted && version == revision) {
+        setState(() => error = _reminderError(e));
+      }
     } finally {
       saving = false;
     }
@@ -624,7 +640,7 @@ class _PreparationPresetRowState extends State<PreparationPresetRow> {
             await widget.onDelete();
           } catch (e) {
             deleting = false;
-            if (mounted) setState(() => error = '$e');
+            if (mounted) setState(() => error = _reminderError(e));
           }
           return false;
         },
