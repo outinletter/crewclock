@@ -1,11 +1,17 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
+import 'widgets/alarm_status_badge.dart';
+import 'widgets/crewclock_header.dart';
+import 'widgets/crewclock_theme.dart';
+import 'widgets/inline_reminder_editor.dart';
 
-class CrewClockBriefingBridge extends ChangeNotifier {
+class FlightBriefingController extends ChangeNotifier {
   Future<Map<String, dynamic>> Function(String?)? _load;
   Future<void> Function(String, String?, Object?)? _action;
   Future<void> _pending = Future<void>.value();
   bool get ready => _load != null;
+  void invalidate() => notifyListeners();
 
   void connect(Future<Map<String, dynamic>> Function(String?) load,
       Future<void> Function(String, String?, Object?) action) {
@@ -27,9 +33,14 @@ class CrewClockBriefingBridge extends ChangeNotifier {
 
 class CrewClockShell extends StatefulWidget {
   const CrewClockShell(
-      {super.key, required this.tools, required this.briefing});
+      {super.key,
+      required this.tools,
+      required this.briefing,
+      this.alarms,
+      this.settings});
   final Widget tools;
-  final CrewClockBriefingBridge briefing;
+  final Widget? alarms, settings;
+  final FlightBriefingController briefing;
 
   @override
   State<CrewClockShell> createState() => _CrewClockShellState();
@@ -38,14 +49,17 @@ class CrewClockShell extends StatefulWidget {
 class _CrewClockShellState extends State<CrewClockShell>
     with WidgetsBindingObserver {
   int _tab = 0;
+  final _pages = PageController();
   Map<String, dynamic>? _data;
-  String? _selected, _error;
-  bool _busy = false, _refreshing = false;
+  String? _selected, _error, _newReminderId;
+  bool _busy = false,
+      _refreshing = false,
+      _addingReminder = false,
+      _editingTasks = false;
   Timer? _timer;
   final _newTask = TextEditingController();
   final _note = TextEditingController();
-  static const _navy = Color(0xff10253a);
-  static const _teal = Color(0xff008594);
+  static const _teal = CrewClockTheme.blue;
 
   @override
   void initState() {
@@ -71,6 +85,7 @@ class _CrewClockShellState extends State<CrewClockShell>
       if (!mounted) return;
       if (_data?['key'] != data['key']) {
         _note.text = data['note'] as String? ?? '';
+        _addingReminder = false;
       }
       setState(() {
         _data = data;
@@ -93,18 +108,19 @@ class _CrewClockShellState extends State<CrewClockShell>
       if (!mounted) return false;
       if (action == 'add') _newTask.clear();
       if (action == 'demo' || action == 'exitDemo') _selected = null;
-      if (action == 'import' || action == 'review') setState(() => _tab = 1);
+      if (action == 'import' || action == 'review' || action == 'addAlarm') {
+        _showTab(1);
+      }
       await _refresh();
       if (mounted && action == 'note') {
         ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Note saved on this device')));
       }
       return true;
-    } catch (_) {
+    } catch (error) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-            content: Text(
-                'Could not complete action. Retry; preparation supports up to 12 items.')));
+        ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Could not save changes. $error')));
       }
       return false;
     } finally {
@@ -115,11 +131,112 @@ class _CrewClockShellState extends State<CrewClockShell>
   @override
   void dispose() {
     _timer?.cancel();
+    _pages.dispose();
     widget.briefing.removeListener(_refresh);
     WidgetsBinding.instance.removeObserver(this);
     _newTask.dispose();
     _note.dispose();
     super.dispose();
+  }
+
+  void _showTab(int index) {
+    if (_pages.hasClients) {
+      _pages.animateToPage(index,
+          duration: const Duration(milliseconds: 250),
+          curve: Curves.easeOutCubic);
+    }
+  }
+
+  Widget _timeline(Map<String, dynamic> data) {
+    final flight = data['flight'] as Map;
+    return Container(
+      key: const ValueKey('preparation-flight-list'),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+          color: _colors.surface, borderRadius: BorderRadius.circular(18)),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  decoration: BoxDecoration(
+                      color: _teal, borderRadius: BorderRadius.circular(12)),
+                  child: Text('${flight['dateBadge'] ?? ''}',
+                      style: const TextStyle(
+                          color: Colors.white, fontWeight: FontWeight.w700))),
+              Text(
+                  '${flight['departureTime'] ?? ''} ${flight['number']} ${flight['from']} → ${flight['to']} ${flight['arrivalTime'] ?? ''}',
+                  style: const TextStyle(
+                      color: _teal, fontSize: 16, fontWeight: FontWeight.w700)),
+              TextButton(
+                  onPressed: _busy || data['demo'] == true
+                      ? null
+                      : () => setState(() {
+                            _addingReminder = !_addingReminder;
+                            _newReminderId = null;
+                          }),
+                  child: const Text('+ Add')),
+            ]),
+        const SizedBox(height: 8),
+        for (final step in data['steps'] as List)
+          Container(
+              key: ValueKey('timeline-${step['id']}'),
+              margin: const EdgeInsets.only(top: 8),
+              decoration: BoxDecoration(
+                  border: Border(
+                      left: BorderSide(
+                          width: 3,
+                          color: (data['next'] as Map?)?['id'] == step['id']
+                              ? _teal
+                              : _colors.outlineVariant))),
+              child: ListTile(
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+                leading: Text('${step['clock'] ?? step['time']}(L)',
+                    style: TextStyle(
+                        color: _colors.primary,
+                        fontSize: 19,
+                        fontFeatures: const [FontFeature.tabularFigures()],
+                        fontWeight: FontWeight.w700)),
+                title: Text('${step['label']}',
+                    style: const TextStyle(fontWeight: FontWeight.w600)),
+                subtitle: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('${step['offset'] ?? ''}'),
+                      AlarmStatusBadge(label: '${step['status']}'),
+                    ]),
+              )),
+        if (_addingReminder)
+          InlineReminderEditor(
+            key: ValueKey('add-timeline-${data['key']}'),
+            label: '',
+            minutesBefore: 60,
+            busy: _busy,
+            onCancel: () => setState(() => _addingReminder = false),
+            onSave: (label, minutes, _, __) async {
+              if (!await _act('addReminder', {
+                'id': _newReminderId ??=
+                    DateTime.now().microsecondsSinceEpoch.toString(),
+                'label': label,
+                'minutes': minutes
+              })) {
+                throw StateError('Unable to add reminder.');
+              }
+              if (mounted) setState(() => _addingReminder = false);
+            },
+          ),
+        if ((data['steps'] as List).isEmpty)
+          const Padding(
+              padding: EdgeInsets.all(12),
+              child:
+                  Text('No preparation reminders. Tap + Add to create one.')),
+      ]),
+    );
   }
 
   Widget _title(String title) => Padding(
@@ -128,35 +245,53 @@ class _CrewClockShellState extends State<CrewClockShell>
             style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
       );
 
-  ColorScheme get _colors => ColorScheme.fromSeed(
-      seedColor: _teal,
-      brightness: _data?['dark'] == true ? Brightness.dark : Brightness.light);
+  ColorScheme get _colors =>
+      CrewClockTheme.colors(dark: _data?['dark'] == true);
 
   Widget _clock(Map clock, bool accent) => Container(
         key: ValueKey('briefing-clock-${clock['label']}'),
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: accent ? _teal : _colors.surfaceContainerHighest,
+          color: _colors.surface,
           borderRadius: BorderRadius.circular(14),
         ),
         child: DefaultTextStyle.merge(
-          style: TextStyle(color: accent ? Colors.white : null),
+          style: TextStyle(color: _colors.onSurface),
           child:
               Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('${clock['label']}',
-                style: const TextStyle(fontWeight: FontWeight.w600)),
+            ConstrainedBox(
+                constraints: const BoxConstraints(minHeight: 40),
+                child: Text('${clock['label']}',
+                    maxLines: 2,
+                    style: const TextStyle(fontWeight: FontWeight.w600))),
             const SizedBox(height: 10),
             Text('${clock['time']}',
-                style:
-                    const TextStyle(fontSize: 28, fontWeight: FontWeight.w700)),
+                style: const TextStyle(
+                    fontSize: 26,
+                    fontFeatures: [FontFeature.tabularFigures()],
+                    fontWeight: FontWeight.w700)),
             const SizedBox(height: 8),
-            Text('${clock['date']}'),
+            Text(
+                '${clock['date']}${clock['dayOffset'] == null || clock['dayOffset'] == 0 ? '' : ' (${clock['dayOffset'] > 0 ? '+' : ''}${clock['dayOffset']}d)'}'),
             Text('${clock['zone']}'),
           ]),
         ),
       );
 
   Future<void> _chooseFlight(List choices, String currentKey) async {
+    final now = DateTime.now();
+    final ordered = List<dynamic>.from(choices);
+    DateTime? departure(dynamic f) =>
+        DateTime.tryParse('${f['departure'] ?? '${f['key']}'.split('|').last}');
+    ordered.sort((a, b) {
+      final da = departure(a), db = departure(b);
+      if (da == null || db == null) {
+        return choices.indexOf(a).compareTo(choices.indexOf(b));
+      }
+      final upcomingA = !da.isBefore(now), upcomingB = !db.isBefore(now);
+      if (upcomingA != upcomingB) return upcomingA ? -1 : 1;
+      return upcomingA ? da.compareTo(db) : db.compareTo(da);
+    });
     final key = await showModalBottomSheet<String>(
       context: context,
       isScrollControlled: true,
@@ -187,7 +322,7 @@ class _CrewClockShellState extends State<CrewClockShell>
                                         fontWeight: FontWeight.w700)),
                                 const SizedBox(height: 4),
                                 Text(
-                                    '${choices.length} flights · Departure date order'),
+                                    '${ordered.length} flights · Upcoming flights first'),
                               ])),
                           IconButton(
                               tooltip: 'Close flight list',
@@ -197,10 +332,10 @@ class _CrewClockShellState extends State<CrewClockShell>
                     Expanded(
                         child: ListView.separated(
                       padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-                      itemCount: choices.length,
+                      itemCount: ordered.length,
                       separatorBuilder: (_, __) => const SizedBox(height: 10),
                       itemBuilder: (context, index) {
-                        final f = choices[index] as Map;
+                        final f = ordered[index] as Map;
                         final selected = f['key'] == currentKey;
                         return Material(
                           color: selected
@@ -265,37 +400,35 @@ class _CrewClockShellState extends State<CrewClockShell>
     final choices = data['flights'] as List;
     final clocks = data['clocks'] as List;
     final tasks = data['tasks'] as List;
-    final next = data['next'] as Map?;
-    final pending = tasks.where((t) => t['checkedAt'] == null);
     final departure = DateTime.parse(flight['departure'] as String);
     final minutes =
         (departure.difference(DateTime.now()).inSeconds / 60).ceil();
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       Container(
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-            color: _navy, borderRadius: BorderRadius.circular(22)),
+            color: _colors.surface, borderRadius: BorderRadius.circular(18)),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text(
               data['demo'] == true
                   ? 'FICTIONAL DEMO · NO ALARMS SCHEDULED'
                   : 'FLIGHT PREPARATION',
               style: const TextStyle(
-                  color: Color(0xff86d9cc),
+                  color: _teal,
                   letterSpacing: 1.5,
                   fontWeight: FontWeight.w700)),
           const SizedBox(height: 12),
           Text('${flight['number']} · ${flight['from']} → ${flight['to']}',
-              style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 28,
+              style: TextStyle(
+                  color: _colors.onSurface,
+                  fontSize: 26,
                   fontWeight: FontWeight.w700)),
           const SizedBox(height: 12),
           Text(
               minutes > 0
                   ? 'Departs in ${minutes ~/ 60}h ${minutes % 60}m'
                   : 'Departure has passed',
-              style: const TextStyle(color: Color(0xffb9cbd9), fontSize: 18)),
+              style: TextStyle(color: _colors.onSurfaceVariant, fontSize: 17)),
           if (data['demo'] == true)
             TextButton(
                 onPressed: _busy ? null : () => _act('exitDemo'),
@@ -330,9 +463,12 @@ class _CrewClockShellState extends State<CrewClockShell>
           ]),
         ),
       ],
-      const SizedBox(height: 20),
+      const SizedBox(height: 16),
+      _timeline(data),
+      _title('Departure time across zones'),
       LayoutBuilder(builder: (context, size) {
-        if (size.maxWidth < 320) {
+        if (size.maxWidth < 320 ||
+            MediaQuery.textScalerOf(context).scale(1) > 1.3) {
           return Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
@@ -354,64 +490,44 @@ class _CrewClockShellState extends State<CrewClockShell>
       const SizedBox(height: 14),
       Text(
           'Same departure instant in three time zones. Flight reminders stay on ${flight['from']} local time when you travel.'),
-      const SizedBox(height: 20),
-      Container(
-        padding: const EdgeInsets.all(18),
-        decoration: BoxDecoration(
-            color: _colors.primaryContainer,
-            borderRadius: BorderRadius.circular(18)),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          const Text('Next preparation',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700)),
-          const SizedBox(height: 12),
-          Text(next == null
-              ? 'No upcoming preparation times for this flight.'
-              : '${next['label']} · ${next['time']}'),
-          const SizedBox(height: 12),
-          Text(pending.isEmpty
-              ? 'Personal preparation complete'
-              : 'To do: ${pending.first['label']}'),
-          const SizedBox(height: 12),
-          OutlinedButton(
-              onPressed:
-                  _busy || data['demo'] == true ? null : () => _act('review'),
-              child: const Text('Review flight alarms')),
-        ]),
-      ),
-      _title('Departure preparation timeline'),
-      for (final step in data['steps'] as List)
-        ListTile(
-          contentPadding: EdgeInsets.zero,
-          leading: const Icon(Icons.schedule, color: _teal),
-          title: Text('${step['label']}'),
-          subtitle: Text('${step['time']}\n${step['status']}'),
-        ),
-      _title('Personal preparation'),
+      const SizedBox(height: 12),
+      Row(children: [
+        Expanded(child: _title('Personal preparation')),
+        IconButton(
+            tooltip: _editingTasks
+                ? 'Finish editing preparation'
+                : 'Edit preparation',
+            onPressed: () => setState(() => _editingTasks = !_editingTasks),
+            icon: Icon(_editingTasks ? Icons.check : Icons.edit_outlined)),
+      ]),
       Text(
           '${tasks.where((t) => t['checkedAt'] != null).length} / ${tasks.length} checked'),
       for (var i = 0; i < tasks.length; i++)
         Row(children: [
           Expanded(
               child: CheckboxListTile(
-            contentPadding: EdgeInsets.zero,
-            controlAffinity: ListTileControlAffinity.leading,
-            value: tasks[i]['checkedAt'] != null,
-            title: Text('${tasks[i]['label']}'),
-            subtitle: tasks[i]['checkedText'] == null
-                ? null
-                : Text('Checked ${tasks[i]['checkedText']}'),
-            onChanged: _busy ? null : (_) => _act('toggle', i),
-          )),
-          IconButton(
-              tooltip: 'Delete preparation item',
-              onPressed: _busy ? null : () => _act('delete', i),
-              icon: const Icon(Icons.close)),
+                  controlAffinity: ListTileControlAffinity.leading,
+                  value: tasks[i]['checkedAt'] != null,
+                  title: Text('${tasks[i]['label']}'),
+                  subtitle: tasks[i]['checkedText'] == null
+                      ? null
+                      : Text('Checked ${tasks[i]['checkedText']}'),
+                  onChanged: _busy ? null : (_) => _act('toggle', i))),
+          if (_editingTasks)
+            IconButton(
+                tooltip: 'Delete preparation item',
+                onPressed: _busy ? null : () => _act('delete', i),
+                icon: const Icon(Icons.remove_circle_outline)),
         ]),
       TextField(
+          onTapOutside: (_) => FocusManager.instance.primaryFocus?.unfocus(),
           controller: _newTask,
           maxLength: 100,
-          decoration: const InputDecoration(
-              labelText: 'New preparation item', border: OutlineInputBorder())),
+          decoration: InputDecoration(
+              labelText: 'New preparation item',
+              border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  borderSide: BorderSide.none))),
       Align(
           alignment: Alignment.centerRight,
           child: TextButton(
@@ -421,12 +537,15 @@ class _CrewClockShellState extends State<CrewClockShell>
               child: const Text('Add item'))),
       _title('Layover / pickup note'),
       TextField(
+          onTapOutside: (_) => FocusManager.instance.primaryFocus?.unfocus(),
           controller: _note,
           maxLines: 3,
           maxLength: 1000,
-          decoration: const InputDecoration(
+          decoration: InputDecoration(
               hintText: 'Hotel pickup, terminal or personal reminder',
-              border: OutlineInputBorder())),
+              border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  borderSide: BorderSide.none))),
       Align(
           alignment: Alignment.centerRight,
           child: TextButton(
@@ -446,13 +565,11 @@ class _CrewClockShellState extends State<CrewClockShell>
           child: RefreshIndicator(
         onRefresh: _refresh,
         child: ListView(
+            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+            key: const ValueKey('briefing-scroll'),
             physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.all(20),
+            padding: const EdgeInsets.all(16),
             children: [
-              const Text('Next flight',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 30, fontWeight: FontWeight.w700)),
-              const SizedBox(height: 20),
               if (_error != null)
                 Padding(
                     padding: const EdgeInsets.only(bottom: 16),
@@ -484,32 +601,64 @@ class _CrewClockShellState extends State<CrewClockShell>
   Widget build(BuildContext context) {
     final dark = _data?['dark'] == true;
     return Theme(
-      data: ThemeData(
-          colorScheme: ColorScheme.fromSeed(
-              seedColor: _teal,
-              brightness: dark ? Brightness.dark : Brightness.light),
-          useMaterial3: true),
+      data: CrewClockTheme.data(dark: dark),
       child: Builder(
           builder: (context) => Scaffold(
-                body: IndexedStack(index: _tab, children: [
-                  Builder(builder: (context) => _home()),
-                  widget.tools
-                ]),
-                bottomNavigationBar: NavigationBar(
-                    selectedIndex: _tab,
-                    onDestinationSelected: (index) {
-                      setState(() => _tab = index);
-                      if (index == 0) _refresh();
-                    },
-                    destinations: const [
-                      NavigationDestination(
-                          icon: Icon(Icons.flight_takeoff),
-                          label: 'Next flight'),
-                      NavigationDestination(
-                          icon: Icon(Icons.calendar_month),
-                          label: 'Roster & alarms'),
+                appBar: const CrewClockHeader(),
+                body: PageView(
+                  key: const ValueKey('crewclock-pages'),
+                  controller: _pages,
+                  onPageChanged: (index) {
+                    setState(() => _tab = index);
+                    if (index == 0) _refresh();
+                  },
+                  children: [
+                    _RetainedPage(
+                        child: Builder(builder: (context) => _home())),
+                    _RetainedPage(child: widget.tools),
+                    if (widget.alarms != null)
+                      _RetainedPage(child: widget.alarms!),
+                    if (widget.settings != null)
+                      _RetainedPage(child: widget.settings!),
+                  ],
+                ),
+                bottomNavigationBar: CupertinoTabBar(
+                    currentIndex: _tab,
+                    activeColor: CrewClockTheme.blue,
+                    onTap: _showTab,
+                    items: [
+                      const BottomNavigationBarItem(
+                          icon: Icon(CupertinoIcons.airplane),
+                          label: 'Briefing'),
+                      const BottomNavigationBarItem(
+                          icon: Icon(CupertinoIcons.calendar), label: 'Roster'),
+                      if (widget.alarms != null)
+                        const BottomNavigationBarItem(
+                            icon: Icon(CupertinoIcons.alarm), label: 'Alarms'),
+                      if (widget.settings != null)
+                        const BottomNavigationBarItem(
+                            icon: Icon(CupertinoIcons.settings),
+                            label: 'Settings'),
                     ]),
               )),
     );
+  }
+}
+
+class _RetainedPage extends StatefulWidget {
+  const _RetainedPage({required this.child});
+  final Widget child;
+  @override
+  State<_RetainedPage> createState() => _RetainedPageState();
+}
+
+class _RetainedPageState extends State<_RetainedPage>
+    with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+    return widget.child;
   }
 }

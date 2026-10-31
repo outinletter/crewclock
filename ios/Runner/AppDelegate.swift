@@ -6,9 +6,12 @@ import AppIntents
 import ActivityKit
 import SwiftUI
 import AVFoundation
+import UniformTypeIdentifiers
+import SQLite3
 
 @main
-@objc class AppDelegate: FlutterAppDelegate, FlutterImplicitEngineDelegate {
+@objc class AppDelegate: FlutterAppDelegate, FlutterImplicitEngineDelegate, UIDocumentPickerDelegate {
+  private var rosterImportResult: FlutterResult?
   private var soundPreview: AVAudioPlayer?
   private var alarmDismissObserver: NSObjectProtocol?
   override func application(
@@ -30,6 +33,12 @@ import AVFoundation
       Task { @MainActor in
         do {
           switch call.method {
+          case "pickRosterFile":
+            self?.pickRosterFile(result)
+          case "readLegacyData":
+            result(self?.readLegacyData() ?? [:])
+          case "readIntervalAlarms":
+            result(UserDefaults.standard.array(forKey: "crewclock.intervals") ?? [])
           case "shareDutyBriefing":
             guard let owner = self else { throw NSError(domain: "CrewClock", code: 3) }
             try owner.shareDutyBriefing(call.arguments as? [String: Any] ?? [:])
@@ -48,6 +57,13 @@ import AVFoundation
           case "getAvailableNotificationSlots":
             let pending = await UNUserNotificationCenter.current().pendingNotificationRequests()
             result(max(0, 64 - pending.count))
+          case "requestAlarmPermission":
+            guard #available(iOS 26.0, *) else { result(false); return }
+            let manager = AlarmManager.shared
+            if manager.authorizationState == .notDetermined {
+              _ = try await manager.requestAuthorization()
+            }
+            result(manager.authorizationState == .authorized)
           case "scheduleAlarms":
             let args = call.arguments as? [String: Any] ?? [:]
             let records = args["records"] as? [[String: Any]] ?? []
@@ -139,6 +155,73 @@ import AVFoundation
     center.removePendingNotificationRequests(withIdentifiers: ids)
     center.removeDeliveredNotifications(withIdentifiers: ids)
     completionHandler()
+  }
+
+  @MainActor private func pickRosterFile(_ result: @escaping FlutterResult) {
+    guard rosterImportResult == nil, let root = UIApplication.shared.connectedScenes
+      .compactMap({ $0 as? UIWindowScene }).flatMap({ $0.windows })
+      .first(where: { $0.isKeyWindow })?.rootViewController else {
+      result(FlutterError(code: "IMPORT_BUSY", message: "Close the current picker and try again.", details: nil)); return
+    }
+    var presenter = root
+    while let presented = presenter.presentedViewController { presenter = presented }
+    let picker = UIDocumentPickerViewController(forOpeningContentTypes:
+      [UTType(filenameExtension: "ics") ?? .plainText, UTType(filenameExtension: "ical") ?? .plainText, .plainText], asCopy: true)
+    picker.allowsMultipleSelection = false
+    picker.delegate = self
+    rosterImportResult = result
+    presenter.present(picker, animated: true)
+  }
+
+  func documentPickerWasCancelled(_ controller: UIDocumentPickerViewController) {
+    rosterImportResult?(nil); rosterImportResult = nil
+  }
+
+  func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
+    let callback = rosterImportResult; rosterImportResult = nil
+    guard let url = urls.first else { callback?(nil); return }
+    let access = url.startAccessingSecurityScopedResource()
+    defer { if access { url.stopAccessingSecurityScopedResource() } }
+    do {
+      let size = try url.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0
+      guard size <= 5_000_000 else { throw NSError(domain: "CrewClock", code: 4,
+        userInfo: [NSLocalizedDescriptionKey: "Choose a roster smaller than 5 MB."]) }
+      let data = try Data(contentsOf: url)
+      guard let text = String(data: data, encoding: .utf8) ?? String(data: data, encoding: .utf16) else {
+        throw NSError(domain: "CrewClock", code: 4, userInfo: [NSLocalizedDescriptionKey: "Use a UTF-8 calendar or text file."])
+      }
+      callback?(["name": url.lastPathComponent, "text": text])
+    } catch { callback?(FlutterError(code: "IMPORT_FAILED", message: error.localizedDescription, details: nil)) }
+  }
+
+  // Read only this application's historical WebKit SQLite storage; no WebView is loaded.
+  private func readLegacyData() -> [String: String] {
+    var values: [String: String] = [:]
+    let library = FileManager.default.urls(for: .libraryDirectory, in: .userDomainMask)[0]
+    let root = library.appendingPathComponent("WebKit")
+    guard let files = FileManager.default.enumerator(at: root, includingPropertiesForKeys: nil) else { return values }
+    for case let file as URL in files {
+      let name = file.lastPathComponent.lowercased()
+      guard name.hasSuffix(".localstorage") || name == "localstorage.sqlite3" else { continue }
+      var db: OpaquePointer?
+      guard sqlite3_open_v2(file.path, &db, SQLITE_OPEN_READONLY, nil) == SQLITE_OK else {
+        if db != nil { sqlite3_close(db) }; continue
+      }
+      defer { sqlite3_close(db) }
+      var statement: OpaquePointer?
+      guard sqlite3_prepare_v2(db, "SELECT key, value FROM ItemTable", -1, &statement, nil) == SQLITE_OK else { continue }
+      defer { sqlite3_finalize(statement) }
+      func string(_ column: Int32) -> String? {
+        guard let bytes = sqlite3_column_blob(statement, column) else { return nil }
+        let data = Data(bytes: bytes, count: Int(sqlite3_column_bytes(statement, column)))
+        if let utf8 = String(data: data, encoding: .utf8), !utf8.contains("\0") { return utf8 }
+        return String(data: data, encoding: .utf16LittleEndian)
+      }
+      while sqlite3_step(statement) == SQLITE_ROW {
+        if let key = string(0), key.hasPrefix("crewclock_"), let value = string(1) { values[key] = value }
+      }
+    }
+    return values
   }
 
   @MainActor private func shareDutyBriefing(_ args: [String: Any]) throws {

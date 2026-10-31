@@ -21,8 +21,18 @@ class AppDatabase {
 
     return openDatabase(
       path,
-      version: 1,
-      onCreate: _createDB,
+      version: 2,
+      onCreate: (db, version) async {
+        await _createDB(db, version);
+        await db.execute(
+            'CREATE TABLE app_state (key TEXT PRIMARY KEY, value TEXT NOT NULL)');
+      },
+      onUpgrade: (db, old, version) async {
+        if (old < 2) {
+          await db.execute(
+              'CREATE TABLE app_state (key TEXT PRIMARY KEY, value TEXT NOT NULL)');
+        }
+      },
     );
   }
 
@@ -44,6 +54,21 @@ class AppDatabase {
         savedAt  TEXT NOT NULL
       )
     ''');
+  }
+
+  Future<Map<String, dynamic>?> loadNativeState() async {
+    final db = await database;
+    final rows =
+        await db.query('app_state', where: 'key = ?', whereArgs: ['native']);
+    return rows.isEmpty
+        ? null
+        : Map<String, dynamic>.from(jsonDecode(rows.first['value'] as String));
+  }
+
+  Future<void> saveNativeState(Map<String, dynamic> state) async {
+    final db = await database;
+    await db.insert('app_state', {'key': 'native', 'value': jsonEncode(state)},
+        conflictAlgorithm: ConflictAlgorithm.replace);
   }
 
   Future<void> saveAlarmsState(String jsonString) async {

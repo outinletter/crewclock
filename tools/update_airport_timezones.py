@@ -36,22 +36,12 @@ def main():
     license_text = args.license.read_text().strip()
     if 'MIT License' not in license_text or '*/' in license_text:
         raise ValueError('Unexpected source license')
-    begin, end = '// BEGIN GENERATED AIRPORT TIMEZONES', '// END GENERATED AIRPORT TIMEZONES'
-    encoded = json.dumps({zone: ' '.join(codes) for zone, codes in sorted(groups.items())}, separators=(',', ':'))
-    block = (f'{begin}\n/*\nSource: https://github.com/mborsetti/airportsdata\n'
-             f'Revision: {args.revision}\nIATA airports: {len(airports)}; time zones: {len(groups)}\n'
-             f'Regenerate with tools/update_airport_timezones.py.\n\n{license_text}\n*/\n'
-             'var AIRPORT_ZONES={};\n'
-             f'var AIRPORT_ZONE_GROUPS={encoded};\n'
-             'Object.keys(AIRPORT_ZONE_GROUPS).forEach(function(zone){\n'
-             '  AIRPORT_ZONE_GROUPS[zone].split(" ").forEach(function(code){AIRPORT_ZONES[code]=zone;});\n'
-             '});\n' + end + '\n')
-    path = Path(__file__).resolve().parents[1] / 'index.html'
-    html = path.read_text()
-    start = html.index(begin) if begin in html else html.index('var AIRPORT_ZONES=')
-    stop = html.index(end, start) + len(end) + 1 if begin in html else html.index('function airportZone(', start)
-    path.write_text(html[:start] + block + html[stop:])
-    print(f'Embedded {len(airports)} IATA airports across {len(groups)} time zones.')
+    root = Path(__file__).resolve().parents[1] / 'assets' / 'data'
+    root.mkdir(parents=True, exist_ok=True)
+    (root / 'airport_timezones.json').write_text(json.dumps(airports, sort_keys=True, separators=(',', ':')))
+    (root / 'airport-data-license.txt').write_text(
+        f'Source: https://github.com/mborsetti/airportsdata\nRevision: {args.revision}\n\n{license_text}\n')
+    print(f'Updated {len(airports)} IATA airports across {len(groups)} time zones.')
 
 
 if __name__ == '__main__':

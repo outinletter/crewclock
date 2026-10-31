@@ -1,554 +1,113 @@
-import 'dart:convert';
-import 'dart:io';
-
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:webview_flutter/webview_flutter.dart';
-import 'package:url_launcher/url_launcher.dart';
-import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'package:timezone/data/latest_all.dart' as tz_data;
-import 'package:timezone/timezone.dart' as tz;
-
-import 'db/database.dart';
 import 'native_home.dart';
-
-class NativeAlarmScheduler {
-  NativeAlarmScheduler();
-
-  final FlutterLocalNotificationsPlugin _notifications =
-      FlutterLocalNotificationsPlugin();
-  static const MethodChannel _nativeAlarmChannel =
-      MethodChannel('crewclock/native_alarm');
-  bool _initialized = false;
-  bool systemAlarmEnabled = false;
-  String? _iosSound;
-  bool privateLabels = false;
-
-  Future<void> init() async {
-    if (_initialized) return;
-
-    tz_data.initializeTimeZones();
-
-    final darwinSettings = DarwinInitializationSettings(
-      requestAlertPermission: false,
-      requestBadgePermission: false,
-      requestSoundPermission: false,
-      notificationCategories: [
-        DarwinNotificationCategory('crewclock_alarm', actions: [
-          DarwinNotificationAction.plain('crewclock.stop', 'Stop'),
-        ]),
-      ],
-    );
-
-    await _notifications.initialize(
-      InitializationSettings(
-        iOS: darwinSettings,
-      ),
-    );
-
-    if (Platform.isIOS) {
-      privateLabels =
-          await _nativeAlarmChannel.invokeMethod<bool>('getAlarmPrivacy') ??
-              false;
-    }
-    _initialized = true;
-  }
-
-  Future<void> scheduleFromJsonString(
-    String raw, {
-    bool requestExactPermissions = true,
-  }) async {
-    try {
-      final parsed = jsonDecode(raw);
-      if (parsed is! List) return;
-      await scheduleFromRecords(
-        parsed.cast<dynamic>(),
-        requestExactPermissions: requestExactPermissions,
-      );
-    } catch (e) {
-      debugPrint('[NativeAlarmScheduler] invalid alarm payload: $e');
-      rethrow;
-    }
-  }
-
-  Future<void> scheduleFromRecords(
-    List<dynamic> records, {
-    bool requestExactPermissions = false,
-  }) async {
-    await init();
-    if (Platform.isIOS) {
-      if (requestExactPermissions && records.isNotEmpty) {
-        await _requestNotificationPermissions();
-      }
-      systemAlarmEnabled = await _nativeAlarmChannel.invokeMethod<bool>(
-            'scheduleAlarms',
-            {'records': records, 'requestPermission': requestExactPermissions},
-          ) ??
-          false;
-      _iosSound =
-          await _nativeAlarmChannel.invokeMethod<String>('getAlarmSound');
-      // Keep delivered reminders; only replace pending schedules.
-      await _nativeAlarmChannel.invokeMethod<void>('cancelPending');
-      if (systemAlarmEnabled) return;
-    } else {
-      await _notifications.cancelAll();
-    }
-
-    final availableSlots = Platform.isIOS
-        ? await _nativeAlarmChannel
-                .invokeMethod<int>('getAvailableNotificationSlots') ??
-            0
-        : 64;
-    final now = DateTime.now().toUtc();
-    final sorted = records.whereType<Map>().toList()
-      ..sort((a, b) =>
-          (DateTime.tryParse(a['time']?.toString() ?? '') ?? DateTime(9999))
-              .compareTo(DateTime.tryParse(b['time']?.toString() ?? '') ??
-                  DateTime(9999)));
-    var scheduledCount = 0;
-    for (final record in sorted) {
-      final time = DateTime.tryParse(record['time']?.toString() ?? '');
-      if (time == null) continue;
-
-      final alarmTime = time.toUtc();
-      if (!alarmTime.isAfter(now)) continue;
-      if (!_asBool(record['armed'])) continue;
-      if (_asBool(record['dism']) || _asBool(record['missed'])) continue;
-      if (Platform.isIOS && scheduledCount >= availableSlots) break;
-
-      final id = _stableNotificationId(record['id']?.toString() ?? '');
-      final label = privateLabels
-          ? 'CrewClock reminder'
-          : (record['lbl']?.toString().trim().isNotEmpty ?? false)
-              ? record['lbl'].toString()
-              : 'CrewClock Alarm';
-      final route = privateLabels ? '' : _routeText(record);
-      final body = route.isEmpty
-          ? 'Scheduled for ${_formatLocal(alarmTime)}'
-          : '$route\n${_formatLocal(alarmTime)}';
-
-      await _scheduleOne(
-        id: id,
-        title: label,
-        body: body,
-        alarmTimeUtc: alarmTime,
-        payload: record['id']?.toString(),
-      );
-      scheduledCount++;
-    }
-  }
-
-  Future<void> _scheduleOne({
-    required int id,
-    required String title,
-    required String body,
-    required DateTime alarmTimeUtc,
-    required String? payload,
-  }) async {
-    final scheduledAt = tz.TZDateTime.from(alarmTimeUtc, tz.UTC);
-    final details = NotificationDetails(
-      iOS: DarwinNotificationDetails(
-        presentAlert: true,
-        presentBadge: true,
-        presentSound: true,
-        sound: _iosSound,
-        categoryIdentifier: 'crewclock_alarm',
-      ),
-    );
-
-    await _notifications.zonedSchedule(
-      id,
-      title,
-      body,
-      scheduledAt,
-      details,
-      uiLocalNotificationDateInterpretation:
-          UILocalNotificationDateInterpretation.absoluteTime,
-      payload: payload,
-    );
-  }
-
-  Future<void> _requestNotificationPermissions() async {
-    await _notifications
-        .resolvePlatformSpecificImplementation<
-            IOSFlutterLocalNotificationsPlugin>()
-        ?.requestPermissions(alert: true, badge: true, sound: true);
-  }
-
-  Future<bool> chooseAlarmSound() async {
-    if (!Platform.isIOS) return false;
-    final selected =
-        await _nativeAlarmChannel.invokeMethod<String>('chooseAlarmSound');
-    return selected != null;
-  }
-
-  Future<void> stopRingingAlarm() async {
-    if (!Platform.isIOS) return;
-    await _nativeAlarmChannel.invokeMethod<void>('stopAlarm');
-  }
-
-  Future<void> reconcileDismissals() async {
-    if (!Platform.isIOS) return;
-    final ids = await _nativeAlarmChannel
-        .invokeListMethod<String>('getDismissedAlarmIds');
-    if (ids == null || ids.isEmpty) return;
-    await AppDatabase.instance.dismissAlarms(ids);
-    await _nativeAlarmChannel.invokeMethod<void>('acknowledgeDismissals', ids);
-  }
-
-  bool _asBool(dynamic value) {
-    if (value is bool) return value;
-    if (value is int) return value != 0;
-    if (value is String) return value == '1' || value.toLowerCase() == 'true';
-    return false;
-  }
-
-  int _stableNotificationId(String source) {
-    var hash = 0x811c9dc5;
-    for (final unit in source.codeUnits) {
-      hash ^= unit;
-      hash = (hash * 0x01000193) & 0x7fffffff;
-    }
-    return hash == 0 ? 1 : hash;
-  }
-
-  String _routeText(Map<dynamic, dynamic> record) {
-    final fnum = record['fnum']?.toString() ?? '';
-    final dep = record['depApt']?.toString() ?? '';
-    final arr = record['arrApt']?.toString() ?? '';
-    if (fnum.isEmpty && dep.isEmpty && arr.isEmpty) return '';
-    final route = dep.isEmpty && arr.isEmpty ? '' : '$dep -> $arr';
-    return [fnum, route].where((part) => part.trim().isNotEmpty).join(' ');
-  }
-
-  String _formatLocal(DateTime utc) {
-    final local = utc.toLocal();
-    String two(int value) => value.toString().padLeft(2, '0');
-    return '${local.year}-${two(local.month)}-${two(local.day)} '
-        '${two(local.hour)}:${two(local.minute)}';
-  }
-}
+import 'widgets/crewclock_header.dart';
+import 'widgets/crewclock_theme.dart';
+import 'native_roster.dart';
+import 'services/crewclock_store.dart';
+import 'services/alarm_scheduler.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
   runApp(const CrewClockApp());
 }
 
-class CrewClockApp extends StatelessWidget {
+class CrewClockApp extends StatefulWidget {
   const CrewClockApp({super.key});
-
   @override
-  Widget build(BuildContext context) {
-    final briefing = CrewClockBriefingBridge();
-    return MaterialApp(
-      home: CrewClockShell(
-          briefing: briefing, tools: CrewClockHome(briefing: briefing)),
-      debugShowCheckedModeBanner: false,
-    );
-  }
+  State<CrewClockApp> createState() => _CrewClockAppState();
 }
 
-class CrewClockHome extends StatefulWidget {
-  const CrewClockHome({super.key, this.briefing});
-  final CrewClockBriefingBridge? briefing;
-
-  @override
-  State<CrewClockHome> createState() => _CrewClockHomeState();
-}
-
-class _CrewClockHomeState extends State<CrewClockHome>
+class _CrewClockAppState extends State<CrewClockApp>
     with WidgetsBindingObserver {
-  late final WebViewController controller;
-  final NativeAlarmScheduler _alarmScheduler = NativeAlarmScheduler();
-  Future<void> _bridgeQueue = Future<void>.value();
-  bool _pageReady = false;
-  bool _dark = false;
-
+  final store = CrewClockStore();
+  final briefing = FlightBriefingController();
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    if (Platform.isIOS) {
-      NativeAlarmScheduler._nativeAlarmChannel
-          .setMethodCallHandler((call) async {
-        if (call.method == 'alarmDismissed' && _pageReady) {
-          _enqueue(_initNativeAlarms);
-        }
-      });
-    }
-    _initWebView();
+    store.addListener(briefing.invalidate);
+    NativeAlarmScheduler.channel.setMethodCallHandler((call) async {
+      if (call.method == 'alarmDismissed') await store.refresh();
+    });
+    _initialize();
+  }
+
+  Future<void> _initialize() async {
+    await store.initialize();
+    if (!mounted || !store.ready) return;
+    briefing.connect(store.snapshot, store.action);
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && store.ready) store.refresh();
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    if (Platform.isIOS) {
-      NativeAlarmScheduler._nativeAlarmChannel.setMethodCallHandler(null);
-    }
+    NativeAlarmScheduler.channel.setMethodCallHandler(null);
+    store.removeListener(briefing.invalidate);
+    store.dispose();
+    briefing.dispose();
     super.dispose();
   }
 
   @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed && _pageReady) {
-      _enqueue(_initNativeAlarms);
-    }
-  }
-
-  void _enqueue(Future<void> Function() action) {
-    _bridgeQueue =
-        _bridgeQueue.then((_) => action()).catchError((Object e) async {
-      debugPrint('[CrewClock] $e');
-      if (!mounted) return;
-      await controller.runJavaScript('markAlarmSchedulingError();');
-      await controller.runJavaScript(
-        'toast(${jsonEncode(e is PlatformException ? e.message ?? 'Could not schedule alarms.' : 'Could not update alarms. Please try again.')}, "er");',
-      );
-    });
-  }
-
-  Future<void> _initNativeAlarms() async {
-    await _alarmScheduler.init();
-    await _alarmScheduler.reconcileDismissals();
-    final data = await AppDatabase.instance.getAlarmsState();
-    await controller.runJavaScript('syncAlarmsFromDB(${jsonEncode(data)});');
-    await _alarmScheduler.scheduleFromRecords(data);
-    if (Platform.isIOS) await _syncIOSAlarmUI();
-  }
-
-  Future<void> _syncIOSAlarmUI() async {
-    final system = _alarmScheduler.systemAlarmEnabled;
-    final queued = await NativeAlarmScheduler._nativeAlarmChannel
-            .invokeMethod<int>('getQueuedAlarmCount') ??
-        0;
-    final sound = _alarmScheduler._iosSound == null ? 'Default' : 'Beep';
-    final status = await NativeAlarmScheduler._nativeAlarmChannel
-            .invokeMethod<Map<dynamic, dynamic>>('getAlarmStatus',
-                await AppDatabase.instance.getAlarmsState()) ??
-        {};
-    await controller.runJavaScript(
-      'window.crewclockSystemAlarm = $system;'
-      'applyNativeAlarmStatus(${jsonEncode(status)});'
-      'document.getElementById("alarmSoundChoice").textContent = ${jsonEncode(sound)};'
-      'document.getElementById("platformAlarmGuide").textContent = ${jsonEncode(system ? 'System alarm enabled. Use Stop or Snooze on the lock screen.${queued > 0 ? " $queued later alarms are waiting and are not yet scheduled. Reopen CrewClock regularly to schedule them as space becomes available." : ""}' : 'Notification reminders only. iOS 26 or later and alarm permission are required for lock-screen alarms. Silent mode and Focus may silence notification sounds.')};',
-    );
-  }
-
-  void _initWebView() {
-    controller = WebViewController()
-      ..setJavaScriptMode(JavaScriptMode.unrestricted)
-      ..setBackgroundColor(const Color(0x00000000))
-      ..setNavigationDelegate(
-        NavigationDelegate(
-          onNavigationRequest: (request) async {
-            if (request.url ==
-                'https://outinletter.github.io/crewclock/privacy.html') {
-              try {
-                if (!await launchUrl(
-                  Uri.parse(request.url),
-                  mode: LaunchMode.externalApplication,
-                )) {
-                  throw StateError('Could not open privacy policy');
-                }
-              } catch (error) {
-                debugPrint('[PrivacyPolicy] $error');
-                await controller.runJavaScript(
-                  "toast('Could not open privacy policy. Please try again.', 'er');",
-                );
-              }
-              return NavigationDecision.prevent;
-            }
-            return request.url.startsWith('file:') ||
-                    request.url == 'about:blank'
-                ? NavigationDecision.navigate
-                : NavigationDecision.prevent;
-          },
-          onWebResourceError: (WebResourceError error) {
-            debugPrint('[WebView] Error: ${error.description}');
-          },
-          onPageFinished: (String url) async {
-            _pageReady = true;
-            await controller
-                .runJavaScript("document.body.classList.add('native-shell');");
-            widget.briefing?.connect(
-              (key) async {
-                final result = await controller.runJavaScriptReturningResult(
-                  'JSON.stringify(nativeBriefingSnapshot(${jsonEncode(key)}))',
-                );
-                dynamic decoded =
-                    result is String ? jsonDecode(result) : result;
-                if (decoded is String) decoded = jsonDecode(decoded);
-                return Map<String, dynamic>.from(decoded as Map);
-              },
-              (action, key, value) => controller.runJavaScript(
-                'nativeBriefingAction(${jsonEncode(action)},${jsonEncode(key)},${jsonEncode(value)});',
-              ),
-            );
-            _enqueue(() async {
-              await _alarmScheduler.reconcileDismissals();
-              final data = await AppDatabase.instance.getAlarmsState();
-              await controller.runJavaScript(
-                'syncAlarmsFromDB(${jsonEncode(data)});',
-              );
-              await _alarmScheduler.scheduleFromRecords(data);
-              if (Platform.isIOS) {
-                await _syncIOSAlarmUI();
-              }
-            });
-          },
-        ),
-      )
-      ..addJavaScriptChannel(
-        'crewclock',
-        onMessageReceived: (message) async {
-          _enqueue(() async {
-            if (await _handleCrewClockCommand(message.message)) return;
-
-            await AppDatabase.instance.saveAlarmsState(message.message);
-            await _alarmScheduler.scheduleFromJsonString(message.message);
-            if (Platform.isIOS) {
-              await _syncIOSAlarmUI();
-            }
-          });
-        },
-      )
-      ..loadFlutterAsset('index.html');
-  }
-
-  Future<bool> _handleCrewClockCommand(String raw) async {
-    try {
-      final decoded = jsonDecode(raw);
-      if (decoded is! Map) return false;
-
-      switch (decoded['type']) {
-        case 'REFRESH_ALARM_STATUS':
-          if (Platform.isIOS) await _syncIOSAlarmUI();
-          return true;
-        case 'SET_ALARM_PRIVACY':
-          _alarmScheduler.privateLabels = decoded['enabled'] == true;
-          if (Platform.isIOS) {
-            await NativeAlarmScheduler._nativeAlarmChannel.invokeMethod<void>(
-                'setAlarmPrivacy', _alarmScheduler.privateLabels);
-          }
-          return true;
-        case 'EXPORT_DUTY_BRIEFING':
-          try {
-            if (!Platform.isIOS) throw Exception('PDF export requires iPhone.');
-            await NativeAlarmScheduler._nativeAlarmChannel.invokeMethod<void>(
-                'shareDutyBriefing',
-                {'title': decoded['title'], 'lines': decoded['lines']});
-          } catch (error) {
-            await controller
-                .runJavaScript('toast(${jsonEncode(error.toString())},"er");');
-          }
-          return true;
-        case 'SET_INTERVAL_ALARMS':
-          try {
-            if (!Platform.isIOS) {
-              throw Exception('Repeating reminders require iPhone.');
-            }
-            await NativeAlarmScheduler._nativeAlarmChannel.invokeMethod<void>(
-                'setAlarmPrivacy', decoded['privateLabels'] == true);
-            final records = await NativeAlarmScheduler._nativeAlarmChannel
-                .invokeMethod<List<dynamic>>('syncIntervalAlarms', {
-              'records': decoded['records'],
-              'requestPermission': decoded['requestPermission']
-            });
-            await controller.runJavaScript(
-                'intervalSyncResult(true,null,${jsonEncode(records)});');
-            await _syncIOSAlarmUI();
-          } catch (error) {
-            await controller.runJavaScript(
-                'intervalSyncResult(false,${jsonEncode(error.toString())},null);');
-          }
-          return true;
-        case 'SET_THEME':
-          if (mounted) setState(() => _dark = decoded['dark'] == true);
-          return true;
-        case 'CONFIRM_RESTORE_ALARMS':
-          if (!mounted) return true;
-          final restore = await showDialog<bool>(
-            context: context,
-            builder: (context) => AlertDialog(
-              title: const Text('Restore default alarms?'),
-              content: const Text(
-                  'Flight alarm presets will be reset. Your flights and personal alarms will be kept.'),
-              actions: [
-                TextButton(
-                    onPressed: () => Navigator.pop(context, false),
-                    child: const Text('Cancel')),
-                TextButton(
-                    onPressed: () => Navigator.pop(context, true),
-                    child: const Text('Restore')),
-              ],
-            ),
-          );
-          if (restore == true && mounted) {
-            await controller.runJavaScript('restoreAlarmDefaults(true);');
-          }
-          return true;
-        case 'CONFIRM_DELETE_ALL':
-          if (!mounted) return true;
-          final confirmed = await showDialog<bool>(
-            context: context,
-            builder: (context) => AlertDialog(
-              title: const Text('Delete all flights and alarms?'),
-              content: const Text(
-                  'This cannot be undone. Preferences remain saved.'),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context, false),
-                  child: const Text('Cancel'),
-                ),
-                TextButton(
-                  onPressed: () => Navigator.pop(context, true),
-                  child: const Text('Delete'),
-                ),
-              ],
-            ),
-          );
-          if (confirmed == true && mounted) {
-            await controller.runJavaScript('clearAllData(true);');
-          }
-          return true;
-        case 'CHOOSE_ALARM_SOUND':
-          final selected = await _alarmScheduler.chooseAlarmSound();
-          if (!selected) return true;
-          await _alarmScheduler.scheduleFromRecords(
-            await AppDatabase.instance.getAlarmsState(),
-          );
-          if (Platform.isIOS) await _syncIOSAlarmUI();
-          await controller.runJavaScript(
-            "toast('Alarm sound selected', 'ok');",
-          );
-          return true;
-        case 'STOP_RINGING_ALARM':
-          await _alarmScheduler.stopRingingAlarm();
-          if (decoded['silent'] != true) {
-            await controller.runJavaScript(
-              "toast('Alarm stopped', 'ok');",
-            );
-          }
-          return true;
-        default:
-          return false;
-      }
-    } on FormatException {
-      return false;
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: SystemUiOverlayStyle.light,
-      child: Scaffold(
-        backgroundColor:
-            _dark ? const Color(0xff08131f) : const Color(0xff10253a),
-        body: SafeArea(
-          child: WebViewWidget(controller: controller),
-        ),
-      ),
-    );
-  }
+  Widget build(BuildContext context) => AnimatedBuilder(
+      animation: store,
+      builder: (c, _) => MaterialApp(
+            debugShowCheckedModeBanner: false,
+            title: 'CrewClock',
+            builder: (context, child) {
+              final keyboard = MediaQuery.viewInsetsOf(context).bottom;
+              return Stack(children: [
+                GestureDetector(
+                    behavior: HitTestBehavior.translucent,
+                    onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
+                    child: child!),
+                if (keyboard > 0)
+                  Positioned(
+                      bottom: keyboard + 8,
+                      right: 12,
+                      child: Material(
+                          elevation: 3,
+                          color: Theme.of(context).colorScheme.surface,
+                          shape: const CircleBorder(),
+                          child: IconButton(
+                              tooltip: 'Close keyboard',
+                              icon: const Icon(Icons.keyboard_hide),
+                              onPressed: () => FocusManager
+                                  .instance.primaryFocus
+                                  ?.unfocus()))),
+              ]);
+            },
+            theme: CrewClockTheme.data(dark: store.dark),
+            home: store.ready
+                ? CrewClockShell(
+                    briefing: briefing,
+                    tools: NativeRosterPage(store: store),
+                    alarms: NativeRosterPage(store: store, section: 1),
+                    settings: NativeRosterPage(store: store, section: 2))
+                : Scaffold(
+                    appBar: const CrewClockHeader(),
+                    body: SafeArea(
+                        child: Center(
+                            child: Padding(
+                                padding: const EdgeInsets.all(24),
+                                child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const SizedBox(height: 20),
+                                      if (store.error == null)
+                                        const CircularProgressIndicator()
+                                      else ...[
+                                        Text(store.error!),
+                                        const SizedBox(height: 12),
+                                        FilledButton(
+                                            onPressed: _initialize,
+                                            child: const Text('Retry'))
+                                      ],
+                                    ]))))),
+          ));
 }

@@ -45,3 +45,6 @@ ios/._*
 # Local signing credentials
 *.keystore
 *.jks
+
+# Local build, migration backups and review captures
+/work/
