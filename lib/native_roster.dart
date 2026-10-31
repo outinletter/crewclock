@@ -317,29 +317,28 @@ class _NativeRosterPageState extends State<NativeRosterPage> {
                         if (arrival != null)
                           Text(store.clock(store.zoned(
                               arrival, store.airportZone(f['arrApt'])))),
-                        TextButton(
-                            onPressed:
-                                store.busy ? null : () => _alarm(flight: f),
-                            child: const Text('+ Add')),
-                        PopupMenuButton<String>(
-                            tooltip: 'Flight actions',
-                            onSelected: (value) async {
-                              if (value == 'edit') _flight(f);
-                              if (value == 'delete' &&
-                                  await _confirm('Delete flight?',
-                                      'Its reminders and personal preparation notes will also be removed.')) {
-                                await _run(() => store.deleteFlight(f));
-                              }
-                            },
-                            itemBuilder: (c) => [
-                                  const PopupMenuItem(
-                                      value: 'edit',
-                                      child: Text('Edit flight')),
-                                  const PopupMenuItem(
-                                      value: 'delete',
-                                      child: Text('Delete flight'))
-                                ])
                       ]),
+                  Row(mainAxisAlignment: MainAxisAlignment.end, children: [
+                    PopupMenuButton<String>(
+                        tooltip: 'Flight actions',
+                        onSelected: (value) async {
+                          if (value == 'edit') _flight(f);
+                          if (value == 'delete' &&
+                              await _confirm('Delete flight?',
+                                  'Its reminders and personal preparation notes will also be removed.')) {
+                            await _run(() => store.deleteFlight(f));
+                          }
+                        },
+                        itemBuilder: (c) => [
+                              const PopupMenuItem(
+                                  value: 'edit', child: Text('Edit flight')),
+                              const PopupMenuItem(
+                                  value: 'delete', child: Text('Delete flight'))
+                            ]),
+                    TextButton(
+                        onPressed: store.busy ? null : () => _alarm(flight: f),
+                        child: const Text('+ Add')),
+                  ]),
                   Text(
                       'Times at ${f['depApt']} · ${store.airportZone(f['depApt']) ?? 'Confirm airport time zone'}',
                       style: Theme.of(context).textTheme.bodySmall),
@@ -474,10 +473,12 @@ class _NativeRosterPageState extends State<NativeRosterPage> {
                     child: Text(
                         'No flights on this day. Choose a marked date or import your roster.')),
               ...selected.map(_flightCard),
-              FilledButton.icon(
-                  onPressed: store.busy ? null : _import,
-                  icon: const Icon(Icons.add),
-                  label: const Text('Add flight')),
+              Align(
+                  alignment: Alignment.centerRight,
+                  child: FilledButton.icon(
+                      onPressed: store.busy ? null : _import,
+                      icon: const Icon(Icons.add),
+                      label: const Text('Add flight'))),
             ]));
   }
 
@@ -652,12 +653,6 @@ class _NativeRosterPageState extends State<NativeRosterPage> {
                     ? null
                     : (v) => _run(() =>
                         store.saveSettings({...store.settings, 'dark': v}))),
-            SwitchListTile.adaptive(
-                title: const Text('Private alarm labels'),
-                subtitle: const Text('Use a generic label on the lock screen'),
-                value: store.scheduler.privateLabels,
-                onChanged:
-                    store.busy ? null : (v) => _run(() => store.setPrivacy(v))),
             ListTile(
                 title: const Text('Alarm sound'),
                 trailing: const Icon(Icons.volume_up),
@@ -701,24 +696,27 @@ class _NativeRosterPageState extends State<NativeRosterPage> {
                   },
                   onDelete: () => _deletePreset(group, preset),
                 ),
-              TextButton.icon(
-                  onPressed: store.busy
-                      ? null
-                      : () => store.saveSettings({
-                            ...store.settings,
-                            '${group}Offs': [
-                              ...store.maps(store.settings['${group}Offs'] ??
-                                  CrewClockStore.defaults['${group}Offs']),
-                              {
-                                'id': 'p${store.id()}',
-                                'lbl': 'New reminder',
-                                'h': 1,
-                                'm': 0
-                              }
-                            ]
-                          }),
-                  icon: const Icon(Icons.add),
-                  label: const Text('Add preparation preset')),
+              Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton.icon(
+                      onPressed: store.busy
+                          ? null
+                          : () => store.saveSettings({
+                                ...store.settings,
+                                '${group}Offs': [
+                                  ...store.maps(store
+                                          .settings['${group}Offs'] ??
+                                      CrewClockStore.defaults['${group}Offs']),
+                                  {
+                                    'id': 'p${store.id()}',
+                                    'lbl': 'New reminder',
+                                    'h': 1,
+                                    'm': 0
+                                  }
+                                ]
+                              }),
+                      icon: const Icon(Icons.add),
+                      label: const Text('Add preparation preset'))),
             ],
             _heading('Privacy & support'),
             const Text(

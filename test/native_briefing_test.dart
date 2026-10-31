@@ -223,6 +223,11 @@ void main() {
             .widget<CupertinoTabBar>(find.byType(CupertinoTabBar))
             .currentIndex,
         0);
+    final tabPadding = tester.widget<Padding>(find
+        .ancestor(
+            of: find.byType(CupertinoTabBar), matching: find.byType(Padding))
+        .first);
+    expect(tabPadding.padding.resolve(TextDirection.ltr).top, 8);
     await tester.tap(find.text('Settings'));
     await tester.pumpAndSettle();
     expect(find.text('Settings content'), findsOneWidget);

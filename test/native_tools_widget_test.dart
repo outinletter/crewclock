@@ -74,9 +74,12 @@ void main() {
       (tester) async {
     final s = await open(tester);
     expect(find.byType(SegmentedButton<int>), findsNothing);
+    await tester.ensureVisible(find.text('Add flight'));
+    expect(tester.getCenter(find.text('Add flight')).dx, greaterThan(195));
     await tester.tap(find.text('Settings').first);
     await tester.pumpAndSettle();
     expect(find.text('Home base'), findsOneWidget);
+    expect(find.text('Private alarm labels'), findsNothing);
     await tester.tap(find.text('Alarms').first);
     await tester.pumpAndSettle();
     expect(find.text('Add personal alarm'), findsNothing);
@@ -98,6 +101,7 @@ void main() {
         find.descendant(of: personal, matching: find.text('Add alarm'));
     await tester.ensureVisible(save);
     await tester.pumpAndSettle();
+    expect(tester.getCenter(save).dx, greaterThan(195));
     await tester.tap(save);
     await tester.pumpAndSettle();
     expect(s.savedAlarm?['lbl'], 'Passport check');
@@ -124,6 +128,9 @@ void main() {
         of: card, matching: find.widgetWithText(TextField, 'Reminder'));
     expect(tester.getCenter(label).dy, closeTo(tester.getCenter(hours).dy, 1));
     expect(tester.getSize(hours).width, lessThanOrEqualTo(90));
+    expect(tester.getSize(hours).height, 44);
+    expect(tester.widget<TextField>(hours).textAlignVertical,
+        TextAlignVertical.center);
     expect(tester.getSize(card).height, lessThanOrEqualTo(120));
     await tester.enterText(hours, '4');
     await tester.enterText(minutes, '15');

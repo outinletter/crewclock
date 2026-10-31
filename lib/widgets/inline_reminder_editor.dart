@@ -441,7 +441,7 @@ class _InlineReminderEditorState extends State<InlineReminderEditor> {
                                 color: Theme.of(context).colorScheme.error))),
                   const SizedBox(height: 14),
                   Wrap(
-                      alignment: WrapAlignment.spaceBetween,
+                      alignment: WrapAlignment.end,
                       crossAxisAlignment: WrapCrossAlignment.center,
                       spacing: 8,
                       runSpacing: 4,
@@ -601,6 +601,7 @@ class _PreparationPresetRowState extends State<PreparationPresetRow> {
           save();
           FocusScope.of(context).unfocus();
         },
+        textAlignVertical: TextAlignVertical.center,
         textAlign: numeric ? TextAlign.center : TextAlign.start,
         keyboardType: numeric ? TextInputType.number : TextInputType.text,
         inputFormatters:
@@ -608,6 +609,10 @@ class _PreparationPresetRowState extends State<PreparationPresetRow> {
         style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500),
         decoration: InputDecoration(
             labelText: hint,
+            constraints: BoxConstraints(
+                minHeight: 44,
+                maxHeight:
+                    MediaQuery.textScalerOf(context).scale(1) > 1.3 ? 64 : 44),
             filled: true,
             fillColor: Colors.transparent,
             border: InputBorder.none,
@@ -616,7 +621,7 @@ class _PreparationPresetRowState extends State<PreparationPresetRow> {
             suffixText: numeric ? (hint == 'Hours' ? 'h' : 'm') : null,
             isDense: true,
             contentPadding:
-                const EdgeInsets.symmetric(horizontal: 10, vertical: 10)),
+                const EdgeInsets.symmetric(horizontal: 10, vertical: 0)),
       );
   @override
   Widget build(BuildContext context) => Dismissible(
@@ -648,7 +653,7 @@ class _PreparationPresetRowState extends State<PreparationPresetRow> {
             margin: const EdgeInsets.only(top: 8),
             child: Padding(
                 padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [

@@ -154,32 +154,37 @@ class _CrewClockShellState extends State<CrewClockShell>
       decoration: BoxDecoration(
           color: _colors.surface, borderRadius: BorderRadius.circular(18)),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: [
-              Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                  decoration: BoxDecoration(
-                      color: _teal, borderRadius: BorderRadius.circular(12)),
-                  child: Text('${flight['dateBadge'] ?? ''}',
-                      style: const TextStyle(
-                          color: Colors.white, fontWeight: FontWeight.w700))),
-              Text(
-                  '${flight['departureTime'] ?? ''} ${flight['number']} ${flight['from']} → ${flight['to']} ${flight['arrivalTime'] ?? ''}',
-                  style: const TextStyle(
-                      color: _teal, fontSize: 16, fontWeight: FontWeight.w700)),
-              TextButton(
-                  onPressed: _busy || data['demo'] == true
-                      ? null
-                      : () => setState(() {
-                            _addingReminder = !_addingReminder;
-                            _newReminderId = null;
-                          }),
-                  child: const Text('+ Add')),
-            ]),
+        Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Expanded(
+              child: Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 10),
+                    decoration: BoxDecoration(
+                        color: _teal, borderRadius: BorderRadius.circular(12)),
+                    child: Text('${flight['dateBadge'] ?? ''}',
+                        style: const TextStyle(
+                            color: Colors.white, fontWeight: FontWeight.w700))),
+                Text(
+                    '${flight['departureTime'] ?? ''} ${flight['number']} ${flight['from']} → ${flight['to']} ${flight['arrivalTime'] ?? ''}',
+                    style: const TextStyle(
+                        color: _teal,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700)),
+              ])),
+          TextButton(
+              onPressed: _busy || data['demo'] == true
+                  ? null
+                  : () => setState(() {
+                        _addingReminder = !_addingReminder;
+                        _newReminderId = null;
+                      }),
+              child: const Text('+ Add')),
+        ]),
         const SizedBox(height: 8),
         for (final step in data['steps'] as List)
           Container(
@@ -650,24 +655,35 @@ class _CrewClockShellState extends State<CrewClockShell>
                       _RetainedPage(child: widget.settings!),
                   ],
                 ),
-                bottomNavigationBar: CupertinoTabBar(
-                    currentIndex: _tab,
-                    activeColor: CrewClockTheme.blue,
-                    onTap: _showTab,
-                    items: [
-                      const BottomNavigationBarItem(
-                          icon: Icon(CupertinoIcons.airplane),
-                          label: 'Briefing'),
-                      const BottomNavigationBarItem(
-                          icon: Icon(CupertinoIcons.calendar), label: 'Roster'),
-                      if (widget.alarms != null)
-                        const BottomNavigationBarItem(
-                            icon: Icon(CupertinoIcons.alarm), label: 'Alarms'),
-                      if (widget.settings != null)
-                        const BottomNavigationBarItem(
-                            icon: Icon(CupertinoIcons.settings),
-                            label: 'Settings'),
-                    ]),
+                bottomNavigationBar: DecoratedBox(
+                    decoration: BoxDecoration(
+                        color: _colors.surface,
+                        border: Border(
+                            top: BorderSide(color: _colors.outlineVariant))),
+                    child: Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: CupertinoTabBar(
+                            border: const Border(),
+                            height: 52,
+                            currentIndex: _tab,
+                            activeColor: CrewClockTheme.blue,
+                            onTap: _showTab,
+                            items: [
+                              const BottomNavigationBarItem(
+                                  icon: Icon(CupertinoIcons.airplane),
+                                  label: 'Briefing'),
+                              const BottomNavigationBarItem(
+                                  icon: Icon(CupertinoIcons.calendar),
+                                  label: 'Roster'),
+                              if (widget.alarms != null)
+                                const BottomNavigationBarItem(
+                                    icon: Icon(CupertinoIcons.alarm),
+                                    label: 'Alarms'),
+                              if (widget.settings != null)
+                                const BottomNavigationBarItem(
+                                    icon: Icon(CupertinoIcons.settings),
+                                    label: 'Settings'),
+                            ]))),
               )),
     );
   }
