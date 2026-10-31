@@ -189,56 +189,90 @@ class _CrewClockShellState extends State<CrewClockShell>
         for (final step in data['steps'] as List)
           Container(
               key: ValueKey('timeline-${step['id']}'),
-              margin: const EdgeInsets.only(top: 8),
               decoration: BoxDecoration(
-                  border: Border(
-                      left: BorderSide(
-                          width: 3,
-                          color: (data['next'] as Map?)?['id'] == step['id']
-                              ? _teal
-                              : _colors.outlineVariant))),
-              child: Semantics(
-                label:
-                    '${step['label']}, ${step['clock']}, ${step['offset']}, ${step['status']}',
-                child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 10, vertical: 12),
-                    child: Row(children: [
-                      Text('${step['clock'] ?? step['time']}(L)',
-                          style: TextStyle(
-                              color: _colors.primary,
-                              fontSize: 17,
-                              fontFeatures: const [
-                                FontFeature.tabularFigures()
-                              ],
-                              fontWeight: FontWeight.w700)),
-                      const SizedBox(width: 10),
-                      Expanded(
-                          child: Tooltip(
-                              message: '${step['label']}',
-                              child: Text('${step['label']}',
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w600)))),
-                      const SizedBox(width: 8),
-                      Text('${step['offset'] ?? ''}',
-                          style: TextStyle(
-                              fontSize: 12, color: _colors.onSurfaceVariant)),
-                      if (!['Scheduled', 'Done', 'Preview', 'Paused']
-                          .contains(step['status'])) ...[
-                        const SizedBox(width: 4),
-                        Tooltip(
-                            message: '${step['status']}',
-                            child: Icon(Icons.info_outline,
-                                size: 16,
-                                color: CrewClockTheme.statusColor(
-                                    '${step['status']}',
-                                    dark: _data?['dark'] == true))),
-                      ],
-                    ])),
-              )),
+                  color: (data['next'] as Map?)?['id'] == step['id']
+                      ? _teal.withValues(alpha: .06)
+                      : null,
+                  borderRadius: BorderRadius.circular(10)),
+              child: IntrinsicHeight(
+                  child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                    SizedBox(
+                        width: 16,
+                        child: Stack(children: [
+                          Positioned(
+                              top: 0,
+                              bottom: 0,
+                              left: 7,
+                              width: 2,
+                              child: ColoredBox(color: _colors.outlineVariant)),
+                          Align(
+                              alignment: Alignment.center,
+                              child: Container(
+                                  key: ValueKey(
+                                      'preparation-marker-${step['id']}'),
+                                  width: 10,
+                                  height: 10,
+                                  decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      color: (data['next'] as Map?)?['id'] ==
+                                              step['id']
+                                          ? _teal
+                                          : _colors.surface,
+                                      border: Border.all(
+                                          width: 2,
+                                          color:
+                                              (data['next'] as Map?)?['id'] ==
+                                                      step['id']
+                                                  ? _teal
+                                                  : _colors.outline)))),
+                        ])),
+                    Expanded(
+                        child: Semantics(
+                      label:
+                          '${step['label']}, ${step['clock']}, ${step['offset']}, ${step['status']}',
+                      child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 12),
+                          child: Row(children: [
+                            Text('${step['clock'] ?? step['time']}(L)',
+                                style: TextStyle(
+                                    color: _colors.primary,
+                                    fontSize: 17,
+                                    fontFeatures: const [
+                                      FontFeature.tabularFigures()
+                                    ],
+                                    fontWeight: FontWeight.w700)),
+                            const SizedBox(width: 10),
+                            Expanded(
+                                child: Tooltip(
+                                    message: '${step['label']}',
+                                    child: Text('${step['label']}',
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.w600)))),
+                            const SizedBox(width: 8),
+                            Text('${step['offset'] ?? ''}',
+                                style: TextStyle(
+                                    fontSize: 12,
+                                    color: _colors.onSurfaceVariant)),
+                            if (!['Scheduled', 'Done', 'Preview', 'Paused']
+                                .contains(step['status'])) ...[
+                              const SizedBox(width: 4),
+                              Tooltip(
+                                  message: '${step['status']}',
+                                  child: Icon(Icons.info_outline,
+                                      size: 16,
+                                      color: CrewClockTheme.statusColor(
+                                          '${step['status']}',
+                                          dark: _data?['dark'] == true))),
+                            ],
+                          ])),
+                    ))
+                  ]))),
         if (_addingReminder)
           InlineReminderEditor(
             key: ValueKey('add-timeline-${data['key']}'),
@@ -432,38 +466,61 @@ class _CrewClockShellState extends State<CrewClockShell>
     final minutes =
         (departure.difference(DateTime.now()).inSeconds / 60).ceil();
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-            color: _colors.surface, borderRadius: BorderRadius.circular(18)),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(
-              data['demo'] == true
-                  ? 'FICTIONAL DEMO · NO ALARMS SCHEDULED'
-                  : 'FLIGHT PREPARATION',
-              style: const TextStyle(
-                  color: _teal,
-                  letterSpacing: 1.5,
-                  fontWeight: FontWeight.w700)),
-          const SizedBox(height: 12),
-          Text('${flight['number']} · ${flight['from']} → ${flight['to']}',
-              style: TextStyle(
-                  color: _colors.onSurface,
-                  fontSize: 26,
-                  fontWeight: FontWeight.w700)),
-          const SizedBox(height: 12),
-          Text(
-              minutes > 0
-                  ? 'Departs in ${minutes ~/ 60}h ${minutes % 60}m'
-                  : 'Departure has passed',
-              style: TextStyle(color: _colors.onSurfaceVariant, fontSize: 17)),
-          if (data['demo'] == true)
-            TextButton(
-                onPressed: _busy ? null : () => _act('exitDemo'),
-                child: const Text('Exit demo',
-                    style: TextStyle(color: Colors.white))),
-        ]),
-      ),
+      IntrinsicHeight(
+          child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        SizedBox(
+            width: 30,
+            child: Column(children: [
+              Container(
+                  key: const ValueKey('flight-plane-badge'),
+                  width: 28,
+                  height: 28,
+                  decoration:
+                      const BoxDecoration(color: _teal, shape: BoxShape.circle),
+                  child: const Icon(CupertinoIcons.airplane,
+                      size: 17, color: Colors.white)),
+              const SizedBox(height: 6),
+              Expanded(
+                  child:
+                      Container(width: 2, color: _teal.withValues(alpha: .4))),
+            ])),
+        const SizedBox(width: 10),
+        Expanded(
+            child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+              color: _colors.surface, borderRadius: BorderRadius.circular(18)),
+          child:
+              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(
+                data['demo'] == true
+                    ? 'FICTIONAL DEMO · NO ALARMS SCHEDULED'
+                    : 'FLIGHT PREPARATION',
+                style: const TextStyle(
+                    color: _teal,
+                    letterSpacing: 1.5,
+                    fontWeight: FontWeight.w700)),
+            const SizedBox(height: 12),
+            Text('${flight['number']} · ${flight['from']} → ${flight['to']}',
+                style: TextStyle(
+                    color: _colors.onSurface,
+                    fontSize: 26,
+                    fontWeight: FontWeight.w700)),
+            const SizedBox(height: 12),
+            Text(
+                minutes > 0
+                    ? 'Departs in ${minutes ~/ 60}h ${minutes % 60}m'
+                    : 'Departure has passed',
+                style:
+                    TextStyle(color: _colors.onSurfaceVariant, fontSize: 17)),
+            if (data['demo'] == true)
+              TextButton(
+                  onPressed: _busy ? null : () => _act('exitDemo'),
+                  child: const Text('Exit demo',
+                      style: TextStyle(color: Colors.white))),
+          ]),
+        )),
+      ])),
       if (choices.length > 1) ...[
         _title('Flight'),
         OutlinedButton(
@@ -629,6 +686,14 @@ class _CrewClockShellState extends State<CrewClockShell>
             ]),
       ));
 
+  BottomNavigationBarItem _tabItem(IconData icon, String label) =>
+      BottomNavigationBarItem(
+        icon: Icon(icon),
+        label: label,
+        activeIcon:
+            Icon(icon, key: ValueKey('selected-tab-$label'), color: _teal),
+      );
+
   @override
   Widget build(BuildContext context) {
     final dark = _data?['dark'] == true;
@@ -666,23 +731,16 @@ class _CrewClockShellState extends State<CrewClockShell>
                             border: const Border(),
                             height: 52,
                             currentIndex: _tab,
-                            activeColor: CrewClockTheme.blue,
+                            activeColor: _colors.onSurfaceVariant,
+                            inactiveColor: _colors.onSurfaceVariant,
                             onTap: _showTab,
                             items: [
-                              const BottomNavigationBarItem(
-                                  icon: Icon(CupertinoIcons.airplane),
-                                  label: 'Briefing'),
-                              const BottomNavigationBarItem(
-                                  icon: Icon(CupertinoIcons.calendar),
-                                  label: 'Roster'),
+                              _tabItem(CupertinoIcons.airplane, 'Briefing'),
+                              _tabItem(CupertinoIcons.calendar, 'Roster'),
                               if (widget.alarms != null)
-                                const BottomNavigationBarItem(
-                                    icon: Icon(CupertinoIcons.alarm),
-                                    label: 'Alarms'),
+                                _tabItem(CupertinoIcons.alarm, 'Alarms'),
                               if (widget.settings != null)
-                                const BottomNavigationBarItem(
-                                    icon: Icon(CupertinoIcons.settings),
-                                    label: 'Settings'),
+                                _tabItem(CupertinoIcons.settings, 'Settings'),
                             ]))),
               )),
     );
