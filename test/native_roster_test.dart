@@ -208,4 +208,49 @@ void main() {
     expect(s.alarms.length, 1);
     expect(s.alarms.single['id'], 'saved_new-1');
   });
+  test('briefing selects next departure, skips airborne and expired selections',
+      () async {
+    final s = SnapshotStore()..ready = true;
+    s.parser.zones = parser.zones;
+    final now = DateTime.now().toUtc();
+    Map<String, dynamic> flight(String id, int hours) => {
+          'id': id,
+          'flight': id,
+          'depApt': 'ICN',
+          'arrApt': 'IST',
+          'departureUtc': now.add(Duration(hours: hours)).toIso8601String(),
+          'arrivalUtc': now.add(Duration(hours: hours + 12)).toIso8601String()
+        };
+    final airborne = flight('Departed', -1),
+        next = flight('Next', 2),
+        later = flight('Later', 5);
+    s.flights = [later, airborne, next];
+    s.alarms = [
+      for (final f in s.flights)
+        {
+          'id': '${f['id']}_alarm',
+          'fnum': f['flight'],
+          'depApt': 'ICN',
+          'arrApt': 'IST',
+          'dep': f['departureUtc'],
+          'time': DateTime.parse(f['departureUtc'] as String)
+              .subtract(const Duration(hours: 1))
+              .toIso8601String(),
+          'lbl': '${f['id']} preparation',
+          'armed': true
+        }
+    ];
+    var snapshot = await s.snapshot(null);
+    expect((snapshot['flight'] as Map)['number'], 'Next');
+    expect((snapshot['steps'] as List).single['label'], 'Next preparation');
+    snapshot = await s.snapshot(s.key(airborne));
+    expect((snapshot['flight'] as Map)['number'], 'Next');
+    snapshot = await s.snapshot(s.key(later));
+    expect((snapshot['flight'] as Map)['number'], 'Later');
+    s.flights = [airborne];
+    snapshot = await s.snapshot(null);
+    expect(snapshot['flight'], isNull);
+    expect(snapshot['hasSchedules'], isTrue);
+    s.dispose();
+  });
 }

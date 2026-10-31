@@ -17,6 +17,7 @@ class NativeRosterPage extends StatefulWidget {
 class _NativeRosterPageState extends State<NativeRosterPage> {
   CrewClockStore get store => widget.store;
   int get _tab => widget.section;
+  bool _followUpcoming = true;
   late String _personalId, _intervalId;
   DateTime _day = DateUtils.dateOnly(DateTime.now()),
       _month = DateTime(DateTime.now().year, DateTime.now().month);
@@ -45,6 +46,7 @@ class _NativeRosterPageState extends State<NativeRosterPage> {
     final f = store.flightById(flight);
     setState(() {
       if (f != null) {
+        _followUpcoming = false;
         _day = DateUtils.dateOnly(
             store.zoned(store.departure(f), store.airportZone(f['depApt'])));
         _month = DateTime(_day.year, _day.month);
@@ -212,12 +214,15 @@ class _NativeRosterPageState extends State<NativeRosterPage> {
               Row(children: [
                 IconButton(
                     tooltip: 'Previous month',
-                    onPressed: () => setState(
-                        () => _month = DateTime(_month.year, _month.month - 1)),
+                    onPressed: () => setState(() {
+                          _followUpcoming = false;
+                          _month = DateTime(_month.year, _month.month - 1);
+                        }),
                     icon: const Icon(Icons.chevron_left)),
                 Expanded(
                     child: TextButton(
                         onPressed: () => setState(() {
+                              _followUpcoming = false;
                               _day = DateUtils.dateOnly(DateTime.now());
                               _month = DateTime(_day.year, _day.month);
                             }),
@@ -227,8 +232,10 @@ class _NativeRosterPageState extends State<NativeRosterPage> {
                                 fontSize: 18, fontWeight: FontWeight.bold)))),
                 IconButton(
                     tooltip: 'Next month',
-                    onPressed: () => setState(
-                        () => _month = DateTime(_month.year, _month.month + 1)),
+                    onPressed: () => setState(() {
+                          _followUpcoming = false;
+                          _month = DateTime(_month.year, _month.month + 1);
+                        }),
                     icon: const Icon(Icons.chevron_right))
               ]),
               Row(
@@ -254,7 +261,10 @@ class _NativeRosterPageState extends State<NativeRosterPage> {
                         selected: selected,
                         child: InkWell(
                             borderRadius: BorderRadius.circular(14),
-                            onTap: () => setState(() => _day = date),
+                            onTap: () => setState(() {
+                                  _followUpcoming = false;
+                                  _day = date;
+                                }),
                             child: Container(
                                 margin: const EdgeInsets.all(2),
                                 decoration: BoxDecoration(
@@ -409,6 +419,17 @@ class _NativeRosterPageState extends State<NativeRosterPage> {
   }
 
   Widget _roster() {
+    if (_followUpcoming) {
+      final next = store
+          .sortedFlights()
+          .where((f) => store.departure(f).isAfter(DateTime.now()))
+          .firstOrNull;
+      if (next != null) {
+        _day = DateUtils.dateOnly(store.zoned(
+            store.departure(next), store.airportZone(next['depApt'])));
+        _month = DateTime(_day.year, _day.month);
+      }
+    }
     final selected = store
         .sortedFlights()
         .where((f) =>

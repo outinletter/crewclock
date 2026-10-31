@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
-import 'widgets/alarm_status_badge.dart';
 import 'widgets/crewclock_header.dart';
 import 'widgets/crewclock_theme.dart';
 import 'widgets/inline_reminder_editor.dart';
@@ -193,23 +192,47 @@ class _CrewClockShellState extends State<CrewClockShell>
                           color: (data['next'] as Map?)?['id'] == step['id']
                               ? _teal
                               : _colors.outlineVariant))),
-              child: ListTile(
-                contentPadding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
-                leading: Text('${step['clock'] ?? step['time']}(L)',
-                    style: TextStyle(
-                        color: _colors.primary,
-                        fontSize: 19,
-                        fontFeatures: const [FontFeature.tabularFigures()],
-                        fontWeight: FontWeight.w700)),
-                title: Text('${step['label']}',
-                    style: const TextStyle(fontWeight: FontWeight.w600)),
-                subtitle: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('${step['offset'] ?? ''}'),
-                      AlarmStatusBadge(label: '${step['status']}'),
-                    ]),
+              child: Semantics(
+                label:
+                    '${step['label']}, ${step['clock']}, ${step['offset']}, ${step['status']}',
+                child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 10, vertical: 12),
+                    child: Row(children: [
+                      Text('${step['clock'] ?? step['time']}(L)',
+                          style: TextStyle(
+                              color: _colors.primary,
+                              fontSize: 17,
+                              fontFeatures: const [
+                                FontFeature.tabularFigures()
+                              ],
+                              fontWeight: FontWeight.w700)),
+                      const SizedBox(width: 10),
+                      Expanded(
+                          child: Tooltip(
+                              message: '${step['label']}',
+                              child: Text('${step['label']}',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w600)))),
+                      const SizedBox(width: 8),
+                      Text('${step['offset'] ?? ''}',
+                          style: TextStyle(
+                              fontSize: 12, color: _colors.onSurfaceVariant)),
+                      if (!['Scheduled', 'Done', 'Preview', 'Paused']
+                          .contains(step['status'])) ...[
+                        const SizedBox(width: 4),
+                        Tooltip(
+                            message: '${step['status']}',
+                            child: Icon(Icons.info_outline,
+                                size: 16,
+                                color: CrewClockTheme.statusColor(
+                                    '${step['status']}',
+                                    dark: _data?['dark'] == true))),
+                      ],
+                    ])),
               )),
         if (_addingReminder)
           InlineReminderEditor(
@@ -250,27 +273,27 @@ class _CrewClockShellState extends State<CrewClockShell>
 
   Widget _clock(Map clock, bool accent) => Container(
         key: ValueKey('briefing-clock-${clock['label']}'),
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(
-          color: _colors.surface,
+          color: accent ? _teal : _colors.surface,
           borderRadius: BorderRadius.circular(14),
         ),
         child: DefaultTextStyle.merge(
-          style: TextStyle(color: _colors.onSurface),
+          style: TextStyle(color: accent ? Colors.white : _colors.onSurface),
           child:
               Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             ConstrainedBox(
-                constraints: const BoxConstraints(minHeight: 40),
-                child: Text('${clock['label']}',
+                constraints: const BoxConstraints(minHeight: 24),
+                child: Text('${clock['label']}'.replaceAll(' departure', ''),
                     maxLines: 2,
                     style: const TextStyle(fontWeight: FontWeight.w600))),
-            const SizedBox(height: 10),
+            const SizedBox(height: 6),
             Text('${clock['time']}',
                 style: const TextStyle(
-                    fontSize: 26,
+                    fontSize: 24,
                     fontFeatures: [FontFeature.tabularFigures()],
                     fontWeight: FontWeight.w700)),
-            const SizedBox(height: 8),
+            const SizedBox(height: 4),
             Text(
                 '${clock['date']}${clock['dayOffset'] == null || clock['dayOffset'] == 0 ? '' : ' (${clock['dayOffset'] > 0 ? '+' : ''}${clock['dayOffset']}d)'}'),
             Text('${clock['zone']}'),
@@ -464,7 +487,6 @@ class _CrewClockShellState extends State<CrewClockShell>
         ),
       ],
       const SizedBox(height: 16),
-      _timeline(data),
       _title('Departure time across zones'),
       LayoutBuilder(builder: (context, size) {
         if (size.maxWidth < 320 ||
@@ -490,6 +512,8 @@ class _CrewClockShellState extends State<CrewClockShell>
       const SizedBox(height: 14),
       Text(
           'Same departure instant in three time zones. Flight reminders stay on ${flight['from']} local time when you travel.'),
+      const SizedBox(height: 16),
+      _timeline(data),
       const SizedBox(height: 12),
       Row(children: [
         Expanded(child: _title('Personal preparation')),
@@ -579,9 +603,12 @@ class _CrewClockShellState extends State<CrewClockShell>
               else if (_data?['flight'] != null)
                 _briefing(_data!)
               else ...[
-                _title('Your next duty, in one place.'),
-                const Text(
-                    'Import your roster to connect departure-local alarms, time-zone checks and a personal preparation list.'),
+                _title(_data?['hasSchedules'] == true
+                    ? 'No upcoming flights'
+                    : 'Your next duty, in one place.'),
+                Text(_data?['hasSchedules'] == true
+                    ? 'All registered flights have departed. Add your next roster to see its preparation alarms.'
+                    : 'Import your roster to connect departure-local alarms, time-zone checks and a personal preparation list.'),
                 const SizedBox(height: 20),
                 FilledButton(
                     onPressed: _busy || !widget.briefing.ready

@@ -261,4 +261,42 @@ void main() {
     expect(find.widgetWithText(TextField, 'Hours'), findsNothing);
     await tester.pumpWidget(const SizedBox());
   });
+  testWidgets('roster automatically focuses the next imported flight date',
+      (tester) async {
+    final store = await open(tester);
+    final at = DateTime.now().toUtc().add(const Duration(days: 5));
+    store.flights = [
+      {
+        'id': 'next',
+        'flight': 'KE955',
+        'depApt': 'ICN',
+        'arrApt': 'IST',
+        'departureUtc': at.toIso8601String()
+      }
+    ];
+    store.alarms = [
+      {
+        'id': 'next-alarm',
+        'fnum': 'KE955',
+        'depApt': 'ICN',
+        'arrApt': 'IST',
+        'dep': at.toIso8601String(),
+        'time': at.subtract(const Duration(hours: 1)).toIso8601String(),
+        'lbl': 'Upcoming flight preparation',
+        'armed': true,
+        'type': 'base'
+      }
+    ];
+    store.notifyListeners();
+    await tester.pumpAndSettle();
+    final row = find.byKey(const ValueKey('alarm-next-alarm'));
+    await tester.ensureVisible(row);
+    await tester.pumpAndSettle();
+    expect(find.text('Upcoming flight preparation'), findsOneWidget);
+    expect(
+        find.text(
+            '${store.date(store.zoned(at, 'Asia/Seoul'))} · Departure-airport local dates'),
+        findsOneWidget);
+    await tester.pumpWidget(const SizedBox());
+  });
 }

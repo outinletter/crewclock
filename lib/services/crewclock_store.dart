@@ -478,20 +478,23 @@ class CrewClockStore extends ChangeNotifier {
     if (!ready) throw StateError('Roster is loading');
     await refresh(notify: false);
     final sorted = sortedFlights();
+    final now = DateTime.now();
     Map<String, dynamic>? f = _demo;
     for (final candidate in sorted) {
-      if (key(candidate) == selected) {
+      if (key(candidate) == selected && departure(candidate).isAfter(now)) {
         f = candidate;
         break;
       }
     }
-    f ??= sorted
-        .where((x) =>
-            DateTime.tryParse('${x['arrivalUtc']}')?.isAfter(DateTime.now()) ??
-            departure(x).isAfter(DateTime.now()))
-        .firstOrNull;
-    f ??= sorted.lastOrNull;
-    if (f == null) return {'flight': null, 'flights': [], 'dark': dark};
+    f ??= sorted.where((x) => departure(x).isAfter(now)).firstOrNull;
+    if (f == null) {
+      return {
+        'flight': null,
+        'flights': [],
+        'dark': dark,
+        'hasSchedules': sorted.isNotEmpty
+      };
+    }
     final dep = departure(f),
         zone = airportZone(f['depApt']),
         state = _preparation(f);

@@ -80,6 +80,19 @@ void main() {
         .toList();
     expect(heights[1], heights[0]);
     expect(heights[2], heights[0]);
+    final clock = find.byKey(const ValueKey('briefing-clock-DFW departure'));
+    expect((tester.widget<Container>(clock).decoration as BoxDecoration).color,
+        const Color(0xff1676c8));
+    final timeline = find.byKey(const ValueKey('preparation-flight-list'));
+    expect(tester.getTopLeft(timeline).dy,
+        greaterThan(tester.getBottomLeft(clock).dy));
+    final row = find.byKey(const ValueKey('timeline-flight_b1'));
+    final label =
+        find.descendant(of: row, matching: find.text('Prepare for Duty'));
+    final offset = find.descendant(of: row, matching: find.text('-4h30m'));
+    expect(tester.getCenter(label).dy, closeTo(tester.getCenter(offset).dy, 1));
+    expect(find.descendant(of: row, matching: find.text('Scheduled')),
+        findsNothing);
     expect(find.text('Next preparation'), findsNothing);
     await tester.pumpWidget(const SizedBox());
   });
