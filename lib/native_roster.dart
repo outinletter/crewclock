@@ -397,24 +397,46 @@ class _NativeRosterPageState extends State<NativeRosterPage> {
               ])));
     }
     final offset = store.departure(flight).difference(at).inMinutes;
+    final status = store.status(a);
     return Card.outlined(
         key: ValueKey('alarm-${a['id']}'),
         margin: const EdgeInsets.only(top: 8),
-        child: ListTile(
-          contentPadding:
-              const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-          leading: Text('${store.clock(local)} (L)',
-              style: TextStyle(
-                  color: Theme.of(context).colorScheme.primary,
-                  fontSize: 19,
-                  fontWeight: FontWeight.w700)),
-          title: Text('${a['lbl']}',
-              style: const TextStyle(fontWeight: FontWeight.w600)),
-          subtitle:
-              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('${offset ~/ 60}h ${offset % 60}m before departure'),
-            AlarmStatusBadge(label: store.status(a)),
-          ]),
+        child: Semantics(
+          label: '${a['lbl']}, ${store.clock(local)}, $status',
+          child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+              child: Row(children: [
+                Text('${store.clock(local)}(L)',
+                    style: TextStyle(
+                        color: Theme.of(context).colorScheme.primary,
+                        fontSize: 17,
+                        fontFeatures: const [FontFeature.tabularFigures()],
+                        fontWeight: FontWeight.w700)),
+                const SizedBox(width: 10),
+                Expanded(
+                    child: Tooltip(
+                        message: '${a['lbl']}',
+                        child: Text('${a['lbl']}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                                fontSize: 14, fontWeight: FontWeight.w600)))),
+                const SizedBox(width: 8),
+                Text('${offset ~/ 60}h ${offset % 60}m',
+                    style: TextStyle(
+                        fontSize: 12,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant)),
+                if (!['Scheduled', 'Done', 'Paused'].contains(status)) ...[
+                  const SizedBox(width: 4),
+                  Tooltip(
+                      message: status,
+                      child: Icon(Icons.info_outline,
+                          size: 16,
+                          color: CrewClockTheme.statusColor(status,
+                              dark: Theme.of(context).brightness ==
+                                  Brightness.dark))),
+                ],
+              ])),
         ));
   }
 

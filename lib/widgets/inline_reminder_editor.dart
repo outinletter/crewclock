@@ -150,7 +150,9 @@ class _InlineReminderEditorState extends State<InlineReminderEditor> {
   Future<void> _save() async {
     FocusScope.of(context).unfocus();
     try {
-      final text = label.text.trim();
+      final entered = label.text.trim();
+      final text =
+          widget.repeat && entered.isEmpty ? 'Repeating reminder' : entered;
       if (text.isEmpty || text.length > 100) {
         throw const FormatException('Enter a label within 100 characters.');
       }
@@ -367,7 +369,9 @@ class _InlineReminderEditorState extends State<InlineReminderEditor> {
                       enabled: !disabled,
                       onChanged: (_) => changed(),
                       decoration: InputDecoration(
-                          labelText: 'Reminder label',
+                          labelText: widget.repeat
+                              ? 'Reminder label (optional)'
+                              : 'Reminder label',
                           border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(16),
                               borderSide: BorderSide.none))),

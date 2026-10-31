@@ -253,6 +253,13 @@ void main() {
     store.notifyListeners();
     await tester.pumpAndSettle();
     final row = find.byKey(const ValueKey('alarm-readonly-alarm'));
+    final label =
+        find.descendant(of: row, matching: find.text('Prepare for Duty'));
+    final offset = find.descendant(of: row, matching: find.text('1h 0m'));
+    expect(tester.getCenter(label).dy, closeTo(tester.getCenter(offset).dy, 1));
+    expect(tester.getSize(row).height, lessThan(65));
+    expect(
+        find.descendant(of: row, matching: find.byType(Column)), findsNothing);
     await tester.ensureVisible(row);
     await tester.pumpAndSettle();
     await tester.tap(find.text('Prepare for Duty'));

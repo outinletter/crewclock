@@ -83,4 +83,32 @@ void main() {
     }
     await tester.pumpWidget(const SizedBox());
   });
+  testWidgets(
+      'repeating reminders allow an empty name and retain minimum duration validation',
+      (tester) async {
+    String? savedLabel;
+    int? savedMinutes;
+    await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+            body: InlineReminderEditor(
+                label: '',
+                minutesBefore: 90,
+                repeat: true,
+                onSave: (label, minutes, _, __) async {
+                  savedLabel = label;
+                  savedMinutes = minutes;
+                }))));
+    await tester.tap(find.text('Save changes'));
+    await tester.pumpAndSettle();
+    expect(savedLabel, 'Repeating reminder');
+    expect(savedMinutes, 90);
+    savedMinutes = null;
+    await tester.enterText(find.widgetWithText(TextField, 'Hours'), '0');
+    await tester.enterText(find.widgetWithText(TextField, 'Minutes'), '0');
+    await tester.tap(find.text('Save changes'));
+    await tester.pumpAndSettle();
+    expect(savedMinutes, isNull);
+    expect(find.textContaining('at least 1 minute'), findsOneWidget);
+    await tester.pumpWidget(const SizedBox());
+  });
 }
