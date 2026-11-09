@@ -43,7 +43,7 @@ Map<String, dynamic> sample(String key) => {
           'armed': true,
           'label': 'Prepare for Duty',
           'clock': '09:25',
-          'offset': '-4h30m',
+          'offset': '-4h 30m',
           'time': '2099-03-10 09:25 DFW',
           'status': 'Scheduled'
         }
@@ -69,10 +69,17 @@ void main() {
         (key) async => sample(key ?? 'CC101'), (_, __, ___) async {});
     await tester.pumpAndSettle();
     expect(find.text('CC101 · DFW → ICN'), findsOneWidget);
+    final hero =
+        tester.getRect(find.byKey(const ValueKey('flight-preparation-card')));
+    final badge =
+        tester.getRect(find.byKey(const ValueKey('flight-plane-badge')));
+    expect(hero.contains(badge.topLeft), isTrue);
+    expect(hero.contains(badge.bottomRight), isTrue);
     expect(find.text('CrewClock'), findsOneWidget);
     expect(find.text('Next flight'), findsNothing);
-    expect(find.text('America/Chicago'), findsOneWidget);
-    expect(find.text('Asia/Seoul'), findsOneWidget);
+    expect(find.text('DFW'), findsOneWidget);
+    expect(find.text('ICN home'), findsOneWidget);
+    expect(find.text('UTC'), findsOneWidget);
     final heights = ['DFW departure', 'ICN home', 'UTC']
         .map((label) => tester
             .getSize(find.byKey(ValueKey('briefing-clock-$label')))
@@ -82,14 +89,14 @@ void main() {
     expect(heights[2], heights[0]);
     final clock = find.byKey(const ValueKey('briefing-clock-DFW departure'));
     expect((tester.widget<Container>(clock).decoration as BoxDecoration).color,
-        const Color(0xff1676c8));
+        Theme.of(tester.element(clock)).colorScheme.primary);
     final timeline = find.byKey(const ValueKey('preparation-flight-list'));
     expect(tester.getTopLeft(timeline).dy,
         greaterThan(tester.getBottomLeft(clock).dy));
     final row = find.byKey(const ValueKey('timeline-flight_b1'));
     final label =
         find.descendant(of: row, matching: find.text('Prepare for Duty'));
-    final offset = find.descendant(of: row, matching: find.text('-4h30m'));
+    final offset = find.descendant(of: row, matching: find.text('-4h 30m'));
     expect(tester.getCenter(label).dy, closeTo(tester.getCenter(offset).dy, 1));
     expect(find.descendant(of: row, matching: find.text('Scheduled')),
         findsNothing);

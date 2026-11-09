@@ -8,12 +8,17 @@ import SwiftUI
 import AVFoundation
 import UniformTypeIdentifiers
 import SQLite3
+import Vision
+import PhotosUI
+import CoreImage
+import PDFKit
 
 @main
-@objc class AppDelegate: FlutterAppDelegate, FlutterImplicitEngineDelegate, UIDocumentPickerDelegate {
+@objc class AppDelegate: FlutterAppDelegate, FlutterImplicitEngineDelegate, UIDocumentPickerDelegate, PHPickerViewControllerDelegate {
   private var rosterImportResult: FlutterResult?
   private var soundPreview: AVAudioPlayer?
   private var alarmDismissObserver: NSObjectProtocol?
+  private var surfaceRouteObserver: NSObjectProtocol?
   override func application(
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
@@ -29,20 +34,19 @@ import SQLite3
     alarmDismissObserver = NotificationCenter.default.addObserver(
       forName: Notification.Name("crewclock.alarmDismissed"), object: nil, queue: .main
     ) { _ in channel.invokeMethod("alarmDismissed", arguments: nil) }
+    surfaceRouteObserver = NotificationCenter.default.addObserver(forName: Notification.Name("crewclock.openAlarms"), object: nil, queue: .main) { _ in channel.invokeMethod("openAlarms", arguments: nil) }
     channel.setMethodCallHandler { [weak self] call, result in
       Task { @MainActor in
         do {
           switch call.method {
+          case "pickRosterImage":
+            self?.pickRosterImage(result)
           case "pickRosterFile":
             self?.pickRosterFile(result)
           case "readLegacyData":
             result(self?.readLegacyData() ?? [:])
           case "readIntervalAlarms":
             result(UserDefaults.standard.array(forKey: "crewclock.intervals") ?? [])
-          case "shareDutyBriefing":
-            guard let owner = self else { throw NSError(domain: "CrewClock", code: 3) }
-            try owner.shareDutyBriefing(call.arguments as? [String: Any] ?? [:])
-            result(nil)
           case "syncIntervalAlarms":
             let args = call.arguments as? [String: Any] ?? [:]
             result(try await CrewIntervalReminders.sync(args["records"] as? [[String: Any]] ?? [],
@@ -52,6 +56,20 @@ import SQLite3
           case "setAlarmPrivacy":
             UserDefaults.standard.set(call.arguments as? Bool == true, forKey: "crewclock.privateLabels")
             result(nil)
+          case "syncSystemSurfaces":
+            if #available(iOS 16.2, *) { try await CrewSurfaceHub.shared.publish(call.arguments as? [String: Any] ?? [:]) }
+            result(nil)
+          case "consumeSurfaceRoute":
+            let open = UserDefaults.standard.bool(forKey: "crewclock.openAlarms")
+            UserDefaults.standard.removeObject(forKey: "crewclock.openAlarms")
+            result(open)
+          case "getAlarmDiagnostics":
+            let notification = await UNUserNotificationCenter.current().notificationSettings()
+            var alarmAllowed = false
+            if #available(iOS 26.0, *) { alarmAllowed = AlarmManager.shared.authorizationState == .authorized }
+            result(["alarmAllowed": alarmAllowed, "deviceTimeZone": TimeZone.current.identifier,
+              "notificationsAllowed": notification.authorizationStatus == .authorized || notification.authorizationStatus == .provisional,
+              "stopHistory": UserDefaults.standard.array(forKey: "crewclock.stopHistory") ?? []])
           case "getAlarmStatus":
             result(try await self?.alarmStatus(call.arguments as? [[String: Any]] ?? []) ?? [:])
           case "getAvailableNotificationSlots":
@@ -67,6 +85,9 @@ import SQLite3
           case "scheduleAlarms":
             let args = call.arguments as? [String: Any] ?? [:]
             let records = args["records"] as? [[String: Any]] ?? []
+            var labels = UserDefaults.standard.dictionary(forKey: "crewclock.alarmLabels") as? [String: String] ?? [:]
+            for record in records { if let id = record["id"] as? String, let label = record["lbl"] as? String { labels[id] = label } }
+            UserDefaults.standard.set(labels, forKey: "crewclock.alarmLabels")
             if records.isEmpty {
               let center = UNUserNotificationCenter.current()
               let pending = await center.pendingNotificationRequests()
@@ -141,20 +162,61 @@ import SQLite3
       return
     }
     let info = response.notification.request.content.userInfo
-    if let source = (info["crewclockSourceID"] ?? info["payload"]) as? String {
+    let source = (info["crewclockSourceID"] ?? info["payload"]) as? String
+    if let source {
       if #available(iOS 26.0, *),
         let mapping = UserDefaults.standard.dictionary(forKey: "crewclock.alarmIDs") as? [String: String],
         let raw = mapping[source], let uuid = UUID(uuidString: raw) {
         do { try CrewSystemAlarms.dismiss(uuid) }
         catch { NSLog("[CrewClock] Stop alarm failed: %@", error.localizedDescription) }
-      } else {
-        recordAlarmDismissal(source)
-      }
+      } else { recordAlarmDismissal(source) }
     }
-    let ids = [response.notification.request.identifier]
-    center.removePendingNotificationRequests(withIdentifiers: ids)
-    center.removeDeliveredNotifications(withIdentifiers: ids)
-    completionHandler()
+    Task {
+      var ids = [response.notification.request.identifier]
+      if let source {
+        let base = source.hasPrefix("backup_") ? String(source.dropFirst(7)) : source
+        let pending = await center.pendingNotificationRequests()
+        ids += pending.filter { request in
+          let value = (request.content.userInfo["crewclockSourceID"] ?? request.content.userInfo["payload"]) as? String
+          return value == base || value == "backup_" + base
+        }.map { $0.identifier }
+      }
+      center.removePendingNotificationRequests(withIdentifiers: ids)
+      center.removeDeliveredNotifications(withIdentifiers: ids)
+      completionHandler()
+    }
+  }
+
+  @MainActor private func pickRosterImage(_ result: @escaping FlutterResult) {
+    guard rosterImportResult == nil, let root = UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene }).flatMap({ $0.windows }).first(where: { $0.isKeyWindow })?.rootViewController else {
+      result(FlutterError(code: "IMPORT_BUSY", message: "Close the current picker first.", details: nil)); return
+    }
+    var presenter = root
+    while let presented = presenter.presentedViewController { presenter = presented }
+    var config = PHPickerConfiguration()
+    config.filter = .images; config.selectionLimit = 1
+    let picker = PHPickerViewController(configuration: config)
+    picker.delegate = self; rosterImportResult = result
+    presenter.present(picker, animated: true)
+  }
+
+  func picker(_ picker: PHPickerViewController, didFinishPicking results: [PHPickerResult]) {
+    let callback = rosterImportResult; rosterImportResult = nil
+    picker.dismiss(animated: true)
+    guard let provider = results.first?.itemProvider else { callback?(nil); return }
+    provider.loadObject(ofClass: UIImage.self) { item, error in
+      do {
+        guard let image = item as? UIImage else { throw error ?? NSError(domain: "CrewClock", code: 4, userInfo: [NSLocalizedDescriptionKey: "Unable to read the selected image."]) }
+        // Render orientation before OCR so camera and rotated screenshots share coordinates.
+        let factor = min(1, 4096 / max(image.size.width, image.size.height))
+        let size = CGSize(width: image.size.width * factor, height: image.size.height * factor)
+        let format = UIGraphicsImageRendererFormat(); format.scale = 1; format.opaque = true
+        let normalized = UIGraphicsImageRenderer(size: size, format: format).image { _ in image.draw(in: CGRect(origin: .zero, size: size)) }
+        guard let cg = normalized.cgImage else { throw NSError(domain: "CrewClock", code: 4) }
+        let text = try recognizeRosterCalendar(cg)
+        DispatchQueue.main.async { callback?(["text": text]) }
+      } catch { DispatchQueue.main.async { callback?(FlutterError(code: "IMAGE_IMPORT_FAILED", message: error.localizedDescription, details: nil)) } }
+    }
   }
 
   @MainActor private func pickRosterFile(_ result: @escaping FlutterResult) {
@@ -166,7 +228,7 @@ import SQLite3
     var presenter = root
     while let presented = presenter.presentedViewController { presenter = presented }
     let picker = UIDocumentPickerViewController(forOpeningContentTypes:
-      [UTType(filenameExtension: "ics") ?? .plainText, UTType(filenameExtension: "ical") ?? .plainText, .plainText], asCopy: true)
+      [UTType(filenameExtension: "ics") ?? .plainText, UTType(filenameExtension: "ical") ?? .plainText, .plainText, .pdf], asCopy: true)
     picker.allowsMultipleSelection = false
     picker.delegate = self
     rosterImportResult = result
@@ -187,6 +249,25 @@ import SQLite3
       guard size <= 5_000_000 else { throw NSError(domain: "CrewClock", code: 4,
         userInfo: [NSLocalizedDescriptionKey: "Choose a roster smaller than 5 MB."]) }
       let data = try Data(contentsOf: url)
+      if url.pathExtension.lowercased() == "pdf" {
+        guard let pdf = PDFDocument(data: data), pdf.pageCount > 0, pdf.pageCount <= 12 else { throw NSError(domain: "CrewClock", code: 4, userInfo: [NSLocalizedDescriptionKey: "Choose a PDF with 1–12 pages."]) }
+        DispatchQueue.global(qos: .userInitiated).async {
+          do {
+            var pages: [String] = []
+            for index in 0..<pdf.pageCount {
+              guard let page = pdf.page(at: index) else { continue }
+              let bounds = page.bounds(for: .mediaBox)
+              let image = page.thumbnail(of: CGSize(width: 2400, height: 2400 * bounds.height / bounds.width), for: .mediaBox)
+              guard let cg = image.cgImage else { continue }
+              pages.append(try recognizeRosterCalendar(cg))
+            }
+            let months = Set(pages.compactMap { $0.components(separatedBy: "\n").first })
+            guard months.count == 1, !pages.isEmpty else { throw NSError(domain: "CrewClock", code: 4, userInfo: [NSLocalizedDescriptionKey: "Import one monthly roster at a time. Each PDF page must contain a complete monthly calendar."]) }
+            DispatchQueue.main.async { callback?(["name": url.lastPathComponent, "text": pages.joined(separator: "\n")]) }
+          } catch { DispatchQueue.main.async { callback?(FlutterError(code: "PDF_IMPORT_FAILED", message: error.localizedDescription, details: nil)) } }
+        }
+        return
+      }
       guard let text = String(data: data, encoding: .utf8) ?? String(data: data, encoding: .utf16) else {
         throw NSError(domain: "CrewClock", code: 4, userInfo: [NSLocalizedDescriptionKey: "Use a UTF-8 calendar or text file."])
       }
@@ -224,38 +305,6 @@ import SQLite3
     return values
   }
 
-  @MainActor private func shareDutyBriefing(_ args: [String: Any]) throws {
-    guard let lines = args["lines"] as? [String], lines.count <= 50,
-      lines.allSatisfy({ $0.count <= 2000 }),
-      let root = UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene })
-        .flatMap({ $0.windows }).first(where: { $0.isKeyWindow })?.rootViewController else {
-      throw NSError(domain: "CrewClock", code: 3, userInfo: [NSLocalizedDescriptionKey: "Unable to export flight preparation."])
-    }
-    let title = String((args["title"] as? String ?? "CrewClock Flight Preparation").prefix(100))
-    let bounds = CGRect(x: 0, y: 0, width: 595, height: 842)
-    let renderer = UIGraphicsPDFRenderer(bounds: bounds)
-    let url = FileManager.default.temporaryDirectory.appendingPathComponent("CrewClock-\(UUID().uuidString).pdf")
-    try renderer.writePDF(to: url) { context in
-      context.beginPage()
-      var y: CGFloat = 40
-      let paragraphs = [title] + lines
-      for (index, text) in paragraphs.enumerated() {
-        let attributes: [NSAttributedString.Key: Any] = [.font: index == 0 ? UIFont.boldSystemFont(ofSize: 20) : UIFont.systemFont(ofSize: 12), .foregroundColor: UIColor.black]
-        let height = ceil((text as NSString).boundingRect(with: CGSize(width: 515, height: CGFloat.greatestFiniteMagnitude), options: [.usesLineFragmentOrigin, .usesFontLeading], attributes: attributes, context: nil).height) + 8
-        if y + height > 802 { context.beginPage(); y = 40 }
-        (text as NSString).draw(in: CGRect(x: 40, y: y, width: 515, height: height), withAttributes: attributes)
-        y += height + 6
-      }
-    }
-    var presenter = root
-    while let presented = presenter.presentedViewController { presenter = presented }
-    let sheet = UIActivityViewController(activityItems: [url], applicationActivities: nil)
-    sheet.popoverPresentationController?.sourceView = presenter.view
-    sheet.popoverPresentationController?.sourceRect = CGRect(x: presenter.view.bounds.midX, y: presenter.view.bounds.midY, width: 1, height: 1)
-    sheet.completionWithItemsHandler = { _, _, _, _ in try? FileManager.default.removeItem(at: url) }
-    presenter.present(sheet, animated: true)
-  }
-
   @MainActor private func chooseSound(_ result: @escaping FlutterResult) {
     guard let root = UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene })
       .flatMap({ $0.windows }).first(where: { $0.isKeyWindow })?.rootViewController else {
@@ -263,7 +312,7 @@ import SQLite3
     }
     var presenter = root
     while let presented = presenter.presentedViewController { presenter = presented }
-    let picker = UIAlertController(title: "Alarm Sound", message: nil, preferredStyle: .actionSheet)
+    let picker = UIAlertController(title: "Alarm Sound", message: nil, preferredStyle: .alert)
     for (label, name) in [("System Default", ""), ("CrewClock Beep", "crewclock_beep.caf")] {
       picker.addAction(UIAlertAction(title: label, style: .default) { [weak self] _ in
         do {
@@ -281,9 +330,6 @@ import SQLite3
       })
     }
     picker.addAction(UIAlertAction(title: "Cancel", style: .cancel) { _ in result(nil) })
-    picker.popoverPresentationController?.sourceView = presenter.view
-    picker.popoverPresentationController?.sourceRect = CGRect(x: presenter.view.bounds.midX,
-      y: presenter.view.bounds.midY, width: 1, height: 1)
     presenter.present(picker, animated: true)
   }
 
@@ -446,9 +492,24 @@ enum CrewIntervalReminders {
     let mapping = defaults.dictionary(forKey: "crewclock.intervalAlarmIDs") as? [String: String] ?? [:]
     guard mapping[sourceID] == alarmID, let uuid = UUID(uuidString: alarmID) else { return }
     let records = defaults.array(forKey: "crewclock.intervals") as? [[String: Any]] ?? []
-    guard let record = records.first(where: { $0["id"] as? String == sourceID && $0["enabled"] as? Bool == true }) else { return }
-    if try AlarmManager.shared.alarms.contains(where: { $0.id == uuid }) { try AlarmManager.shared.stop(id: uuid) }
-    _ = try await AlarmManager.shared.schedule(id: uuid, configuration: configuration(record: record, uuid: uuid, date: nextDate(record)))
+    guard records.contains(where: { $0["id"] as? String == sourceID && $0["enabled"] as? Bool == true }) else { return }
+    var updated = records
+    guard let index = updated.firstIndex(where: { $0["id"] as? String == sourceID }) else { return }
+    updated[index]["anchor"] = Date().timeIntervalSince1970 * 1000
+    let nextID = UUID()
+    let date = nextDate(updated[index])
+    // Reserve the next occurrence before stopping the current one.
+    _ = try await AlarmManager.shared.schedule(id: nextID,
+      configuration: configuration(record: updated[index], uuid: nextID, date: date))
+    var nextMapping = mapping
+    nextMapping[sourceID] = nextID.uuidString
+    defaults.set(updated, forKey: "crewclock.intervals")
+    defaults.set(nextMapping, forKey: "crewclock.intervalAlarmIDs")
+    if try AlarmManager.shared.alarms.contains(where: { $0.id == uuid }) {
+      try AlarmManager.shared.stop(id: uuid)
+    }
+    recordAlarmStop(sourceID, kind: "repeating")
+    if #available(iOS 16.2, *) { await CrewSurfaceHub.shared.refreshFromSystem() }
   }
 
 }
@@ -598,16 +659,35 @@ enum CrewSystemAlarms {
     }
     let mapping = defaults.dictionary(forKey: "crewclock.alarmIDs") as? [String: String] ?? [:]
     if let source = mapping.first(where: { $0.value == uuid.uuidString })?.key {
-      recordAlarmDismissal(source)
+      let base = source.hasPrefix("backup_") ? String(source.dropFirst(7)) : source
+      for key in [base, "backup_" + base] {
+        if let raw = mapping[key], let other = UUID(uuidString: raw), other != uuid {
+          try? AlarmManager.shared.cancel(id: other)
+        }
+      }
+      recordAlarmDismissal(base)
     }
   }
 }
 
-private func recordAlarmDismissal(_ source: String) {
+private func recordAlarmStop(_ source: String, kind: String) {
+  let defaults = UserDefaults.standard
+  var history = defaults.array(forKey: "crewclock.stopHistory") as? [[String: Any]] ?? []
+  let intervals = defaults.array(forKey: "crewclock.intervals") as? [[String: Any]] ?? []
+  let labels = defaults.dictionary(forKey: "crewclock.alarmLabels") as? [String: String] ?? [:]
+  let label = labels[source] ?? (intervals.first { $0["id"] as? String == source }?["label"] as? String) ?? "Alarm"
+  history.append(["sourceID": source, "label": label, "kind": kind, "stoppedAt": Date().timeIntervalSince1970 * 1000])
+  defaults.set(Array(history.suffix(100)), forKey: "crewclock.stopHistory")
+}
+
+private func recordAlarmDismissal(_ rawSource: String) {
+  let source = rawSource.hasPrefix("backup_") ? String(rawSource.dropFirst(7)) : rawSource
+  recordAlarmStop(source, kind: "personal-or-flight")
   var ids = UserDefaults.standard.stringArray(forKey: "crewclock.dismissed") ?? []
   if !ids.contains(source) { ids.append(source) }
   UserDefaults.standard.set(ids, forKey: "crewclock.dismissed")
   NotificationCenter.default.post(name: Notification.Name("crewclock.alarmDismissed"), object: nil)
+  if #available(iOS 16.2, *) { Task { @MainActor in await CrewSurfaceHub.shared.refreshFromSystem() } }
 }
 
 @available(iOS 26.0, *)
@@ -645,7 +725,7 @@ struct CrewSnoozeIntent: LiveActivityIntent {
 
 @available(iOS 26.0, *)
 struct CrewIntervalStopIntent: LiveActivityIntent {
-  static var title: LocalizedStringResource = "Stop and continue interval reminder"
+  static var title: LocalizedStringResource = "Stop and repeat interval reminder"
   @Parameter(title: "Source ID") var sourceID: String
   @Parameter(title: "Alarm ID") var alarmID: String
   init() {}
@@ -654,4 +734,52 @@ struct CrewIntervalStopIntent: LiveActivityIntent {
     try await CrewIntervalReminders.advance(sourceID: sourceID, alarmID: alarmID)
     return .result()
   }
+}
+
+// Geometry preserves calendar cells; plain OCR reading order can mix adjacent dates.
+private func recognizeRosterCalendar(_ image: CGImage) throws -> String {
+  let request = VNRecognizeTextRequest()
+  request.recognitionLevel = .accurate
+  request.recognitionLanguages = ["en-US"]
+  request.usesLanguageCorrection = false
+  try VNImageRequestHandler(cgImage: image).perform([request])
+  let lines = (request.results ?? []).compactMap { observation -> (String, CGRect)? in
+    guard let candidate = observation.topCandidates(1).first else { return nil }
+    return (candidate.string, observation.boundingBox)
+  }
+  let monthPattern = #"(?i)^(January|February|March|April|May|June|July|August|September|October|November|December)\s+20[0-9]{2}$"#
+  guard let title = lines.first(where: { $0.0.range(of: monthPattern, options: .regularExpression) != nil })?.0 else {
+    throw NSError(domain: "CrewClock", code: 4, userInfo: [NSLocalizedDescriptionKey: "Month and year were not recognized. Choose a full, clear monthly roster image."])
+  }
+  let anchors = lines.filter { $0.0.range(of: #"(?i)^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+[0-9]{1,2}$"#, options: .regularExpression) != nil }
+  guard anchors.count >= 28 else { throw NSError(domain: "CrewClock", code: 4, userInfo: [NSLocalizedDescriptionKey: "Calendar dates are incomplete. Choose the full monthly roster."]) }
+  var output = [title]
+  let ordered = anchors.sorted { Int($0.0.split(separator: " ").last!)! < Int($1.0.split(separator: " ").last!)! }
+  let xs = anchors.map { $0.1.minX }.sorted()
+  let left = xs.first! - 0.008
+  let columnWidth = (xs.last! - xs.first!) / 6
+  let imageContext = CIContext(options: [.cacheIntermediates: false])
+  for anchor in ordered {
+    let column = Int(((anchor.1.minX - left) / columnWidth).rounded(.down))
+    let nextRow = anchors.filter { $0.1.midY < anchor.1.midY - 0.04 }.map { $0.1.midY }.max() ?? 0
+    let top = anchor.1.midY - 0.006
+    let bottom = nextRow + 0.015
+    let rect = CGRect(x: max(0, left + CGFloat(column) * columnWidth) * CGFloat(image.width),
+      y: (1 - top) * CGFloat(image.height),
+      width: min(columnWidth, 1 - max(0, left + CGFloat(column) * columnWidth)) * CGFloat(image.width),
+      height: max(0.001, top - bottom) * CGFloat(image.height)).integral
+    guard let cropped = image.cropping(to: rect) else { continue }
+    let scaled = CIImage(cgImage: cropped).transformed(by: CGAffineTransform(scaleX: 3, y: 3))
+    let enlarged = imageContext.createCGImage(scaled, from: scaled.extent) ?? cropped
+    let cellRequest = VNRecognizeTextRequest()
+    cellRequest.recognitionLevel = .accurate
+    cellRequest.recognitionLanguages = ["en-US"]
+    cellRequest.usesLanguageCorrection = false
+    cellRequest.customWords = ["KE", "DH", "ICN", "IST", "PRG", "DFW", "DPS", "HKT", "GMP"]
+    try VNImageRequestHandler(cgImage: enlarged).perform([cellRequest])
+    let cell = (cellRequest.results ?? []).sorted { $0.boundingBox.midY > $1.boundingBox.midY }
+    output.append(anchor.0)
+    output.append(contentsOf: cell.compactMap { $0.topCandidates(1).first?.string })
+  }
+  return output.joined(separator: "\n")
 }

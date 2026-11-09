@@ -1,3 +1,6 @@
+import 'package:crewclock/widgets/centered_date_time_picker.dart';
+import 'package:crewclock/native_home.dart';
+import 'native_briefing_test.dart' show sample;
 import 'package:crewclock/native_roster.dart';
 import 'package:crewclock/widgets/crewclock_header.dart';
 import 'package:crewclock/services/crewclock_store.dart';
@@ -30,7 +33,8 @@ class ToolsStore extends CrewClockStore {
   }
 
   @override
-  Future<void> importFlights(List<Map<String, dynamic>> flights) async {
+  Future<void> importFlights(List<Map<String, dynamic>> flights,
+      {List<Map<String, dynamic>>? nonFlights}) async {
     imported = flights;
   }
 }
@@ -44,6 +48,7 @@ void main() {
     final s = ToolsStore();
     s.parser.zones = {
       'ICN': 'Asia/Seoul',
+      'GMP': 'Asia/Seoul',
       'DFW': 'America/Chicago',
       'IST': 'Europe/Istanbul'
     };
@@ -78,7 +83,8 @@ void main() {
     expect(tester.getCenter(find.text('Add flight')).dx, greaterThan(195));
     await tester.tap(find.text('Settings').first);
     await tester.pumpAndSettle();
-    expect(find.text('Home base'), findsOneWidget);
+    expect(find.text('Home base · International'), findsOneWidget);
+    expect(find.text('Home base · Domestic'), findsOneWidget);
     expect(find.text('Private alarm labels'), findsNothing);
     await tester.tap(find.text('Alarms').first);
     await tester.pumpAndSettle();
@@ -86,7 +92,7 @@ void main() {
     expect(find.text('Check / retry alarms'), findsNothing);
     expect(find.text('Stop ringing'), findsNothing);
     expect(find.text('iOS alarm / notification permissions'), findsNothing);
-    expect(find.byType(CupertinoDatePicker), findsOneWidget);
+    expect(find.byType(CenteredDateTimePicker), findsOneWidget);
     expect(find.byType(BottomSheet), findsNothing);
     expect(find.text('System alarms enabled'), findsNothing);
     final personal = find.byWidgetPredicate((w) =>
@@ -116,24 +122,18 @@ void main() {
     final card = find.byKey(const ValueKey('preset-base-b2'));
     await tester.scrollUntilVisible(card, 300,
         scrollable: find.byType(Scrollable).first);
-    final hours = find.descendant(
-        of: card, matching: find.widgetWithText(TextField, 'Hours'));
-    final minutes = find.descendant(
-        of: card, matching: find.widgetWithText(TextField, 'Minutes'));
+    final wheels =
+        find.descendant(of: card, matching: find.byType(CupertinoPicker));
+    final hours = wheels.at(0), minutes = wheels.at(1);
     await tester.ensureVisible(hours);
     await tester.pumpAndSettle();
-    expect(
-        tester.getTopLeft(hours).dy, closeTo(tester.getTopLeft(minutes).dy, 1));
-    final label = find.descendant(
-        of: card, matching: find.widgetWithText(TextField, 'Reminder'));
+    final label =
+        find.descendant(of: card, matching: find.byType(TextField)).first;
     expect(tester.getCenter(label).dy, closeTo(tester.getCenter(hours).dy, 1));
-    expect(tester.getSize(hours).width, lessThanOrEqualTo(90));
-    expect(tester.getSize(hours).height, 44);
-    expect(tester.widget<TextField>(hours).textAlignVertical,
-        TextAlignVertical.center);
     expect(tester.getSize(card).height, lessThanOrEqualTo(120));
-    await tester.enterText(hours, '4');
-    await tester.enterText(minutes, '15');
+    tester.widget<CupertinoPicker>(hours).scrollController!.jumpToItem(4);
+    tester.widget<CupertinoPicker>(minutes).scrollController!.jumpToItem(15);
+    await tester.pumpAndSettle();
     await tester.pump(const Duration(milliseconds: 700));
     await tester.pumpAndSettle();
     expect(find.descendant(of: card, matching: find.byType(Checkbox)),
@@ -151,6 +151,10 @@ void main() {
     await tester.pumpAndSettle();
     await tester.dragFrom(
         tester.getTopRight(card) + const Offset(-5, 20), const Offset(-350, 0));
+    await tester.pumpAndSettle();
+    expect(store.maps(store.settings['baseOffs']).any((p) => p['id'] == 'b2'),
+        isTrue);
+    await tester.tap(find.byTooltip('Delete reminder'));
     await tester.pumpAndSettle();
     expect(store.maps(store.settings['baseOffs']).any((p) => p['id'] == 'b2'),
         isFalse);
@@ -280,7 +284,7 @@ void main() {
     await tester.tap(find.text('Prepare for Duty'));
     await tester.pumpAndSettle();
     expect(find.byType(BottomSheet), findsNothing);
-    expect(find.widgetWithText(TextField, 'Hours'), findsNothing);
+    expect(find.byKey(const ValueKey('preset-hours')), findsNothing);
     await tester.pumpWidget(const SizedBox());
   });
   testWidgets('roster automatically focuses the next imported flight date',
@@ -317,7 +321,7 @@ void main() {
     expect(find.text('Upcoming flight preparation'), findsOneWidget);
     expect(
         find.text(
-            '${store.date(store.zoned(at, 'Asia/Seoul'))} · Departure-airport local dates'),
+            '${store.date(store.zoned(at, 'Asia/Seoul'))} · Departure local date'),
         findsOneWidget);
     await tester.pumpWidget(const SizedBox());
   });
@@ -342,6 +346,172 @@ void main() {
     expect(record['minutes'], 60);
     expect(record['enabled'], isTrue);
     expect(find.textContaining('Invalid repeating reminder'), findsNothing);
+    await tester.pumpWidget(const SizedBox());
+  });
+  testWidgets('roster calendar stays fixed when schedule list scrolls',
+      (tester) async {
+    final s = await open(tester);
+    final dep = DateTime.now().toUtc().add(const Duration(days: 2));
+    s.flights = [
+      {
+        'id': 'fixed',
+        'flight': 'KE955',
+        'depApt': 'ICN',
+        'arrApt': 'IST',
+        'departureUtc': dep.toIso8601String()
+      }
+    ];
+    s.alarms = List.generate(
+        12,
+        (i) => {
+              'id': 'a$i',
+              'fnum': 'KE955',
+              'depApt': 'ICN',
+              'arrApt': 'IST',
+              'dep': dep.toIso8601String(),
+              'time': dep.subtract(Duration(minutes: i + 1)).toIso8601String(),
+              'lbl': 'Prepare $i',
+              'armed': true
+            });
+    s.notifyListeners();
+    await tester.pumpAndSettle();
+    final calendar = find.byKey(const ValueKey('roster-calendar'));
+    final before = tester.getTopLeft(calendar);
+    expect(tester.getSize(calendar).height, lessThan(310));
+    final list = find.byKey(const ValueKey('roster-schedule-list'));
+    await tester.drag(list, const Offset(0, -250));
+    await tester.pumpAndSettle();
+    expect(tester.getTopLeft(calendar), before);
+    final position = tester
+        .state<ScrollableState>(
+            find.descendant(of: list, matching: find.byType(Scrollable)).first)
+        .position;
+    expect(position.pixels, greaterThan(0));
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox());
+  });
+  testWidgets('home base accepts multiple comma separated airports',
+      (tester) async {
+    final s = await open(tester);
+    await tester.tap(find.text('Settings').first);
+    await tester.pumpAndSettle();
+    final editor = find.byType(InlineHomeBaseEditor).first;
+    final input = find.descendant(of: editor, matching: find.byType(TextField));
+    await tester.enterText(input, 'icn, DFW, ICN');
+    FocusManager.instance.primaryFocus?.unfocus();
+    await tester.pumpAndSettle();
+    await tester.tap(find.descendant(of: editor, matching: find.text('Save')));
+    await tester.pumpAndSettle();
+    expect(s.settings['baseApt'], 'ICN, DFW');
+    expect(s.presetGroup({'depApt': 'DFW'}), 'base');
+    expect(s.home, 'ICN');
+    await tester.pumpWidget(const SizedBox());
+  });
+  testWidgets('personal and repeating lists appear below their creation forms',
+      (tester) async {
+    final s = await open(tester);
+    s.alarms = [
+      {
+        'id': 'personal-list',
+        'type': 'direct',
+        'lbl': 'Saved personal',
+        'time': DateTime.now()
+            .toUtc()
+            .add(const Duration(hours: 2))
+            .toIso8601String(),
+        'armed': true
+      }
+    ];
+    s.intervals = [
+      {
+        'id': 'interval_123',
+        'label': 'Repeating reminder',
+        'minutes': 90,
+        'enabled': true
+      }
+    ];
+    await tester.tap(find.text('Alarms').first);
+    await tester.pumpAndSettle();
+    final personalForm = find.byWidgetPredicate((w) =>
+        w.key is ValueKey<String> &&
+        (w.key as ValueKey<String>).value.startsWith('new-personal-'));
+    expect(tester.getTopLeft(find.text('Saved personal')).dy,
+        greaterThan(tester.getBottomLeft(personalForm).dy));
+    final repeatForm = find.byWidgetPredicate((w) =>
+        w.key is ValueKey<String> &&
+        (w.key as ValueKey<String>).value.startsWith('new-interval-'));
+    await tester.scrollUntilVisible(find.text('Every 1h 30m'), 180,
+        scrollable: find.byType(Scrollable).first);
+    expect(tester.getTopLeft(find.text('Every 1h 30m')).dy,
+        greaterThan(tester.getBottomLeft(repeatForm).dy));
+    final tile = find
+        .ancestor(
+            of: find.text('Every 1h 30m'), matching: find.byType(ListTile))
+        .first;
+    expect(
+        find
+            .descendant(of: tile, matching: find.byType(Text))
+            .evaluate()
+            .length,
+        2);
+    expect(find.descendant(of: tile, matching: find.text('Scheduled')),
+        findsNothing);
+    expect(find.text('Repeating reminder'), findsNothing);
+    expect(find.byIcon(Icons.repeat), findsNothing);
+    await tester.pumpWidget(const SizedBox());
+  });
+  testWidgets(
+      'keyboard keeps reminder label visible while time controls use rollers',
+      (tester) async {
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final s = await open(tester);
+    final bridge = FlightBriefingController()
+      ..connect((_) async => sample('CC101'), (_, __, ___) async {});
+    await tester.pumpWidget(MaterialApp(
+        home: CrewClockShell(
+            briefing: bridge,
+            tools: NativeRosterPage(store: s),
+            alarms: NativeRosterPage(store: s, section: 1),
+            settings: NativeRosterPage(store: s, section: 2))));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Settings').last);
+    await tester.pumpAndSettle();
+    final field = find.descendant(
+        of: find.byKey(const ValueKey('preset-base-b1')),
+        matching: find.byType(TextField));
+    await tester.ensureVisible(field);
+    await tester.pumpAndSettle();
+    final editable =
+        find.descendant(of: field, matching: find.byType(EditableText));
+    final before = tester.getTopLeft(editable).dy - tester.getTopLeft(field).dy;
+    final height = tester.getSize(field).height;
+    await tester.showKeyboard(field);
+    tester.view.viewInsets = const FakeViewPadding(bottom: 300);
+    addTearDown(tester.view.resetViewInsets);
+    await tester.pumpAndSettle();
+    expect(tester.getBottomLeft(field).dy, lessThanOrEqualTo(844 - 300));
+    expect(tester.getTopLeft(editable).dy - tester.getTopLeft(field).dy,
+        closeTo(before, 1));
+    expect(tester.getSize(field).height, height);
+    final position = tester.getTopLeft(field).dy;
+    await tester.enterText(field, '1');
+    await tester.pump(const Duration(milliseconds: 700));
+    await tester.pumpAndSettle();
+    expect(tester.getTopLeft(field).dy, closeTo(position, 1));
+    expect(tester.getTopLeft(editable).dy - tester.getTopLeft(field).dy,
+        closeTo(before, 1));
+    expect(find.byTooltip('Close keyboard'), findsNothing);
+    await tester.tap(find.text('Settings').first);
+    await tester.pumpAndSettle();
+    expect(tester.testTextInput.isVisible, isFalse);
+    tester.view.resetViewInsets();
+    await tester.pumpAndSettle();
+    expect(
+        find.descendant(
+            of: find.byKey(const ValueKey('preset-base-b1')),
+            matching: find.byType(CupertinoPicker)),
+        findsNWidgets(2));
     await tester.pumpWidget(const SizedBox());
   });
 }

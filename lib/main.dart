@@ -28,6 +28,7 @@ class _CrewClockAppState extends State<CrewClockApp>
     store.addListener(briefing.invalidate);
     NativeAlarmScheduler.channel.setMethodCallHandler((call) async {
       if (call.method == 'alarmDismissed') await store.refresh();
+      if (call.method == 'openAlarms') briefing.openAlarms();
     });
     _initialize();
   }
@@ -36,6 +37,11 @@ class _CrewClockAppState extends State<CrewClockApp>
     await store.initialize();
     if (!mounted || !store.ready) return;
     briefing.connect(store.snapshot, store.action);
+    if (await NativeAlarmScheduler.channel
+            .invokeMethod<bool>('consumeSurfaceRoute') ==
+        true) {
+      briefing.openAlarms();
+    }
   }
 
   @override
@@ -59,33 +65,19 @@ class _CrewClockAppState extends State<CrewClockApp>
       builder: (c, _) => MaterialApp(
             debugShowCheckedModeBanner: false,
             title: 'CrewClock',
-            builder: (context, child) {
-              final keyboard = MediaQuery.viewInsetsOf(context).bottom;
-              return Stack(children: [
-                GestureDetector(
-                    behavior: HitTestBehavior.translucent,
-                    onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
-                    child: child!),
-                if (keyboard > 0)
-                  Positioned(
-                      bottom: keyboard + 8,
-                      right: 12,
-                      child: Material(
-                          elevation: 3,
-                          color: Theme.of(context).colorScheme.surface,
-                          shape: const CircleBorder(),
-                          child: IconButton(
-                              tooltip: 'Close keyboard',
-                              icon: const Icon(Icons.keyboard_hide),
-                              onPressed: () => FocusManager
-                                  .instance.primaryFocus
-                                  ?.unfocus()))),
-              ]);
-            },
+            builder: (context, child) => GestureDetector(
+                behavior: HitTestBehavior.translucent,
+                onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
+                child: child!),
             theme: CrewClockTheme.data(dark: store.dark),
             home: store.ready
                 ? CrewClockShell(
                     briefing: briefing,
+                    headerActions: (index) => [
+                          if (index == 1 || index == 3)
+                            NativePageActions(
+                                store: store, section: index == 1 ? 0 : 2),
+                        ],
                     tools: NativeRosterPage(store: store),
                     alarms: NativeRosterPage(store: store, section: 1),
                     settings: NativeRosterPage(store: store, section: 2))

@@ -109,7 +109,11 @@ class AppDatabase {
     final db = await database;
     final batch = db.batch();
     for (final id in ids) {
-      batch.update('alarms', {'dism': 1}, where: 'id = ?', whereArgs: [id]);
+      batch.delete('alarms',
+          where: 'id = ? AND type = ?', whereArgs: [id, 'direct']);
+      batch.update('alarms', {'dism': 1, 'armed': 0},
+          where: 'id = ? AND (type IS NULL OR type != ?)',
+          whereArgs: [id, 'direct']);
     }
     await batch.commit(noResult: true);
   }

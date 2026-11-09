@@ -1,10 +1,13 @@
+import 'widgets/width_aware_title.dart';
+import 'widgets/alarm_time_visuals.dart';
+import 'widgets/relative_alarm_editor.dart';
+import 'widgets/flight_schedule_summary.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'services/crewclock_store.dart';
 import 'services/alarm_scheduler.dart';
 import 'widgets/inline_reminder_editor.dart';
 import 'widgets/crewclock_theme.dart';
-import 'widgets/alarm_status_badge.dart';
 
 class NativeRosterPage extends StatefulWidget {
   const NativeRosterPage({super.key, required this.store, this.section = 0});
@@ -18,12 +21,14 @@ class _NativeRosterPageState extends State<NativeRosterPage> {
   CrewClockStore get store => widget.store;
   int get _tab => widget.section;
   bool _followUpcoming = true;
+  String get _personalZone => store.personalZone;
+  final Map<String, List<String>> _editingPresetOrder = {};
   late String _personalId, _intervalId;
-  DateTime _day = DateUtils.dateOnly(DateTime.now()),
-      _month = DateTime(DateTime.now().year, DateTime.now().month);
+  DateTime _day = DateUtils.dateOnly(DateTime.now());
   @override
   void initState() {
     super.initState();
+    if (_tab == 2) FocusManager.instance.addListener(_presetFocusChanged);
     _personalId = store.id();
     _intervalId = 'interval_${store.id()}';
     if (widget.section == 0) store.openTools = _open;
@@ -36,8 +41,13 @@ class _NativeRosterPageState extends State<NativeRosterPage> {
 
   @override
   void dispose() {
+    if (_tab == 2) FocusManager.instance.removeListener(_presetFocusChanged);
     if (widget.section == 0) store.openTools = null;
     super.dispose();
+  }
+
+  void _presetFocusChanged() {
+    if (mounted) setState(() {});
   }
 
   void _open(String action, String? flight) {
@@ -48,12 +58,28 @@ class _NativeRosterPageState extends State<NativeRosterPage> {
       if (f != null) {
         _followUpcoming = false;
         _day = DateUtils.dateOnly(
-            store.zoned(store.departure(f), store.airportZone(f['depApt'])));
-        _month = DateTime(_day.year, _day.month);
+            store.zoned(store.departure(f), store.displayZone(f['depApt'])));
       }
     });
     if (action == 'import') _import();
     if (action == 'addAlarm' && f != null) _alarm(flight: f);
+  }
+
+  void _message(String text, {VoidCallback? onUndo}) {
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.hideCurrentMaterialBanner();
+    messenger.showMaterialBanner(MaterialBanner(content: Text(text), actions: [
+      if (onUndo != null)
+        TextButton(
+            onPressed: () {
+              messenger.hideCurrentMaterialBanner();
+              onUndo();
+            },
+            child: const Text('Undo')),
+      TextButton(
+          onPressed: messenger.hideCurrentMaterialBanner,
+          child: const Text('Close')),
+    ]));
   }
 
   Future<void> _run(Future<void> Function() work) async {
@@ -61,25 +87,11 @@ class _NativeRosterPageState extends State<NativeRosterPage> {
       await work();
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('$e')));
+        _message('$e');
       }
     }
   }
 
-  Future<bool> _confirm(String title, String message) async =>
-      await showDialog<bool>(
-          context: context,
-          builder: (c) =>
-              AlertDialog(title: Text(title), content: Text(message), actions: [
-                TextButton(
-                    onPressed: () => Navigator.pop(c, false),
-                    child: const Text('Cancel')),
-                FilledButton(
-                    onPressed: () => Navigator.pop(c, true),
-                    child: const Text('Delete'))
-              ])) ??
-      false;
   Future<void> _flight([Map<String, dynamic>? flight]) async {
     final f = await showModalBottomSheet<Map<String, dynamic>>(
         context: context,
@@ -119,10 +131,16 @@ class _NativeRosterPageState extends State<NativeRosterPage> {
                               fontSize: 24, fontWeight: FontWeight.bold)),
                       ListTile(
                           leading: const Icon(Icons.calendar_month),
-                          title: const Text('Import ICS / calendar file'),
+                          title: const Text('Import PDF / ICS calendar'),
                           subtitle: const Text(
-                              'ICS / ICAL / plain text · stays on this device'),
+                              'PDF / ICS / ICAL / text · stays on this device'),
                           onTap: () => Navigator.pop(c, 'file')),
+                      ListTile(
+                          leading: const Icon(Icons.image_outlined),
+                          title: const Text('Import roster image'),
+                          subtitle: const Text(
+                              'Read a full monthly calendar · review before saving'),
+                          onTap: () => Navigator.pop(c, 'image')),
                       ListTile(
                           leading: const Icon(Icons.content_paste),
                           title: const Text('Paste schedule text (manual)'),
@@ -142,9 +160,10 @@ class _NativeRosterPageState extends State<NativeRosterPage> {
     await _run(() async {
       List<Map<String, dynamic>> flights;
       String? text;
-      if (kind == 'file') {
+      if (kind == 'file' || kind == 'image') {
         final file = await NativeAlarmScheduler.channel
-            .invokeMapMethod<String, dynamic>('pickRosterFile');
+            .invokeMapMethod<String, dynamic>(
+                kind == 'image' ? 'pickRosterImage' : 'pickRosterFile');
         text = file?['text'] as String?;
       } else if (mounted) {
         text = await showModalBottomSheet<String>(
@@ -154,7 +173,16 @@ class _NativeRosterPageState extends State<NativeRosterPage> {
             builder: (c) => const TextRosterEditor());
       }
       if (text == null || text.trim().isEmpty) return;
-      flights = store.parser.parse(text);
+      final nonFlights = store.parser.nonFlightDays(text);
+      try {
+        flights = store.parser.parse(text);
+      } on FormatException catch (e) {
+        if (nonFlights.isNotEmpty && e.message.startsWith('No dated flights')) {
+          flights = [];
+        } else {
+          rethrow;
+        }
+      }
       if (!mounted) return;
       final accepted = await showModalBottomSheet<bool>(
           context: context,
@@ -173,7 +201,7 @@ class _NativeRosterPageState extends State<NativeRosterPage> {
                                     fontSize: 24, fontWeight: FontWeight.bold)),
                             const SizedBox(height: 12),
                             Text(
-                                '${flights.length} flights. Matching dated routes will be updated; other existing flights are retained. Confirm airport-local times before scheduling.'),
+                                '${flights.length} flights · ${nonFlights.length} non-flight entries. Matching dated routes will be updated; other existing flights are retained. Confirm airport-local times before scheduling.'),
                             Expanded(
                                 child: ListView(
                                     keyboardDismissBehavior:
@@ -183,9 +211,10 @@ class _NativeRosterPageState extends State<NativeRosterPage> {
                                         .map((f) => ListTile(
                                             leading: const Icon(
                                                 Icons.flight_takeoff),
-                                            title: Text(store.flightLabel(f)),
+                                            title: Text(
+                                                '${store.importChange(f)} · ${store.flightLabel(f)}'),
                                             subtitle: Text(
-                                                'Departure ${store.stamp(store.departure(f), store.airportZone(f['depApt']))} · ${store.airportZone(f['depApt']) ?? 'TIME ZONE REQUIRED'}')))
+                                                '${store.matchingFlight(f) == null ? '' : 'Before: ${store.importTimes(store.matchingFlight(f)!)}\n'}After: ${store.importTimes(f)}')))
                                         .toList())),
                             FilledButton(
                                 onPressed: () => Navigator.pop(c, true),
@@ -195,153 +224,96 @@ class _NativeRosterPageState extends State<NativeRosterPage> {
                                 onPressed: () => Navigator.pop(c, false),
                                 child: const Text('Cancel')),
                           ])))));
-      if (accepted == true) await store.importFlights(flights);
+      if (accepted == true) {
+        await store.importFlights(flights, nonFlights: nonFlights);
+      }
     });
   }
 
-  Widget _calendar() {
-    final first = DateTime(_month.year, _month.month),
-        days = DateUtils.getDaysInMonth(_month.year, _month.month),
-        offset = first.weekday % 7;
-    final flightDays = store.flights
-        .map((f) => store.date(
-            store.zoned(store.departure(f), store.airportZone(f['depApt']))))
-        .toSet();
+  Widget _rosterClock(List<Map<String, dynamic>> flights) {
+    final times = [
+      for (final f in flights)
+        for (final a in store.flightAlarms(f))
+          store.zoned(DateTime.parse(a['time']), store.displayZone(f['depApt']))
+    ];
+    void move(int delta) => setState(() {
+          _followUpcoming = false;
+          _day = _day.add(Duration(days: delta));
+        });
     return Card(
-        child: Padding(
-            padding: const EdgeInsets.all(12),
-            child: Column(children: [
-              Row(children: [
-                IconButton(
-                    tooltip: 'Previous month',
-                    onPressed: () => setState(() {
-                          _followUpcoming = false;
-                          _month = DateTime(_month.year, _month.month - 1);
-                        }),
-                    icon: const Icon(Icons.chevron_left)),
-                Expanded(
-                    child: TextButton(
-                        onPressed: () => setState(() {
-                              _followUpcoming = false;
-                              _day = DateUtils.dateOnly(DateTime.now());
-                              _month = DateTime(_day.year, _day.month);
-                            }),
-                        child: Text(
-                            '${_month.year} · ${store.two(_month.month)}',
-                            style: const TextStyle(
-                                fontSize: 18, fontWeight: FontWeight.bold)))),
-                IconButton(
-                    tooltip: 'Next month',
-                    onPressed: () => setState(() {
-                          _followUpcoming = false;
-                          _month = DateTime(_month.year, _month.month + 1);
-                        }),
-                    icon: const Icon(Icons.chevron_right))
-              ]),
-              Row(
-                  children: ['S', 'M', 'T', 'W', 'T', 'F', 'S']
-                      .map((s) => Expanded(child: Center(child: Text(s))))
-                      .toList()),
-              GridView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  itemCount: ((days + offset) / 7).ceil() * 7,
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 7, childAspectRatio: 1.05),
-                  itemBuilder: (c, i) {
-                    final number = i - offset + 1;
-                    if (number < 1 || number > days) {
-                      return const SizedBox.shrink();
-                    }
-                    final date = DateTime(_month.year, _month.month, number),
-                        selected = DateUtils.isSameDay(_day, date);
-                    return Semantics(
-                        label:
-                            '${store.date(date)}${flightDays.contains(store.date(date)) ? ', flights scheduled' : ''}',
-                        selected: selected,
-                        child: InkWell(
-                            borderRadius: BorderRadius.circular(14),
-                            onTap: () => setState(() {
-                                  _followUpcoming = false;
-                                  _day = date;
-                                }),
-                            child: Container(
-                                margin: const EdgeInsets.all(2),
-                                decoration: BoxDecoration(
-                                    color: selected
-                                        ? Theme.of(c)
-                                            .colorScheme
-                                            .primaryContainer
-                                        : null,
-                                    borderRadius: BorderRadius.circular(14)),
-                                child: Column(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Text('$number',
-                                          style: TextStyle(
-                                              fontWeight: selected
-                                                  ? FontWeight.bold
-                                                  : FontWeight.normal)),
-                                      if (flightDays.contains(store.date(date)))
-                                        const Text('•',
-                                            style: TextStyle(
-                                                height: .7,
-                                                color: CrewClockTheme.blue))
-                                    ]))));
-                  }),
-            ])));
+        child: Column(children: [
+      Row(children: [
+        IconButton(
+            tooltip: 'Previous day',
+            onPressed: () => move(-1),
+            icon: const Icon(Icons.chevron_left)),
+        Expanded(
+            child: TextButton(
+                onPressed: () async {
+                  final date = await showDatePicker(
+                      context: context,
+                      initialDate: _day,
+                      firstDate: DateTime(2000),
+                      lastDate: DateTime(2100));
+                  if (date != null && mounted) {
+                    setState(() {
+                      _followUpcoming = false;
+                      _day = date;
+                    });
+                  }
+                },
+                child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(store.displayDate(_day), maxLines: 1)))),
+        IconButton(
+            tooltip: 'Next day',
+            onPressed: () => move(1),
+            icon: const Icon(Icons.chevron_right)),
+      ]),
+      if (times.isNotEmpty)
+        AlarmTimeDial(
+            times: times,
+            caption: 'First alarm',
+            hourCycle: 12,
+            emphasizeNumbers: true)
+      else
+        const Padding(
+            padding: EdgeInsets.all(16),
+            child: Text('No flight alarms on this day')),
+    ]));
   }
 
   Widget _flightCard(Map<String, dynamic> f) {
     final local =
-        store.zoned(store.departure(f), store.airportZone(f['depApt']));
+        store.zoned(store.departure(f), store.displayZone(f['depApt']));
     final arrival = DateTime.tryParse('${f['arrivalUtc']}');
     return Card(
+        color: Color.alphaBlend(const Color(0xff679bcf).withValues(alpha: .055),
+            Theme.of(context).colorScheme.surface),
         child: Padding(
             padding: const EdgeInsets.all(14),
             child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      children: [
-                        Chip(
-                            label: Text(
-                                '${store.two(local.month)}/${store.two(local.day)}')),
-                        Text(
-                            '${store.clock(local)} ${f['flight']} ${f['depApt']} → ${f['arrApt']}',
-                            style: const TextStyle(
-                                fontWeight: FontWeight.bold, fontSize: 16)),
-                        if (arrival != null)
-                          Text(store.clock(store.zoned(
-                              arrival, store.airportZone(f['arrApt'])))),
-                      ]),
-                  Row(mainAxisAlignment: MainAxisAlignment.end, children: [
-                    PopupMenuButton<String>(
-                        tooltip: 'Flight actions',
-                        onSelected: (value) async {
-                          if (value == 'edit') _flight(f);
-                          if (value == 'delete' &&
-                              await _confirm('Delete flight?',
-                                  'Its reminders and personal preparation notes will also be removed.')) {
-                            await _run(() => store.deleteFlight(f));
-                          }
-                        },
-                        itemBuilder: (c) => [
-                              const PopupMenuItem(
-                                  value: 'edit', child: Text('Edit flight')),
-                              const PopupMenuItem(
-                                  value: 'delete', child: Text('Delete flight'))
-                            ]),
-                    TextButton(
-                        onPressed: store.busy ? null : () => _alarm(flight: f),
-                        child: const Text('+ Add')),
-                  ]),
-                  Text(
-                      'Times at ${f['depApt']} · ${store.airportZone(f['depApt']) ?? 'Confirm airport time zone'}',
-                      style: Theme.of(context).textTheme.bodySmall),
+                  FlightScheduleSummary(
+                      date:
+                          '${store.two(local.month)}/${store.two(local.day)} ${[
+                        'Mon',
+                        'Tue',
+                        'Wed',
+                        'Thu',
+                        'Fri',
+                        'Sat',
+                        'Sun'
+                      ][local.weekday - 1]}',
+                      departure: store.clock(local),
+                      arrival: arrival == null
+                          ? ''
+                          : store.clock(store.zoned(
+                              arrival, store.displayZone(f['arrApt']))),
+                      number: '${f['flight']}',
+                      route: '${f['depApt']} → ${f['arrApt']}',
+                      timeSuffix: store.timeSuffix),
                   for (final a in store.flightAlarms(f))
                     _alarmRow(a, flight: f),
                 ])));
@@ -349,94 +321,107 @@ class _NativeRosterPageState extends State<NativeRosterPage> {
 
   Widget _alarmRow(Map<String, dynamic> a, {Map<String, dynamic>? flight}) {
     final at = DateTime.parse(a['time']);
-    final zone = store.airportZone(flight?['depApt'] ?? store.home) ?? 'UTC';
-    final local = store.zoned(at, zone);
+    final zone = flight == null
+        ? '${a['zone'] ?? store.personalZone}'
+        : store.airportZone(flight['depApt']) ?? 'UTC';
+    final local = store.zoned(at, store.displayUTC ? 'UTC' : zone);
+    final isPastUncancelled =
+        !store.flag(a['dism']) && at.isBefore(DateTime.now());
+
+    Widget content;
     if (flight == null) {
-      return Card.outlined(
+      final isTimer = store.flag(a['elapsedAlarm']) || '${a['lbl']}' == 'Timer';
+      content = Card.outlined(
           child: Padding(
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               child: Row(children: [
                 Expanded(
                     child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                      Text(store.clock(local),
+                      Text('${store.clock(local)} (${store.timeSuffix})',
                           style: TextStyle(
-                              fontSize: 30,
-                              fontWeight: FontWeight.w600,
+                              fontSize: 24,
+                              fontWeight: FontWeight.w700,
                               color: Theme.of(context).colorScheme.primary)),
-                      Text('${a['lbl']}',
-                          style: const TextStyle(fontWeight: FontWeight.w600)),
-                      Text('${store.date(local)} · $zone',
+                      Text(
+                          '${store.displayDate(local)}${[
+                            'Personal alarm',
+                            '',
+                            'null'
+                          ].contains('${a['lbl']}') ? '' : ' · ${a['lbl']}'}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                           style: Theme.of(context).textTheme.bodySmall),
-                      AlarmStatusBadge(label: store.status(a)),
+                      if (isTimer)
+                        IntervalCountdown(
+                            next: at,
+                            minutes:
+                                (a['durationMinutes'] as num?)?.toInt() ?? 60,
+                            enabled: !store.flag(a['dism'])),
                     ])),
-                Switch.adaptive(
-                    value: store.flag(a['armed']) && !store.flag(a['dism']),
-                    onChanged: store.busy
-                        ? null
-                        : (value) => _run(() => store.toggleAlarm(a, value))),
                 PopupMenuButton<String>(
                     tooltip: 'Alarm actions',
                     onSelected: (value) async {
                       if (value == 'edit') await _alarm(alarm: a);
-                      if (value == 'retry') {
-                        await _run(() => store.retryScheduling());
-                      }
                       if (value == 'delete') {
                         await _run(() => store.deleteAlarm(a));
                       }
                     },
                     itemBuilder: (_) => const [
                           PopupMenuItem(value: 'edit', child: Text('Edit')),
-                          PopupMenuItem(
-                              value: 'retry', child: Text('Retry reservation')),
                           PopupMenuItem(value: 'delete', child: Text('Delete'))
                         ]),
               ])));
+    } else {
+      final offset = store.departure(flight).difference(at).inMinutes;
+      final status = store.status(a);
+      content = Card.outlined(
+          key: ValueKey('alarm-${a['id']}'),
+          margin: const EdgeInsets.only(top: 8),
+          child: Semantics(
+            label: '${a['lbl']}, ${store.clock(local)}, $status',
+            child: Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                child: Row(children: [
+                  Text('${store.clock(local)}(${store.timeSuffix})',
+                      style: TextStyle(
+                          color: Theme.of(context).colorScheme.primary,
+                          fontSize: 17,
+                          fontFeatures: const [FontFeature.tabularFigures()],
+                          fontWeight: FontWeight.w700)),
+                  const SizedBox(width: 10),
+                  Expanded(
+                      child: Tooltip(
+                          message: '${a['lbl']}',
+                          child: Text('${a['lbl']}',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                  fontSize: 14, fontWeight: FontWeight.w600)))),
+                  const SizedBox(width: 8),
+                  Text(CrewClockStore.offsetText(offset),
+                      style: TextStyle(
+                          fontSize: 12,
+                          color:
+                              Theme.of(context).colorScheme.onSurfaceVariant)),
+                  if (!['Scheduled', 'Done', 'Paused'].contains(status)) ...[
+                    const SizedBox(width: 4),
+                    Tooltip(
+                        message: status,
+                        child: Icon(Icons.info_outline,
+                            size: 16,
+                            color: CrewClockTheme.statusColor(status,
+                                dark: Theme.of(context).brightness ==
+                                    Brightness.dark))),
+                  ],
+                ])),
+          ));
     }
-    final offset = store.departure(flight).difference(at).inMinutes;
-    final status = store.status(a);
-    return Card.outlined(
-        key: ValueKey('alarm-${a['id']}'),
-        margin: const EdgeInsets.only(top: 8),
-        child: Semantics(
-          label: '${a['lbl']}, ${store.clock(local)}, $status',
-          child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-              child: Row(children: [
-                Text('${store.clock(local)}(L)',
-                    style: TextStyle(
-                        color: Theme.of(context).colorScheme.primary,
-                        fontSize: 17,
-                        fontFeatures: const [FontFeature.tabularFigures()],
-                        fontWeight: FontWeight.w700)),
-                const SizedBox(width: 10),
-                Expanded(
-                    child: Tooltip(
-                        message: '${a['lbl']}',
-                        child: Text('${a['lbl']}',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                                fontSize: 14, fontWeight: FontWeight.w600)))),
-                const SizedBox(width: 8),
-                Text('${offset ~/ 60}h ${offset % 60}m',
-                    style: TextStyle(
-                        fontSize: 12,
-                        color: Theme.of(context).colorScheme.onSurfaceVariant)),
-                if (!['Scheduled', 'Done', 'Paused'].contains(status)) ...[
-                  const SizedBox(width: 4),
-                  Tooltip(
-                      message: status,
-                      child: Icon(Icons.info_outline,
-                          size: 16,
-                          color: CrewClockTheme.statusColor(status,
-                              dark: Theme.of(context).brightness ==
-                                  Brightness.dark))),
-                ],
-              ])),
-        ));
+    final item =
+        isPastUncancelled ? Opacity(opacity: 0.4, child: content) : content;
+    return item;
   }
 
   Widget _roster() {
@@ -448,7 +433,6 @@ class _NativeRosterPageState extends State<NativeRosterPage> {
       if (next != null) {
         _day = DateUtils.dateOnly(store.zoned(
             store.departure(next), store.airportZone(next['depApt'])));
-        _month = DateTime(_day.year, _day.month);
       }
     }
     final selected = store
@@ -458,51 +442,102 @@ class _NativeRosterPageState extends State<NativeRosterPage> {
                 store.departure(f), store.airportZone(f['depApt']))) ==
             store.date(_day))
         .toList();
-    return RefreshIndicator(
-        onRefresh: () => store.refresh(),
-        child: ListView(
-            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-            padding: const EdgeInsets.all(12),
-            children: [
-              _calendar(),
-              const SizedBox(height: 12),
-              Text('${store.date(_day)} · Departure-airport local dates'),
-              if (selected.isEmpty)
-                const Padding(
-                    padding: EdgeInsets.all(24),
-                    child: Text(
-                        'No flights on this day. Choose a marked date or import your roster.')),
-              ...selected.map(_flightCard),
-              Align(
-                  alignment: Alignment.centerRight,
-                  child: FilledButton.icon(
-                      onPressed: store.busy ? null : _import,
-                      icon: const Icon(Icons.add),
-                      label: const Text('Add flight'))),
-            ]));
+    final landscape =
+        MediaQuery.orientationOf(context) == Orientation.landscape;
+    return Column(children: [
+      if (!landscape)
+        Padding(
+            padding: const EdgeInsets.fromLTRB(12, 4, 12, 4),
+            child: _rosterClock(selected)),
+      Expanded(
+          child: RefreshIndicator(
+              onRefresh: () => store.refresh(),
+              child: ListView(
+                  key: const ValueKey('roster-schedule-list'),
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  keyboardDismissBehavior:
+                      ScrollViewKeyboardDismissBehavior.onDrag,
+                  padding: const EdgeInsets.all(12),
+                  children: [
+                    if (landscape) _rosterClock(selected),
+                    FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                            '${store.displayDate(_day)} · Departure local date',
+                            maxLines: 1)),
+                    if (selected.isEmpty)
+                      const Padding(
+                          padding: EdgeInsets.all(24),
+                          child: Text(
+                              'No flights on this day. Choose another date or import your roster.')),
+                    for (final duty in store.duties
+                        .where((d) => d['date'] == store.date(_day)))
+                      Card(
+                          child: ListTile(
+                              leading: Icon(duty['category'] == 'Off / leave'
+                                  ? Icons.weekend_outlined
+                                  : Icons.event_note),
+                              title: Text('${duty['category']}'),
+                              subtitle: Text('${duty['label']}'))),
+                    ...selected.map(_flightCard),
+                  ]))),
+    ]);
+  }
+
+  Widget _alarmSwitch(
+          {required bool value, required ValueChanged<bool>? onChanged}) =>
+      SizedBox(
+        width: 48,
+        height: 44,
+        child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            excludeFromSemantics: true,
+            onTap: onChanged == null ? null : () => onChanged(!value),
+            child: Center(
+                child: Transform.scale(
+                    scale: .85,
+                    child: Switch.adaptive(
+                        activeTrackColor: Theme.of(context).colorScheme.primary,
+                        value: value,
+                        onChanged: onChanged)))),
+      );
+
+  DateTime? _intervalDate(Map a) {
+    final status = store.statuses['${a['id']}'];
+    if (a['enabled'] != true || status is! Map || status['next'] is! num) {
+      return null;
+    }
+    return DateTime.fromMillisecondsSinceEpoch((status['next'] as num).toInt(),
+        isUtc: true);
+  }
+
+  String _intervalTitle(Map a) {
+    final every =
+        'Every ${(a['minutes'] as num).toInt() ~/ 60}h ${(a['minutes'] as num).toInt() % 60}m';
+    return ['Repeating reminder', 'Repeating reminders', '']
+            .contains('${a['label']}')
+        ? every
+        : '${a['label']} · $every';
   }
 
   Widget _alarms() => ListView(
           keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-          padding: const EdgeInsets.all(12),
+          padding: const EdgeInsets.fromLTRB(12, 4, 12, 40),
           children: [
-            _heading('Personal alarms'),
-            for (final a in store.alarms.where((a) => a['type'] == 'direct'))
-              _alarmRow(a),
             InlineReminderEditor(
                 key: ValueKey('new-personal-$_personalId'),
                 saveLabel: 'Add alarm',
                 label: '',
                 date: store.date(store.zoned(
                     DateTime.now().add(const Duration(hours: 1)),
-                    store.airportZone(store.home))),
+                    _personalZone)),
                 time: store.clock(store.zoned(
                     DateTime.now().add(const Duration(hours: 1)),
-                    store.airportZone(store.home))),
-                zone: store.airportZone(store.home) ?? 'UTC',
+                    _personalZone)),
+                zone: _personalZone,
                 onSave: (label, _, date, time) async {
-                  final at = store.parser.localInstant(
-                      date!, time!, store.airportZone(store.home) ?? 'UTC');
+                  final at =
+                      store.parser.localInstant(date!, time!, _personalZone);
                   if (!at.isAfter(DateTime.now())) {
                     throw const FormatException(
                         'Choose a future reminder time.');
@@ -514,78 +549,29 @@ class _NativeRosterPageState extends State<NativeRosterPage> {
                     'type': 'direct',
                     'armed': true,
                     'dism': false,
-                    'missed': false
+                    'missed': false,
+                    'timeBasis': 'home',
+                    'wallDate': date,
+                    'wallTime': time,
+                    'zone': _personalZone
                   });
                   if (mounted) setState(() => _personalId = store.id());
                 }),
-            _heading('Repeating reminders'),
+            for (final a in store.alarms.where((a) =>
+                a['type'] == 'direct' &&
+                !store.flag(a['elapsedAlarm']) &&
+                '${a['lbl']}' != 'Timer'))
+              _alarmRow(a),
+            _heading('Timer'),
+            RelativeAlarmEditor(onAdd: store.addRelativeAlarm),
+            for (final a in store.alarms.where((a) =>
+                a['type'] == 'timer' ||
+                store.flag(a['elapsedAlarm']) ||
+                '${a['lbl']}' == 'Timer'))
+              _alarmRow(a),
+            _heading('Create repeating reminder'),
             const Text(
-                'The next cycle is reserved after Stop. Waiting reminders are not yet scheduled.'),
-            for (final a in store.intervals)
-              Card.outlined(
-                  child: ListTile(
-                      leading: const Icon(Icons.repeat),
-                      title: Text('${a['label']}',
-                          style: const TextStyle(fontWeight: FontWeight.w600)),
-                      subtitle: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                                'Every ${(a['minutes'] as num).toInt() ~/ 60}h ${(a['minutes'] as num).toInt() % 60}m'),
-                            AlarmStatusBadge(label: store.intervalStatus(a)),
-                            Text(
-                                store.intervalNext(a) ??
-                                    'Next cycle is reserved after Stop',
-                                style: Theme.of(context).textTheme.bodySmall),
-                          ]),
-                      trailing: Row(mainAxisSize: MainAxisSize.min, children: [
-                        Switch.adaptive(
-                            value: a['enabled'] == true,
-                            onChanged: store.busy
-                                ? null
-                                : (value) => _run(() => store.saveIntervals(
-                                    store.intervals
-                                        .map((x) => x['id'] == a['id']
-                                            ? {
-                                                ...x,
-                                                'enabled': value,
-                                                'anchor': DateTime.now()
-                                                    .millisecondsSinceEpoch
-                                              }
-                                            : x)
-                                        .toList()))),
-                        PopupMenuButton<String>(
-                            tooltip: 'Repeating reminder actions',
-                            onSelected: (value) async {
-                              if (value == 'delete') {
-                                await _run(() => store.saveIntervals(store
-                                    .intervals
-                                    .where((x) => x['id'] != a['id'])
-                                    .toList()));
-                              }
-                              if (value == 'edit' && mounted) {
-                                final next = await showModalBottomSheet<
-                                        Map<String, dynamic>>(
-                                    context: context,
-                                    isScrollControlled: true,
-                                    showDragHandle: true,
-                                    builder: (_) => IntervalEditor(
-                                        store: store, record: a));
-                                if (next != null) {
-                                  await _run(() => store.saveIntervals(store
-                                      .intervals
-                                      .map((x) => x['id'] == a['id'] ? next : x)
-                                      .toList()));
-                                }
-                              }
-                            },
-                            itemBuilder: (_) => const [
-                                  PopupMenuItem(
-                                      value: 'edit', child: Text('Edit')),
-                                  PopupMenuItem(
-                                      value: 'delete', child: Text('Delete'))
-                                ]),
-                      ]))),
+                'After Stop, the next reminder is scheduled for the selected interval.'),
             InlineReminderEditor(
                 key: ValueKey('new-interval-$_intervalId'),
                 saveLabel: 'Add reminder',
@@ -611,11 +597,107 @@ class _NativeRosterPageState extends State<NativeRosterPage> {
                     setState(() => _intervalId = 'interval_${store.id()}');
                   }
                 }),
+            if (store.intervals.isNotEmpty)
+              _heading('Saved repeating reminders'),
+            for (final a in store.intervals)
+              Card.outlined(
+                  child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 8),
+                      child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            Expanded(
+                                child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                  Text(
+                                      (store.intervalNext(a) ??
+                                              (a['enabled'] == false
+                                                  ? 'Paused'
+                                                  : 'No upcoming alarm reserved'))
+                                          .replaceFirst('Next: ', ''),
+                                      style: TextStyle(
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.w700,
+                                          color: Theme.of(context)
+                                              .colorScheme
+                                              .primary)),
+                                  Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(_intervalTitle(a),
+                                            style: Theme.of(context)
+                                                .textTheme
+                                                .bodySmall),
+                                        IntervalCountdown(
+                                            next: _intervalDate(a),
+                                            minutes:
+                                                (a['minutes'] as num).toInt(),
+                                            enabled: a['enabled'] == true),
+                                      ]),
+                                ])),
+                            Row(mainAxisSize: MainAxisSize.min, children: [
+                              _alarmSwitch(
+                                  value: a['enabled'] == true,
+                                  onChanged: store.busy
+                                      ? null
+                                      : (value) => _run(() =>
+                                          store.saveIntervals(store.intervals
+                                              .map((x) => x['id'] == a['id']
+                                                  ? {
+                                                      ...x,
+                                                      'enabled': value,
+                                                      'anchor': DateTime.now()
+                                                          .millisecondsSinceEpoch
+                                                    }
+                                                  : x)
+                                              .toList()))),
+                              PopupMenuButton<String>(
+                                  tooltip: 'Repeating reminder actions',
+                                  onSelected: (value) async {
+                                    if (value == 'delete') {
+                                      await _run(() => store.saveIntervals(store
+                                          .intervals
+                                          .where((x) => x['id'] != a['id'])
+                                          .toList()));
+                                    }
+                                    if (value == 'edit' && mounted) {
+                                      final next = await showModalBottomSheet<
+                                              Map<String, dynamic>>(
+                                          context: context,
+                                          isScrollControlled: true,
+                                          showDragHandle: true,
+                                          builder: (_) => IntervalEditor(
+                                              store: store, record: a));
+                                      if (next != null) {
+                                        await _run(() => store.saveIntervals(
+                                            store.intervals
+                                                .map((x) => x['id'] == a['id']
+                                                    ? next
+                                                    : x)
+                                                .toList()));
+                                      }
+                                    }
+                                  },
+                                  itemBuilder: (_) => const [
+                                        PopupMenuItem(
+                                            value: 'edit', child: Text('Edit')),
+                                        PopupMenuItem(
+                                            value: 'delete',
+                                            child: Text('Delete'))
+                                      ]),
+                            ])
+                          ]))),
           ]);
-  Widget _heading(String text) => Padding(
-      padding: const EdgeInsets.only(top: 16, bottom: 8),
-      child: Text(text,
-          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)));
+  Widget _heading(String text, {bool minor = false}) => Padding(
+      padding: EdgeInsets.only(top: minor ? 12 : 20, bottom: 8),
+      child: WidthAwareTitle(text,
+          style: TextStyle(
+              fontSize: minor ? 17 : 20, fontWeight: FontWeight.bold)));
   Future<void> _deletePreset(String group, Map<String, dynamic> preset) async {
     final key = '${group}Offs';
     final original =
@@ -626,54 +708,118 @@ class _NativeRosterPageState extends State<NativeRosterPage> {
       key: original.where((p) => p['id'] != preset['id']).toList()
     });
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text('${preset['lbl']} deleted'),
-      action: SnackBarAction(
-          label: 'Undo',
-          onPressed: () => _run(() async {
-                final current = store
-                    .maps(store.settings[key] ?? CrewClockStore.defaults[key]);
-                if (current.any((p) => p['id'] == preset['id'])) return;
-                current.insert(index.clamp(0, current.length),
-                    Map<String, dynamic>.from(preset));
-                await store.saveSettings({...store.settings, key: current});
-              })),
-    ));
+    _message('${preset['lbl']} deleted',
+        onUndo: () => _run(() async {
+              final current = store
+                  .maps(store.settings[key] ?? CrewClockStore.defaults[key]);
+              if (current.any((p) => p['id'] == preset['id'])) return;
+              current.insert(index.clamp(0, current.length),
+                  Map<String, dynamic>.from(preset));
+              await store.saveSettings({...store.settings, key: current});
+            }));
+  }
+
+  List<Map<String, dynamic>> _orderedPresets(String group) {
+    final sorted = store.preparationPresets(group);
+    final editing = FocusManager.instance.primaryFocus?.context
+            ?.findAncestorWidgetOfExactType<PreparationPresetRow>() !=
+        null;
+    if (!editing) {
+      _editingPresetOrder.remove(group);
+      return sorted;
+    }
+    final ids = _editingPresetOrder.putIfAbsent(
+        group, () => sorted.map((p) => '${p['id']}').toList());
+    int index(Map p) {
+      final i = ids.indexOf('${p['id']}');
+      return i < 0 ? ids.length : i;
+    }
+
+    sorted.sort((a, b) => index(a).compareTo(index(b)));
+    return sorted;
+  }
+
+  Future<void> _clearRoster() async {
+    final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (c) => AlertDialog(
+              title: const Text('Delete all roster?'),
+              content: Text(
+                  'Delete all ${store.flights.length} flights, their flight alarms and preparation lists? Personal alarms, repeating reminders and settings will be kept. This cannot be undone.'),
+              actions: [
+                TextButton(
+                    onPressed: () => Navigator.pop(c, false),
+                    child: const Text('Cancel')),
+                TextButton(
+                    style: TextButton.styleFrom(
+                        foregroundColor: Theme.of(c).colorScheme.error),
+                    onPressed: () => Navigator.pop(c, true),
+                    child: const Text('Delete all'))
+              ],
+            ));
+    if (confirmed == true && mounted) {
+      await _run(() async {
+        await store.clearRoster();
+        if (mounted) _message('Roster deleted');
+      });
+    }
   }
 
   Widget _settings() => ListView(
           keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-          padding: const EdgeInsets.all(12),
+          padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
           children: [
+            _heading('Appearance & sound'),
+            Card.outlined(
+                child: Row(children: [
+              Expanded(
+                  child: ListTile(
+                      leading: Icon(store.dark
+                          ? Icons.light_mode_outlined
+                          : Icons.dark_mode_outlined),
+                      title: const Text('Appearance'),
+                      subtitle: Text(store.dark ? 'Dark' : 'Light'),
+                      onTap: store.busy
+                          ? null
+                          : () => _run(() => store.saveSettings(
+                              {...store.settings, 'dark': !store.dark})))),
+              Expanded(
+                  child: ListTile(
+                      leading: const Icon(Icons.volume_up_outlined),
+                      title: const Text('Alarm sound'),
+                      subtitle: const Text('Choose sound'),
+                      onTap: store.busy
+                          ? null
+                          : () => _run(() async {
+                                if (await store.scheduler.chooseAlarmSound()) {
+                                  await store.retryScheduling();
+                                }
+                              })))
+            ])),
+            Card.outlined(
+                child: SwitchListTile.adaptive(
+                    title: const Text('Live Activity'),
+                    subtitle:
+                        const Text('Show the next alarm on the Lock Screen'),
+                    value: store.settings['liveActivity'] == true,
+                    onChanged: store.busy
+                        ? null
+                        : (value) => _run(() => store.saveSettings(
+                            {...store.settings, 'liveActivity': value})))),
+            _heading('Home bases'),
             InlineHomeBaseEditor(store: store),
-            SwitchListTile.adaptive(
-                title: const Text('Dark appearance'),
-                value: store.dark,
-                onChanged: store.busy
-                    ? null
-                    : (v) => _run(() =>
-                        store.saveSettings({...store.settings, 'dark': v}))),
-            ListTile(
-                title: const Text('Alarm sound'),
-                trailing: const Icon(Icons.volume_up),
-                onTap: store.busy
-                    ? null
-                    : () => _run(() async {
-                          if (await store.scheduler.chooseAlarmSound()) {
-                            await store.retryScheduling();
-                          }
-                        })),
+            InlineHomeBaseEditor(store: store, domestic: true),
             _heading('Flight preparation presets'),
-            const Text(
-                'Changes save automatically for future imports. Swipe left to delete. Existing alarms keep their times.'),
+            const Text('Auto-save · Swipe to reveal Delete.'),
             for (final group in ['base', 'dom', 'intl']) ...[
-              _heading({
-                'base': 'Home-base international',
-                'dom': 'Home-base domestic',
-                'intl': 'Overseas'
-              }[group]!),
-              for (final preset in store.maps(store.settings['${group}Offs'] ??
-                  CrewClockStore.defaults['${group}Offs']))
+              _heading(
+                  {
+                    'base': 'Home-base international',
+                    'dom': 'Home-base domestic',
+                    'intl': 'Overseas'
+                  }[group]!,
+                  minor: true),
+              for (final preset in _orderedPresets(group))
                 PreparationPresetRow(
                   key: ValueKey('preset-$group-${preset['id']}'),
                   label: '${preset['lbl']}',
@@ -718,6 +864,18 @@ class _NativeRosterPageState extends State<NativeRosterPage> {
                       icon: const Icon(Icons.add),
                       label: const Text('Add preparation preset'))),
             ],
+            _heading('Reset roster data'),
+            Card.outlined(
+                child: ListTile(
+              leading: Icon(Icons.delete_sweep_outlined,
+                  color: Theme.of(context).colorScheme.error),
+              title: Text('Delete all roster',
+                  style: TextStyle(color: Theme.of(context).colorScheme.error)),
+              subtitle:
+                  const Text('Remove flights and their linked flight alarms'),
+              enabled: !store.busy && store.flights.isNotEmpty,
+              onTap: _clearRoster,
+            )),
             _heading('Privacy & support'),
             const Text(
                 'Schedules and preparation notes stay on this device. Paste text using iPhone Live Text, or import a calendar file. No photo-library access is requested.'),
@@ -745,19 +903,6 @@ class _NativeRosterPageState extends State<NativeRosterPage> {
       animation: store,
       builder: (c, _) => SafeArea(
               child: Column(children: [
-            Padding(
-                padding: const EdgeInsets.fromLTRB(16, 8, 12, 4),
-                child: Row(children: [
-                  Expanded(
-                      child: Text(['Roster', 'Alarms', 'Settings'][_tab],
-                          style: const TextStyle(
-                              fontSize: 23, fontWeight: FontWeight.w700))),
-                  if (_tab == 0)
-                    IconButton(
-                        tooltip: 'Import roster',
-                        onPressed: store.busy ? null : _import,
-                        icon: const Icon(Icons.file_open_outlined)),
-                ])),
             if (store.error != null)
               Padding(
                   padding: const EdgeInsets.all(8),
@@ -767,8 +912,11 @@ class _NativeRosterPageState extends State<NativeRosterPage> {
               Padding(
                   padding: const EdgeInsets.all(8),
                   child: Text(store.migrationNotice!)),
-            if (store.busy) const LinearProgressIndicator(),
-            const SizedBox(height: 10),
+            if (_tab != 2)
+              SizedBox(
+                  height: 4,
+                  child: store.busy ? const LinearProgressIndicator() : null),
+            const SizedBox(height: 2),
             Expanded(
                 child: ClipRect(
                     child: _tab == 0
@@ -809,12 +957,13 @@ class _TextRosterEditorState extends State<TextRosterEditor> {
                             fontSize: 24, fontWeight: FontWeight.bold)),
                     const SizedBox(height: 12),
                     const Text(
-                        'Paste ICS calendar content, or one flight per line:\n2026-11-02 KE955 ICN IST 13:55\nTimes in text lines are departure-airport local. For other roster formats use manual entry.'),
+                        'Paste ICS, or text copied from a full monthly roster (include month/year and date headings). For calendar images, Import roster image preserves date columns more reliably.\nFlight lines: 2026-11-02 KE955 ICN IST 13:55\nOptional arrival: 2026-11-02 20:05. All times are airport-local.'),
                     const SizedBox(height: 12),
                     TextField(
                         onTapOutside: (_) =>
                             FocusManager.instance.primaryFocus?.unfocus(),
                         controller: input,
+                        textAlignVertical: TextAlignVertical.center,
                         maxLines: 8,
                         decoration: InputDecoration(
                             border: OutlineInputBorder(
@@ -1023,7 +1172,9 @@ class AlarmEditor extends StatelessWidget {
   final Map<String, dynamic>? flight, alarm;
   @override
   Widget build(BuildContext context) {
-    final zone = store.airportZone(flight?['depApt'] ?? store.home) ?? 'UTC';
+    final zone = flight == null
+        ? '${alarm?['zone'] ?? store.personalZone}'
+        : store.airportZone(flight!['depApt']) ?? 'UTC';
     final at = DateTime.tryParse('${alarm?['time']}') ??
         DateTime.now().add(const Duration(hours: 1));
     final local = store.zoned(at, zone);
@@ -1060,7 +1211,16 @@ class AlarmEditor extends StatelessWidget {
                               'Choose a future reminder time.');
                         }
                         Navigator.pop(context, {
+                          ...?alarm,
                           'id': alarm?['id'] ?? store.id(),
+                          if (flight == null) ...{
+                            'zone': zone,
+                            'wallDate': date,
+                            'wallTime': time,
+                            'timeBasis': alarm?['timeBasis'] ??
+                                store.settings['personalTimeBasis'] ??
+                                'home'
+                          },
                           'time': instant.toUtc().toIso8601String(),
                           'dep': flight == null
                               ? null
@@ -1115,7 +1275,9 @@ class IntervalEditor extends StatelessWidget {
 }
 
 class InlineHomeBaseEditor extends StatefulWidget {
-  const InlineHomeBaseEditor({super.key, required this.store});
+  const InlineHomeBaseEditor(
+      {super.key, required this.store, this.domestic = false});
+  final bool domestic;
   final CrewClockStore store;
   @override
   State<InlineHomeBaseEditor> createState() => _InlineHomeBaseEditorState();
@@ -1128,13 +1290,17 @@ class _InlineHomeBaseEditorState extends State<InlineHomeBaseEditor> {
   @override
   void initState() {
     super.initState();
-    input = TextEditingController(text: widget.store.home);
+    input = TextEditingController(
+        text: widget.store.baseAirports(domestic: widget.domestic).join(', '));
   }
 
   @override
   void didUpdateWidget(covariant InlineHomeBaseEditor old) {
     super.didUpdateWidget(old);
-    if (!dirty) input.text = widget.store.home;
+    if (!dirty) {
+      input.text =
+          widget.store.baseAirports(domestic: widget.domestic).join(', ');
+    }
   }
 
   @override
@@ -1149,52 +1315,119 @@ class _InlineHomeBaseEditorState extends State<InlineHomeBaseEditor> {
           padding: const EdgeInsets.all(14),
           child:
               Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            const Text('Home base',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            WidthAwareTitle(
+                widget.domestic
+                    ? 'Home base · Domestic'
+                    : 'Home base · International',
+                style:
+                    const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 12),
-            TextField(
-                onTapOutside: (_) =>
-                    FocusManager.instance.primaryFocus?.unfocus(),
-                controller: input,
-                enabled: !widget.store.busy,
-                maxLength: 3,
-                textCapitalization: TextCapitalization.characters,
-                onChanged: (_) => setState(() => dirty = true),
-                decoration: InputDecoration(
-                    labelText: 'Airport code',
-                    border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(16),
-                        borderSide: BorderSide.none))),
-            Text(widget.store.airportZone(input.text.trim().toUpperCase()) ??
-                'Enter a known three-letter airport code.'),
+            Row(children: [
+              Expanded(
+                  child: TextField(
+                      onTapOutside: (_) =>
+                          FocusManager.instance.primaryFocus?.unfocus(),
+                      controller: input,
+                      textAlignVertical: TextAlignVertical.center,
+                      enabled: !widget.store.busy,
+                      maxLength: 100,
+                      textCapitalization: TextCapitalization.characters,
+                      onChanged: (_) => setState(() => dirty = true),
+                      decoration: InputDecoration(
+                          labelText: 'Airport codes',
+                          hintText: widget.domestic ? 'GMP, CJU' : 'ICN, PUS',
+                          counterText: '',
+                          border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(16),
+                              borderSide: BorderSide.none)))),
+              const SizedBox(width: 12),
+              if (dirty)
+                Align(
+                    alignment: Alignment.centerRight,
+                    child: FilledButton.tonal(
+                        onPressed: !dirty || widget.store.busy
+                            ? null
+                            : () async {
+                                final codes = input.text
+                                    .toUpperCase()
+                                    .split(',')
+                                    .map((s) => s.trim())
+                                    .where((s) => s.isNotEmpty)
+                                    .toSet()
+                                    .toList();
+                                if (codes.isEmpty ||
+                                    codes.any((code) =>
+                                        code.length != 3 ||
+                                        widget.store.airportZone(code) ==
+                                            null)) {
+                                  setState(() => error =
+                                      'Enter known airport codes separated by commas.');
+                                  return;
+                                }
+                                try {
+                                  await widget.store.saveSettings({
+                                    ...widget.store.settings,
+                                    (widget.domestic
+                                        ? 'domesticBaseApt'
+                                        : 'baseApt'): codes.join(', ')
+                                  });
+                                  if (mounted) {
+                                    setState(() {
+                                      dirty = false;
+                                      error = null;
+                                    });
+                                  }
+                                } catch (e) {
+                                  if (mounted) setState(() => error = '$e');
+                                }
+                              },
+                        child: const Text('Save'))),
+            ]),
             if (error != null)
               Text(error!,
                   style: TextStyle(color: Theme.of(context).colorScheme.error)),
-            Align(
-                alignment: Alignment.centerRight,
-                child: FilledButton.tonal(
-                    onPressed: !dirty || widget.store.busy
-                        ? null
-                        : () async {
-                            final code = input.text.trim().toUpperCase();
-                            if (widget.store.airportZone(code) == null) {
-                              setState(() => error =
-                                  'Enter a known three-letter airport code.');
-                              return;
-                            }
-                            try {
-                              await widget.store.saveSettings(
-                                  {...widget.store.settings, 'baseApt': code});
-                              if (mounted) {
-                                setState(() {
-                                  dirty = false;
-                                  error = null;
-                                });
-                              }
-                            } catch (e) {
-                              if (mounted) setState(() => error = '$e');
-                            }
-                          },
-                    child: const Text('Save home base'))),
           ])));
+}
+
+class NativePageActions extends StatelessWidget {
+  const NativePageActions(
+      {super.key, required this.store, required this.section});
+  final CrewClockStore store;
+  final int section;
+  Future<void> _run(
+      BuildContext context, Future<void> Function() action) async {
+    try {
+      await action();
+    } catch (e) {
+      if (context.mounted) {
+        final messenger = ScaffoldMessenger.of(context);
+        messenger.hideCurrentMaterialBanner();
+        messenger
+            .showMaterialBanner(MaterialBanner(content: Text('$e'), actions: [
+          TextButton(
+              onPressed: messenger.hideCurrentMaterialBanner,
+              child: const Text('Close'))
+        ]));
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => AnimatedBuilder(
+      animation: store,
+      builder: (context, _) => Row(mainAxisSize: MainAxisSize.min, children: [
+            if (section == 0)
+              TextButton.icon(
+                  style: TextButton.styleFrom(
+                      foregroundColor: Colors.white,
+                      disabledForegroundColor: Colors.white38,
+                      minimumSize: const Size(0, 44),
+                      padding: const EdgeInsets.symmetric(horizontal: 4)),
+                  label:
+                      const Text('Add Roster', style: TextStyle(fontSize: 13)),
+                  onPressed: store.busy
+                      ? null
+                      : () => store.openTools?.call('import', null),
+                  icon: const Icon(Icons.add, size: 18)),
+          ]));
 }

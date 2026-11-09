@@ -50,6 +50,16 @@ void main() {
       }
     }
   });
+  test('primary accents use the same blue family with readable text', () {
+    for (final dark in [false, true]) {
+      final colors = CrewClockTheme.colors(dark: dark);
+      final a = colors.primary.computeLuminance();
+      final b = colors.onPrimary.computeLuminance();
+      final ratio = (a > b ? a + .05 : b + .05) / (a > b ? b + .05 : a + .05);
+      expect(ratio, greaterThanOrEqualTo(4.5));
+      if (!dark) expect(colors.primary, CrewClockTheme.blue);
+    }
+  });
   testWidgets('preset adapts to large text and keeps saves visible',
       (tester) async {
     await tester.binding.setSurfaceSize(const Size(320, 700));
@@ -66,12 +76,13 @@ void main() {
                     minutesBefore: 270,
                     onSave: (_, minutes, __, ___) async => saved = minutes,
                     onDelete: () async {})))));
-    final minutes = find.widgetWithText(TextField, 'Minutes');
+    final minutes = find.byKey(const ValueKey('preset-minutes'));
     await tester.enterText(minutes, '15');
     await tester.pump(const Duration(milliseconds: 700));
     await tester.pumpAndSettle();
     expect(saved, 255);
-    expect(find.text('Saved'), findsOneWidget);
+    expect(find.text('Save'), findsNothing);
+    expect(find.text('Saved'), findsNothing);
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox());
   });

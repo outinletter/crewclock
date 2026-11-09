@@ -9,16 +9,25 @@ class CrewClockStore extends ChangeNotifier {
   final NativeAlarmScheduler scheduler = NativeAlarmScheduler();
   final RosterParser parser = RosterParser();
   final AppDatabase db = AppDatabase.instance;
-  List<Map<String, dynamic>> flights = [], alarms = [], intervals = [];
+  List<Map<String, dynamic>> flights = [],
+      alarms = [],
+      intervals = [],
+      duties = [];
   Map<String, dynamic> settings = {}, briefings = {}, statuses = {};
   bool ready = false, busy = false;
+  Map<String, dynamic> alarmDiagnostics = {};
+  String? get alarmWarning => alarmDiagnostics['alarmAllowed'] == false
+      ? 'System alarms are disabled. Enable CrewClock alarms in iPhone Settings.'
+      : alarmDiagnostics['notificationsAllowed'] == false
+          ? 'Notifications are off. System alarms remain available, but notification alerts are disabled.'
+          : null;
   String? error, migrationNotice, selectedFlight, pendingToolsAction;
   void Function(String action, String? flight)? openTools;
   Map<String, dynamic>? _demo, _demoState;
   Future<void> _tail = Future<void>.value();
 
   static const preparation = [
-    'Roster and departure time checked',
+    'Roster and departure time',
     'Crew documents packed',
     'Passport & VISA',
     'Personal bag ready'
@@ -30,8 +39,8 @@ class CrewClockStore extends ChangeNotifier {
       {'id': 'b3', 'h': 0, 'm': 40, 'lbl': 'Boarding time'}
     ],
     'domOffs': [
-      {'id': 'd1', 'h': 3, 'm': 0, 'lbl': 'Prepare for Duty'},
-      {'id': 'd2', 'h': 2, 'm': 30, 'lbl': 'Depart for Airport'},
+      {'id': 'd1', 'h': 3, 'm': 30, 'lbl': 'Prepare for Duty'},
+      {'id': 'd2', 'h': 3, 'm': 30, 'lbl': 'Depart for Airport'},
       {'id': 'd3', 'h': 0, 'm': 30, 'lbl': 'Boarding time'}
     ],
     'intlOffs': [
@@ -40,7 +49,79 @@ class CrewClockStore extends ChangeNotifier {
       {'id': 'i3', 'h': 0, 'm': 40, 'lbl': 'Boarding time'}
     ],
   };
-  String get home => settings['baseApt'] as String? ?? 'ICN';
+  List<String> baseAirports(
+      {bool domestic = false, Map<String, dynamic>? configuration}) {
+    final config = configuration ?? settings;
+    final raw = config[domestic ? 'domesticBaseApt' : 'baseApt'];
+    final codes = '${raw ?? (domestic ? 'GMP' : 'ICN')}'
+        .toUpperCase()
+        .split(RegExp(r'[,;\s]+'))
+        .where((s) => s.isNotEmpty)
+        .toSet()
+        .toList();
+    return codes.isEmpty ? [domestic ? 'GMP' : 'ICN'] : codes;
+  }
+
+  bool get displayUTC => false;
+  String deviceZone = 'UTC';
+  String get personalZone => airportZone(home) ?? 'UTC';
+  String? displayZone(String airport) =>
+      displayUTC ? 'UTC' : airportZone(airport);
+  String get timeSuffix => displayUTC ? 'Z' : 'L';
+  List<Map<String, dynamic>> get schedulingRecords {
+    final delay = (settings['backupMinutes'] as num?)?.toInt() ?? 0;
+    return [
+      ...alarms,
+      if (delay > 0)
+        for (final a in alarms)
+          if (flag(a['armed']) &&
+              !flag(a['dism']) &&
+              DateTime.parse(a['time'])
+                  .add(Duration(minutes: delay))
+                  .isAfter(DateTime.now()))
+            {
+              ...a,
+              'id': 'backup_${a['id']}',
+              'backupOf': a['id'],
+              'lbl': 'Backup · ${a['lbl']}',
+              'time': DateTime.parse(a['time'])
+                  .add(Duration(minutes: delay))
+                  .toUtc()
+                  .toIso8601String(),
+            }
+    ];
+  }
+
+  Future<void> setDisplayUTC(bool value) => change(() async {
+        settings['displayUTC'] = value;
+        await _persist();
+        await publishSurfaces();
+      });
+  Future<void> addRelativeAlarm(String label, int minutes) async {
+    if (minutes < 1 || minutes > 10080) {
+      throw const FormatException('Choose 1 minute to 7 days.');
+    }
+    await saveAlarm({
+      'id': 'timer_${id()}',
+      'lbl': label,
+      'time': DateTime.now()
+          .toUtc()
+          .add(Duration(minutes: minutes))
+          .toIso8601String(),
+      // Timers are fixed, one-shot alarms. Keep them distinct from both
+      // personal alarms (`direct`) and repeating reminders (`intervals`).
+      'type': 'timer',
+      'armed': true,
+      'dism': false,
+      'missed': false,
+      'elapsedAlarm': true,
+      'durationMinutes': minutes,
+      'oneShot': true
+    });
+  }
+
+  String get home => baseAirports().first;
+  String get domesticHome => baseAirports(domestic: true).first;
   bool get dark => settings['dark'] == true;
   bool flag(dynamic value) => value == true || value == 1 || value == 'true';
   String id() => DateTime.now().microsecondsSinceEpoch.toString();
@@ -58,6 +139,15 @@ class CrewClockStore extends ChangeNotifier {
       tz.TZDateTime.from(time, tz.getLocation(zone ?? 'UTC'));
   String two(int n) => n.toString().padLeft(2, '0');
   String date(DateTime at) => '${at.year}-${two(at.month)}-${two(at.day)}';
+  String displayDate(DateTime at) => '${date(at)} ${[
+        'Mon',
+        'Tue',
+        'Wed',
+        'Thu',
+        'Fri',
+        'Sat',
+        'Sun'
+      ][at.weekday - 1]}';
   String clock(DateTime at) => '${two(at.hour)}:${two(at.minute)}';
   String stamp(DateTime at, String? zone) {
     final d = zoned(at, zone);
@@ -94,6 +184,7 @@ class CrewClockStore extends ChangeNotifier {
       final saved = await db.loadNativeState();
       if (saved != null) {
         flights = maps(saved['flights']);
+        duties = maps(saved['duties']);
         settings = Map<String, dynamic>.from(saved['settings'] as Map? ?? {});
         briefings = Map<String, dynamic>.from(saved['briefings'] as Map? ?? {});
         intervals = maps(saved['intervals']);
@@ -168,10 +259,40 @@ class CrewClockStore extends ChangeNotifier {
       }
       settings['airportZones'] = overrides;
       settings.putIfAbsent('baseApt', () => 'ICN');
+      for (final removed in [
+        'displayUTC',
+        'personalTimeBasis',
+        'backupMinutes'
+      ]) {
+        settings.remove(removed);
+      }
+      for (final a in alarms) {
+        if (a['timeBasis'] == 'device') a['timeBasis'] = 'fixed';
+      }
+      await db.saveAlarmsState(jsonEncode(alarms));
       await _persist();
       try {
         await scheduler.requestStartupPermissions();
-        await scheduler.scheduleFromRecords(alarms);
+        final domestic = maps(settings['domOffs']);
+        final oldDefault = domestic.any((p) =>
+            '${p['lbl']}'.trim().toLowerCase() == 'prepare for duty' &&
+            p['h'] == 4 &&
+            p['m'] == 0);
+        if (oldDefault) {
+          await saveSettings({
+            ...settings,
+            'domOffs': domestic
+                .map((p) =>
+                    '${p['lbl']}'.trim().toLowerCase() == 'prepare for duty' &&
+                            p['h'] == 4 &&
+                            p['m'] == 0
+                        ? {...p, 'h': 3, 'm': 30}
+                        : p)
+                .toList()
+          });
+        } else {
+          await scheduler.scheduleFromRecords(schedulingRecords);
+        }
       } catch (_) {
         error =
             'Your schedules are available, but alarm reservations could not be restored. Check CrewClock permissions in iPhone Settings and reopen the app.';
@@ -186,6 +307,7 @@ class CrewClockStore extends ChangeNotifier {
 
   Future<void> _persist() => db.saveNativeState({
         'flights': flights,
+        'duties': duties,
         'settings': settings,
         'briefings': briefings,
         'intervals': intervals
@@ -205,12 +327,126 @@ class CrewClockStore extends ChangeNotifier {
     return result;
   }
 
+  String? surfaceError;
+  Future<void> publishSurfaces() async {
+    final upcoming = <Map<String, dynamic>>[];
+    for (final alarm in schedulingRecords) {
+      final status = statuses['${alarm['id']}'] as Map?;
+      if (!['scheduled', 'alerting'].contains(status?['state'])) continue;
+      final at = DateTime.tryParse('${alarm['time']}');
+      if (at == null || !at.isAfter(DateTime.now())) continue;
+      final dep =
+          alarm['dep'] == null ? null : DateTime.tryParse('${alarm['dep']}');
+      upcoming.add({
+        'id': '${alarm['id']}',
+        'label': '${alarm['lbl']}',
+        'at': at.millisecondsSinceEpoch / 1000.0,
+        'flightDeparture':
+            dep == null ? null : dep.millisecondsSinceEpoch / 1000.0,
+        'zone': displayUTC
+            ? 'UTC'
+            : alarm['zone'] ??
+                airportZone('${alarm['depApt'] ?? home}') ??
+                personalZone
+      });
+    }
+    for (final alarm in intervals) {
+      final status = statuses['${alarm['id']}'] as Map?;
+      if (alarm['enabled'] != true ||
+          !['scheduled', 'alerting'].contains(status?['state']) ||
+          status?['next'] is! num) {
+        continue;
+      }
+      upcoming.add({
+        'id': '${alarm['id']}',
+        'label': '${alarm['label']}',
+        'at': (status!['next'] as num).toDouble() / 1000,
+        'flightDeparture': null,
+        'zone': displayUTC ? 'UTC' : personalZone
+      });
+    }
+    upcoming.sort((a, b) => (a['at'] as num).compareTo(b['at'] as num));
+    final nextFlight = sortedFlights()
+        .where((f) => departure(f).isAfter(DateTime.now()))
+        .firstOrNull;
+    try {
+      await NativeAlarmScheduler.channel
+          .invokeMethod<void>('syncSystemSurfaces', {
+        'payload': {
+          'updatedAt': DateTime.now().millisecondsSinceEpoch / 1000.0,
+          'alarms': upcoming,
+          'flight': nextFlight == null ? '' : flightLabel(nextFlight),
+          'flightNumber': nextFlight?['flight'],
+          'departureDate': nextFlight == null
+              ? null
+              : date(zoned(
+                  departure(nextFlight), airportZone(nextFlight['depApt']))),
+          'departureAirport': nextFlight?['depApt'],
+          'arrivalAirport': nextFlight?['arrApt'],
+          'departureTime': nextFlight == null
+              ? null
+              : clock(zoned(
+                  departure(nextFlight), airportZone(nextFlight['depApt']))),
+          'arrivalTime': nextFlight == null || nextFlight['arrivalUtc'] == null
+              ? null
+              : clock(zoned(DateTime.parse('${nextFlight['arrivalUtc']}'),
+                  airportZone(nextFlight['arrApt']))),
+          'allowed': alarmDiagnostics['alarmAllowed'] == true
+        },
+        'liveActivity': settings['liveActivity'] == true
+      });
+      surfaceError = null;
+    } catch (_) {
+      surfaceError =
+          'Unable to update a system surface. Check Live Activities permission in iPhone Settings. Alarm reservations are separate.';
+    }
+  }
+
   Future<void> refresh({bool notify = true}) async {
-    await scheduler.reconcileDismissals();
-    alarms = maps(await db.getAlarmsState());
-    statuses = Map<String, dynamic>.from(await NativeAlarmScheduler.channel
-            .invokeMethod<Map>('getAlarmStatus', alarms) ??
+    alarmDiagnostics = Map<String, dynamic>.from(await NativeAlarmScheduler
+            .channel
+            .invokeMethod<Map>('getAlarmDiagnostics') ??
         {});
+    deviceZone = '${alarmDiagnostics['deviceTimeZone'] ?? deviceZone}';
+    await scheduler.reconcileDismissals();
+    intervals = maps(await NativeAlarmScheduler.channel
+        .invokeMethod<List<dynamic>>('readIntervalAlarms'));
+    alarms = maps(await db.getAlarmsState());
+    alarms.removeWhere((a) =>
+        (a['type'] == 'direct' || a['type'] == 'timer') && flag(a['dism']));
+    var floatingChanged = false;
+    for (final alarm in alarms.where((a) =>
+        a['type'] == 'direct' &&
+        a['timeBasis'] == 'device' &&
+        a['wallDate'] != null &&
+        a['wallTime'] != null &&
+        flag(a['armed']) &&
+        !flag(a['dism']))) {
+      if (alarm['zone'] == deviceZone) continue;
+      try {
+        final at = parser.localInstant(
+            '${alarm['wallDate']}', '${alarm['wallTime']}', deviceZone);
+        alarm['time'] = at.toIso8601String();
+        alarm['zone'] = deviceZone;
+        if (!at.isAfter(DateTime.now())) {
+          alarm['armed'] = false;
+          alarm['missed'] = true;
+        }
+        floatingChanged = true;
+      } catch (_) {
+        error =
+            'A device-local alarm needs a valid local time after the time-zone change. Review Personal Alarms.';
+      }
+    }
+    if (floatingChanged) {
+      await db.saveAlarmsState(jsonEncode(alarms));
+      await scheduler.scheduleFromRecords(schedulingRecords);
+    }
+
+    statuses = Map<String, dynamic>.from(await NativeAlarmScheduler.channel
+            .invokeMethod<Map>('getAlarmStatus', schedulingRecords) ??
+        {});
+    await publishSurfaces();
     if (notify) notifyListeners();
   }
 
@@ -218,7 +454,7 @@ class CrewClockStore extends ChangeNotifier {
     await db.saveAlarmsState(jsonEncode(alarms));
     await _persist();
     try {
-      await scheduler.scheduleFromRecords(alarms,
+      await scheduler.scheduleFromRecords(schedulingRecords,
           requestExactPermissions: request);
       error = null;
     } catch (e) {
@@ -274,35 +510,34 @@ class CrewClockStore extends ChangeNotifier {
     final at = DateTime.fromMillisecondsSinceEpoch(
         (status!['next'] as num).toInt(),
         isUtc: true);
-    return 'Next: ${stamp(at, airportZone(home))} $home';
+    return 'Next: ${stamp(at, displayUTC ? 'UTC' : personalZone)} ($timeSuffix)';
   }
 
-  String presetGroup(Map f) {
-    final domestic = (settings['domesticAirports'] as List? ??
-            [
-              'ICN',
-              'GMP',
-              'PUS',
-              'CJU',
-              'TAE',
-              'KWJ',
-              'CJJ',
-              'RSU',
-              'USN',
-              'KPO',
-              'MWX',
-              'YNY',
-              'HIN',
-              'KUV',
-              'WJU'
-            ])
-        .contains(f['arrApt']);
-    final group = f['depApt'] == home ? (domestic ? 'dom' : 'base') : 'intl';
-    return group;
+  String presetGroup(Map f, {Map<String, dynamic>? configuration}) {
+    final config = configuration ?? settings;
+    if (baseAirports(domestic: true, configuration: config)
+        .contains(f['depApt'])) {
+      return 'dom';
+    }
+    if (baseAirports(configuration: config).contains(f['depApt'])) {
+      return 'base';
+    }
+    return 'intl';
   }
 
-  List<Map<String, dynamic>> offsets(Map f) => maps(
-      settings['${presetGroup(f)}Offs'] ?? defaults['${presetGroup(f)}Offs']);
+  List<Map<String, dynamic>> preparationPresets(String group) {
+    final list = maps(settings['${group}Offs'] ?? defaults['${group}Offs']);
+    int duration(Map p) =>
+        (p['h'] as num).toInt() * 60 + (p['m'] as num).toInt();
+    list.sort((a, b) {
+      final order = duration(b).compareTo(duration(a));
+      return order == 0 ? '${a['id']}'.compareTo('${b['id']}') : order;
+    });
+    return list;
+  }
+
+  List<Map<String, dynamic>> offsets(Map f) =>
+      preparationPresets(presetGroup(f));
 
   List<Map<String, dynamic>> buildFlightAlarms(Map<String, dynamic> f) =>
       offsets(f)
@@ -327,8 +562,88 @@ class CrewClockStore extends ChangeNotifier {
               })
           .toList();
 
-  Future<void> importFlights(List<Map<String, dynamic>> imported) =>
+  List<Map<String, dynamic>> pairingFor(Map flight) {
+    final groups = <List<Map<String, dynamic>>>[];
+    for (final current in sortedFlights()) {
+      final previous = groups.isEmpty ? null : groups.last.last;
+      final arrival = previous == null
+          ? null
+          : DateTime.tryParse('${previous['arrivalUtc']}');
+      final gap =
+          arrival == null ? null : departure(current).difference(arrival);
+      final connects = previous != null &&
+          previous['arrApt'] == current['depApt'] &&
+          ![...baseAirports(), ...baseAirports(domestic: true)]
+              .contains(previous['arrApt']) &&
+          gap != null &&
+          !gap.isNegative &&
+          gap.inHours <= 96;
+      if (connects) {
+        groups.last.add(current);
+      } else {
+        groups.add([current]);
+      }
+    }
+    return groups
+            .where((g) => g.any((f) => key(f) == key(flight)))
+            .firstOrNull ??
+        [Map<String, dynamic>.from(flight)];
+  }
+
+  String scheduledGapBefore(Map flight) {
+    final previous = sortedFlights()
+        .where((f) => departure(f).isBefore(departure(flight)))
+        .lastOrNull;
+    final arrival = DateTime.tryParse('${previous?['arrivalUtc']}');
+    if (arrival == null) return 'Ground gap unavailable';
+    final gap = departure(flight).difference(arrival);
+    if (gap.isNegative) return 'Overlapping flight times';
+    return 'Scheduled ground gap: ${gap.inHours}h ${gap.inMinutes % 60}m · excludes duty/reporting';
+  }
+
+  Map<String, dynamic>? matchingFlight(Map<String, dynamic> f) {
+    final exact = flightById(f['id']);
+    final matches = exact != null
+        ? [exact]
+        : flights
+            .where((old) =>
+                old['flight'] == f['flight'] &&
+                old['depApt'] == f['depApt'] &&
+                old['arrApt'] == f['arrApt'] &&
+                date(zoned(departure(old), airportZone(old['depApt']))) ==
+                    date(zoned(departure(f), airportZone(f['depApt']))))
+            .toList();
+    if (matches.length > 1) {
+      throw const FormatException(
+          'Multiple flights match. Edit those flights individually.');
+    }
+    return matches.firstOrNull;
+  }
+
+  String importChange(Map<String, dynamic> f) {
+    final old = matchingFlight(f);
+    if (old == null) return 'New';
+    return old['departureUtc'] == f['departureUtc'] &&
+            old['arrivalUtc'] == f['arrivalUtc'] &&
+            old['depApt'] == f['depApt'] &&
+            old['arrApt'] == f['arrApt']
+        ? 'Unchanged'
+        : 'Changed';
+  }
+
+  String importTimes(Map<String, dynamic> f) {
+    final arrival = DateTime.tryParse('${f['arrivalUtc']}');
+    return '${stamp(departure(f), airportZone(f['depApt']))} ${f['depApt']} (L) → ${arrival == null ? 'arrival unknown' : stamp(arrival, airportZone(f['arrApt']))} ${f['arrApt']} (L)';
+  }
+
+  Future<void> importFlights(List<Map<String, dynamic>> imported,
+          {List<Map<String, dynamic>>? nonFlights}) =>
       change(() async {
+        if (nonFlights != null) {
+          final dates = nonFlights.map((d) => d['date']).toSet();
+          duties.removeWhere((d) => dates.contains(d['date']));
+          duties.addAll(nonFlights);
+        }
         for (final incoming in imported) {
           final zone = incoming['departureZone'] as String? ??
               airportZone(incoming['depApt']);
@@ -359,21 +674,8 @@ class CrewClockStore extends ChangeNotifier {
             throw FormatException(
                 'Confirm the departure airport time zone for ${f['depApt']} using manual entry.');
           }
-          final exact = flightById(f['id']);
-          final matches = exact != null
-              ? [exact]
-              : flights
-                  .where((old) =>
-                      old['flight'] == f['flight'] &&
-                      old['depApt'] == f['depApt'] &&
-                      old['arrApt'] == f['arrApt'] &&
-                      date(zoned(departure(old), airportZone(old['depApt']))) ==
-                          date(zoned(departure(f), airportZone(f['depApt']))))
-                  .toList();
-          if (matches.length > 1) {
-            throw const FormatException(
-                'Multiple flights match. Edit those flights individually.');
-          }
+          final match = matchingFlight(f);
+          final matches = match == null ? <Map<String, dynamic>>[] : [match];
           if (matches.isNotEmpty) {
             final old = matches.first,
                 records = flightAlarms(old),
@@ -408,6 +710,21 @@ class CrewClockStore extends ChangeNotifier {
         briefings.remove(key(f));
         await _saveAlarms();
       });
+  Future<void> clearRoster() => change(() async {
+        final ids = flights.expand(flightAlarms).map((a) => a['id']).toSet();
+        alarms.removeWhere((a) =>
+            ids.contains(a['id']) ||
+            a['type'] == 'base' ||
+            a['type'] == 'intl');
+        flights.clear();
+        duties.clear();
+        briefings.clear();
+        selectedFlight = null;
+        pendingToolsAction = null;
+        _demo = null;
+        _demoState = null;
+        await _saveAlarms();
+      });
   Future<void> saveAlarm(Map<String, dynamic> record) => change(() async {
         alarms.removeWhere((a) => a['id'] == record['id']);
         alarms.add(record);
@@ -436,10 +753,40 @@ class CrewClockStore extends ChangeNotifier {
         await refresh();
       });
   Future<void> saveSettings(Map<String, dynamic> next) => change(() async {
+        final previous = settings;
         settings = next;
-        await _persist();
-        notifyListeners();
-        // Existing departure instants and custom alarms remain fixed when changing the home base.
+        for (final f in flights) {
+          final group = presetGroup(f);
+          final oldGroup = presetGroup(f, configuration: previous);
+          if (jsonEncode(
+                      previous['${group}Offs'] ?? defaults['${group}Offs']) ==
+                  jsonEncode(
+                      next['${group}Offs'] ?? defaults['${group}Offs']) &&
+              previous['baseApt'] == next['baseApt'] &&
+              previous['domesticBaseApt'] == next['domesticBaseApt']) {
+            continue;
+          }
+          final generated = buildFlightAlarms(f);
+          final ids = generated.map((a) => a['id']).toSet();
+          for (final updated in generated) {
+            final index = alarms.indexWhere((a) => a['id'] == updated['id']);
+            if (index >= 0) {
+              // Preserve completion, pause state and manually added reminders.
+              alarms[index]['time'] = updated['time'];
+              alarms[index]['lbl'] = updated['lbl'];
+            } else if (departure(f).isAfter(DateTime.now())) {
+              alarms.add(updated);
+            }
+          }
+          final prefix = '${f['id']}_';
+          final oldIds =
+              maps(previous['${oldGroup}Offs'] ?? defaults['${oldGroup}Offs'])
+                  .map((p) => '$prefix${p['id']}')
+                  .toSet();
+          alarms.removeWhere(
+              (a) => oldIds.contains(a['id']) && !ids.contains(a['id']));
+        }
+        await _saveAlarms(request: true);
       });
   Future<void> setPrivacy(bool value) => change(() async {
         await NativeAlarmScheduler.channel
@@ -465,7 +812,12 @@ class CrewClockStore extends ChangeNotifier {
             'note': ''
           };
     result['tasks'] = maps(result['tasks']);
-    for (final task in result['tasks']) {
+    for (var i = 0; i < (result['tasks'] as List).length; i++) {
+      final task = result['tasks'][i];
+      task['id'] ??= 'task_$i';
+      if (task['label'] == 'Roster and departure time checked') {
+        task['label'] = 'Roster and departure time';
+      }
       if (['airport transport arranged', 'airport transit']
           .contains('${task['label']}'.toLowerCase())) {
         task['label'] = 'Passport & VISA';
@@ -508,7 +860,7 @@ class CrewClockStore extends ChangeNotifier {
         'armed': flag(a['armed']) && !flag(a['dism']),
         'label': a['lbl'],
         'at': at.toIso8601String(),
-        'clock': clock(zoned(at, zone)),
+        'clock': clock(zoned(at, displayUTC ? 'UTC' : zone)),
         'offset': offsetText(minutes),
         'time': '${stamp(at, zone)} ${f!['depApt']}',
         'status': _demo == null ? status(a) : 'Preview'
@@ -535,6 +887,7 @@ class CrewClockStore extends ChangeNotifier {
     return {
       'key': key(f),
       'dark': dark,
+      'timeSuffix': timeSuffix,
       'demo': _demo != null,
       'flight': {
         'number': f['flight'],
@@ -550,10 +903,10 @@ class CrewClockStore extends ChangeNotifier {
           'Sat',
           'Sun'
         ][local.weekday - 1]}',
-        'departureTime': clock(local),
+        'departureTime': clock(zoned(dep, displayZone(f['depApt']))),
         'arrivalTime': arrival == null
             ? (f['arrTime'] ?? '—')
-            : clock(zoned(arrival, airportZone(f['arrApt'])))
+            : clock(zoned(arrival, displayZone(f['arrApt'])))
       },
       'flights': _demo != null
           ? []
@@ -589,7 +942,7 @@ class CrewClockStore extends ChangeNotifier {
 
   static String offsetText(int minutes) {
     final value = minutes.abs();
-    return '${minutes >= 0 ? '-' : '+'}${value ~/ 60}h${value % 60}m';
+    return '${minutes >= 0 ? '-' : '+'}${value ~/ 60}h ${value % 60}m';
   }
 
   Future<void> action(String action, String? selected, Object? value) async {
@@ -672,6 +1025,28 @@ class CrewClockStore extends ChangeNotifier {
     }
     final state = _preparation(f), tasks = maps(state['tasks']);
     switch (action) {
+      case 'renameTask':
+        final args = Map<String, dynamic>.from(value as Map);
+        if (args['flightKey'] != null && args['flightKey'] != key(f)) {
+          throw StateError('Flight changed while editing.');
+        }
+        final label = '${args['label']}'.trim();
+        if (label.isEmpty || label.length > 100) {
+          throw const FormatException(
+              'Use a preparation name within 100 characters.');
+        }
+        tasks.firstWhere((t) => t['id'] == args['id'])['label'] = label;
+        break;
+      case 'reorderTasks':
+        final ids = List<String>.from(value as List);
+        if (ids.length != tasks.length ||
+            ids.toSet().length != tasks.length ||
+            !tasks.every((t) => ids.contains(t['id']))) {
+          throw const FormatException('Preparation list changed. Try again.');
+        }
+        tasks.sort(
+            (a, b) => ids.indexOf(a['id']).compareTo(ids.indexOf(b['id'])));
+        break;
       case 'toggle':
         final task = tasks[value as int];
         task['checkedAt'] = task['checkedAt'] == null
@@ -687,33 +1062,11 @@ class CrewClockStore extends ChangeNotifier {
           throw const FormatException(
               'Use up to 12 items, each within 100 characters.');
         }
-        tasks.add({'label': label, 'checkedAt': null});
+        tasks.add({'id': 'task_${id()}', 'label': label, 'checkedAt': null});
         break;
       case 'note':
         state['note'] = '$value'.substring(0, '$value'.length.clamp(0, 1000));
         break;
-      case 'export':
-        final snap = await snapshot(selected),
-            lines = <String>[
-              _demo == null
-                  ? 'Personal flight preparation'
-                  : 'FICTIONAL DEMO — no alarms scheduled',
-              flightLabel(f),
-              ...((snap['clocks'] as List).map((c) =>
-                  '${c['label']}: ${c['date']} ${c['time']} (${c['zone']})')),
-              ...((snap['steps'] as List)
-                  .map((s) => '${s['time']} — ${s['label']} · ${s['status']}')),
-              ...tasks.map((t) =>
-                  '${t['checkedAt'] == null ? '[ ]' : '[Checked ${t['checkedAt']}]'} ${t['label']}'),
-              'Layover / pickup note: ${state['note'] ?? ''}',
-              'Personal organization only. Follow your airline’s official procedures.'
-            ];
-        await NativeAlarmScheduler.channel.invokeMethod<void>(
-            'shareDutyBriefing', {
-          'title': 'CrewClock Flight Preparation',
-          'lines': lines.take(50).toList()
-        });
-        return;
       default:
         throw StateError('Unsupported action');
     }

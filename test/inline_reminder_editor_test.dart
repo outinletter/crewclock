@@ -1,3 +1,4 @@
+import 'package:crewclock/widgets/centered_date_time_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -70,14 +71,14 @@ void main() {
                   onSave: (_, __, ___, ____) async {}))));
       final button = find.widgetWithText(FilledButton, 'Save changes');
       final fields = timed
-          ? find.byType(CupertinoDatePicker)
+          ? find.byType(CenteredDateTimePicker)
           : find.widgetWithText(TextField, 'Hours');
       expect(tester.getTopLeft(button).dy - tester.getBottomLeft(fields).dy,
           greaterThanOrEqualTo(14));
       if (timed) {
-        final picker = tester.widget<CupertinoDatePicker>(fields);
+        final picker = tester.widget<CenteredDateTimePicker>(fields);
         expect(picker.itemExtent, 28);
-        expect(tester.getSize(fields).height, 120);
+        expect(tester.getSize(fields).height, 112);
       }
       expect(tester.takeException(), isNull);
     }
@@ -138,6 +139,23 @@ void main() {
     await tester.pumpAndSettle();
     expect(saved, isNull);
     expect(find.textContaining('Enter a label'), findsOneWidget);
+    await tester.pumpWidget(const SizedBox());
+  });
+  testWidgets('current time button resets both the date and the roller',
+      (tester) async {
+    await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+            body: InlineReminderEditor(
+                label: '',
+                date: '2099-11-02',
+                time: '13:55',
+                onSave: (_, __, ___, ____) async {}))));
+    await tester.tap(find.text('Current time'));
+    await tester.pumpAndSettle();
+    final picker =
+        tester.widget<CenteredDateTimePicker>(find.byType(CenteredDateTimePicker));
+    expect(picker.initialDateTime.difference(DateTime.now()).inSeconds.abs(),
+        lessThan(61));
     await tester.pumpWidget(const SizedBox());
   });
 }

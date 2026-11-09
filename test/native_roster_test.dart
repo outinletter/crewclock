@@ -125,7 +125,7 @@ void main() {
     final data = await s.snapshot(null);
     final step = (data['steps'] as List).single;
     expect(step['clock'], '09:25');
-    expect(step['offset'], '-4h30m');
+    expect(step['offset'], '-4h 30m');
     expect(step['status'], 'Scheduled');
     expect((data['flight'] as Map)['departureTime'], '13:55');
     expect((data['clocks'] as List)[2]['time'], '04:55');

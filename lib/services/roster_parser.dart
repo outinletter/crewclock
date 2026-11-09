@@ -50,7 +50,205 @@ class RosterParser {
     if (text.length > 5000000) {
       throw const FormatException('Choose a roster smaller than 5 MB.');
     }
-    return text.contains('BEGIN:VEVENT') ? _calendar(text) : _lines(text);
+    if (text.contains('BEGIN:VEVENT')) return _calendar(text);
+    if (RegExp(
+            r'\b(January|February|March|April|May|June|July|August|September|October|November|December)\s+20\d{2}',
+            caseSensitive: false)
+        .hasMatch(text)) {
+      return _monthly(text);
+    }
+    return _lines(text);
+  }
+
+  List<Map<String, dynamic>> nonFlightDays(String text) {
+    final result = <Map<String, dynamic>>[];
+    String? category(String label) {
+      if (RegExp(r'^(DO|RDO|ATDO|OFF|ALV|ALM)$').hasMatch(label)) {
+        return 'Off / leave';
+      }
+      if (RegExp(r'RESERVE|STANDBY|SBY').hasMatch(label)) return 'Reserve';
+      if (RegExp(r'^(LO\s*|LAYOVER)').hasMatch(label)) return 'Layover';
+      if (RegExp(r'CRM|UPRT|EMER|SAFE_MT|SIM|TRAIN').hasMatch(label)) {
+        return 'Training';
+      }
+      return null;
+    }
+
+    void add(String date, String label) {
+      final type = category(label.trim().toUpperCase());
+      if (type != null) {
+        result.add({'date': date, 'label': label.trim(), 'category': type});
+      }
+    }
+
+    if (text.contains('BEGIN:VEVENT')) {
+      for (final event in text.split('BEGIN:VEVENT').skip(1)) {
+        final summary =
+            RegExp(r'(?:^|\n)SUMMARY:([^\r\n]+)').firstMatch(event)?[1];
+        final date = RegExp(r'(?:^|\n)DTSTART[^:]*:(\d{4})(\d{2})(\d{2})')
+            .firstMatch(event);
+        if (summary != null && date != null) {
+          add('${date[1]}-${date[2]}-${date[3]}', summary);
+        }
+      }
+    } else {
+      const months = [
+        'January',
+        'February',
+        'March',
+        'April',
+        'May',
+        'June',
+        'July',
+        'August',
+        'September',
+        'October',
+        'November',
+        'December'
+      ];
+      final title =
+          RegExp('(${months.join('|')})\\s+(20[0-9]{2})', caseSensitive: false)
+              .firstMatch(text);
+      if (title == null) return result;
+      final month =
+          months.indexWhere((m) => m.toLowerCase() == title[1]!.toLowerCase()) +
+              1;
+      final matches = RegExp(
+              '\\b${months[month - 1].substring(0, 3)}\\s+([0-9]{1,2})\\b',
+              caseSensitive: false)
+          .allMatches(text)
+          .toList();
+      for (var i = 0; i < matches.length; i++) {
+        final date =
+            '${title[2]}-${month.toString().padLeft(2, '0')}-${matches[i][1]!.padLeft(2, '0')}';
+        for (final line in text
+            .substring(matches[i].end,
+                i + 1 < matches.length ? matches[i + 1].start : text.length)
+            .split('\n')) {
+          add(date, line);
+        }
+      }
+    }
+    final unique = <String, Map<String, dynamic>>{};
+    for (final item in result) {
+      unique['${item['date']}|${item['label']}'] = item;
+    }
+    return unique.values.toList();
+  }
+
+  List<Map<String, dynamic>> _monthly(String text) {
+    text = text.replaceAll('\u00a0', ' ').replaceAll(RegExp('[−‐‑]'), '-');
+    text = text.replaceAllMapped(
+        RegExp(r'(?<!\d)(\d{1,2})\s*[.:：]\s*(\d{2})\b'),
+        (m) => '${m[1]!.padLeft(2, '0')}:${m[2]}');
+    text = text.replaceAll(RegExp(r'\b[Il1]CN\b'), 'ICN');
+    const months = [
+      'January',
+      'February',
+      'March',
+      'April',
+      'May',
+      'June',
+      'July',
+      'August',
+      'September',
+      'October',
+      'November',
+      'December'
+    ];
+    final title =
+        RegExp('(${months.join('|')})\\s+(20[0-9]{2})', caseSensitive: false)
+            .firstMatch(text)!;
+    final year = int.parse(title[2]!);
+    final month =
+        months.indexWhere((m) => m.toLowerCase() == title[1]!.toLowerCase()) +
+            1;
+    final monthCode = months[month - 1].substring(0, 3);
+    final headers =
+        RegExp('\\b$monthCode\\s+([0-9]{1,2})\\b', caseSensitive: false)
+            .allMatches(text)
+            .toList();
+    final flights = <Map<String, dynamic>>[];
+    final pending = <String, Map<String, dynamic>>{};
+    final flightPattern = RegExp(
+        r'\b([A-Z]{2})\s*(\d{1,4})\s*([A-Z]{3})\s*(\d{2}:\d{2})?\s*[-–—→]\s*([A-Z]{3})(?:\s*(\d{2}:\d{2}))?');
+    final cells = [
+      for (var i = 0; i < headers.length; i++)
+        (
+          day: int.parse(headers[i][1]!),
+          text: text
+              .substring(headers[i].end,
+                  i + 1 < headers.length ? headers[i + 1].start : text.length)
+              .toUpperCase()
+        )
+    ]..sort((a, b) => a.day.compareTo(b.day));
+    for (final entry in cells) {
+      final day = entry.day;
+      if (day < 1 || day > DateTime(year, month + 1, 0).day) {
+        throw const FormatException('Invalid calendar date.');
+      }
+      final date =
+          '$year-${month.toString().padLeft(2, '0')}-${day.toString().padLeft(2, '0')}';
+      final cell = entry.text;
+      for (final m in flightPattern.allMatches(cell)) {
+        final airline =
+            m[1] == 'DH' && RegExp(r'\bKE\s*\d').hasMatch(text.toUpperCase())
+                ? 'KE'
+                : m[1];
+        final number = '$airline${m[2]}', from = m[3]!, to = m[5]!;
+        final depZone = zone(from), arrZone = zone(to);
+        if (depZone == null || arrZone == null) {
+          throw FormatException(
+              'Unknown route $from-$to. Check recognized text.');
+        }
+        final flightKey = '$number|$from|$to';
+        if (m[4] != null) {
+          if (pending.containsKey(flightKey)) {
+            throw FormatException(
+                'Missing arrival date for $number. Use manual entry.');
+          }
+          final dep = localInstant(date, m[4]!, depZone);
+          final record = <String, dynamic>{
+            'id': '$number|$from|${dep.toIso8601String()}',
+            'flight': number,
+            'depApt': from,
+            'arrApt': to,
+            'departureUtc': dep.toIso8601String(),
+            'arrivalUtc': null
+          };
+          if (m[6] != null) {
+            final arr = localInstant(date, m[6]!, arrZone);
+            if (!arr.isAfter(dep)) {
+              throw FormatException(
+                  'Arrival date for $number is ambiguous. Use manual entry.');
+            }
+            record['arrivalUtc'] = arr.toIso8601String();
+          } else {
+            pending[flightKey] = record;
+          }
+          flights.add(record);
+        } else if (m[6] != null) {
+          final record = pending.remove(flightKey);
+          if (record == null) {
+            throw FormatException(
+                'Missing departure date for $number. Include the full calendar.');
+          }
+          final arr = localInstant(date, m[6]!, arrZone);
+          if (!arr.isAfter(DateTime.parse(record['departureUtc']))) {
+            throw FormatException('Check arrival date for $number.');
+          }
+          record['arrivalUtc'] = arr.toIso8601String();
+        } else {
+          throw FormatException(
+              'Missing times for $number. Check recognized text.');
+        }
+      }
+    }
+    if (pending.isNotEmpty) {
+      throw const FormatException(
+          'Some arrival dates are missing. Include the full calendar or enter flights manually.');
+    }
+    return _deduplicate(flights);
   }
 
   List<Map<String, dynamic>> _calendar(String raw) {
@@ -150,11 +348,11 @@ class RosterParser {
     final flights = <Map<String, dynamic>>[];
     for (final line in raw.split('\n').where((l) => l.trim().isNotEmpty)) {
       final m = RegExp(
-              r'^(\d{4}-\d{2}-\d{2})[\s,]+([A-Za-z]{2,3}\d{1,4})[\s,]+([A-Za-z]{3})[\s,→/-]+([A-Za-z]{3})[\s,]+(\d{2}:\d{2})\s*$')
+              r'^(\d{4}-\d{2}-\d{2})[\s,]+([A-Za-z]{2,3}\d{1,4})[\s,]+([A-Za-z]{3})[\s,→/-]+([A-Za-z]{3})[\s,]+(\d{2}:\d{2})(?:\s+(\d{4}-\d{2}-\d{2})\s+(\d{2}:\d{2}))?\s*$')
           .firstMatch(line.trim());
       if (m == null) {
         throw const FormatException(
-            'Text format: YYYY-MM-DD KE955 ICN IST 13:55. Use manual entry for other formats.');
+            'Text format: YYYY-MM-DD KE955 ICN IST 13:55. Optional arrival: YYYY-MM-DD HH:mm (destination local date/time). Use manual entry for other formats.');
       }
       final from = m[3]!.toUpperCase(), to = m[4]!.toUpperCase();
       final z = zone(from);
@@ -163,13 +361,22 @@ class RosterParser {
             'Unknown airport $from. Use manual entry with an explicit time zone.');
       }
       final dep = localInstant(m[1]!, m[5]!, z);
+      DateTime? arrival;
+      if (m[6] != null) {
+        final arrivalZone = zone(to);
+        if (arrivalZone == null) throw FormatException('Unknown airport $to.');
+        arrival = localInstant(m[6]!, m[7]!, arrivalZone);
+        if (!arrival.isAfter(dep)) {
+          throw const FormatException('Arrival must be after departure.');
+        }
+      }
       flights.add({
         'id': '${m[2]}|$from|${dep.toIso8601String()}',
         'flight': m[2]!.toUpperCase(),
         'depApt': from,
         'arrApt': to,
         'departureUtc': dep.toIso8601String(),
-        'arrivalUtc': null
+        'arrivalUtc': arrival?.toIso8601String()
       });
     }
     return _deduplicate(flights);

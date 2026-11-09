@@ -1,6 +1,9 @@
+import 'duration_wheels.dart';
+import 'centered_date_time_picker.dart';
+import 'swipe_to_reveal_delete.dart';
+import 'package:timezone/timezone.dart' as tz;
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
 
 String _reminderError(Object error) {
@@ -30,14 +33,14 @@ class HoursMinutesFields extends StatelessWidget {
     if (h == null ||
         m == null ||
         h < 0 ||
-        h > 168 ||
+        h > maxDurationHours ||
         m < 0 ||
         m > 59 ||
         h * 60 + m < minimum ||
-        h * 60 + m > 10080) {
+        h * 60 + m > maxDurationHours * 60) {
       throw FormatException(minimum == 0
-          ? 'Use 0–168 hours and 0–59 minutes, up to 168 hours total.'
-          : 'Enter at least 1 minute, up to 168 hours total.');
+          ? 'Use 0–24 hours and 0–59 minutes, up to 24 hours total.'
+          : 'Enter 1 minute to 24 hours.');
     }
     return h * 60 + m;
   }
@@ -117,6 +120,7 @@ class _InlineReminderEditorState extends State<InlineReminderEditor> {
   bool dirty = false, saving = false;
   String? error;
   bool saved = false, expanded = false;
+  int pickerRevision = 0;
   @override
   void initState() {
     super.initState();
@@ -199,6 +203,25 @@ class _InlineReminderEditorState extends State<InlineReminderEditor> {
       if (mounted) setState(() => saving = false);
     }
   }
+
+  Widget _repeatEntry(bool disabled) => DurationAlarmCard(
+        label: label,
+        hint: 'Label',
+        addTooltip: widget.saveLabel,
+        actionIcon:
+            widget.saveLabel.startsWith('Add') ? Icons.add : Icons.check,
+        minutes: (int.tryParse(hours.text) ?? 0) * 60 +
+            (int.tryParse(minutes.text) ?? 0),
+        enabled: !disabled,
+        error: error,
+        onLabelChanged: (_) => changed(),
+        onChanged: (value) {
+          hours.text = '${value ~/ 60}';
+          minutes.text = '${value % 60}';
+          changed();
+        },
+        onAdd: _save,
+      );
 
   Widget _number(TextEditingController controller, String text, String unit,
           bool disabled) =>
@@ -300,7 +323,11 @@ class _InlineReminderEditorState extends State<InlineReminderEditor> {
                                     ? null
                                     : _save,
                             icon: Icon(
-                                saved ? Icons.check : Icons.save_outlined,
+                                saved
+                                    ? Icons.check
+                                    : widget.saveLabel.startsWith('Add')
+                                        ? Icons.add
+                                        : Icons.save_outlined,
                                 color: dirty
                                     ? Theme.of(context).colorScheme.primary
                                     : null))),
@@ -335,6 +362,7 @@ class _InlineReminderEditorState extends State<InlineReminderEditor> {
   @override
   Widget build(BuildContext context) {
     final disabled = widget.busy || saving;
+    final personalAlarm = widget.minutesBefore == null;
     if (widget.summary && !expanded) {
       final total = widget.minutesBefore ?? 0;
       return Card.outlined(
@@ -359,6 +387,9 @@ class _InlineReminderEditorState extends State<InlineReminderEditor> {
         MediaQuery.sizeOf(context).width >= 350 &&
         MediaQuery.textScalerOf(context).scale(1) <= 1.3) {
       return _compact(disabled);
+    }
+    if (widget.repeat) {
+      return _repeatEntry(disabled);
     }
     return Card.outlined(
         margin: const EdgeInsets.only(top: 6),
@@ -400,17 +431,39 @@ class _InlineReminderEditorState extends State<InlineReminderEditor> {
                         enabled: !disabled,
                         onChanged: changed),
                   ] else ...[
+                    Row(children: [
+                      TextButton(
+                          onPressed: disabled
+                              ? null
+                              : () {
+                                  final now = DateTime.now().toUtc();
+                                  final local = widget.zone == null
+                                      ? now.toLocal()
+                                      : tz.TZDateTime.from(
+                                          now, tz.getLocation(widget.zone!));
+                                  date.text =
+                                      '${local.year}-${local.month.toString().padLeft(2, '0')}-${local.day.toString().padLeft(2, '0')}';
+                                  time.text =
+                                      '${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}';
+                                  setState(() => pickerRevision++);
+                                  changed();
+                                },
+                          child: const Text('Current time')),
+                      const Spacer(),
+                      TextButton(
+                          onPressed: disabled ? null : _save,
+                          child: Text('+ ${widget.saveLabel}')),
+                    ]),
                     SizedBox(
                         height: MediaQuery.textScalerOf(context).scale(1) > 1.3
-                            ? 144
-                            : 120,
-                        child: CupertinoDatePicker(
-                          mode: CupertinoDatePickerMode.dateAndTime,
+                            ? 54
+                            : 44,
+                        child: CenteredDateTimePicker(
+                          key: ValueKey(pickerRevision),
                           itemExtent:
                               MediaQuery.textScalerOf(context).scale(1) > 1.3
                                   ? 36
                                   : 28,
-                          use24hFormat: true,
                           initialDateTime:
                               DateTime.tryParse('${date.text}T${time.text}') ??
                                   DateTime.now(),
@@ -467,19 +520,24 @@ class _InlineReminderEditorState extends State<InlineReminderEditor> {
                                   ? null
                                   : () => _perform(widget.onDelete!),
                               icon: const Icon(Icons.delete_outline)),
-                        FilledButton.tonalIcon(
-                            onPressed:
-                                disabled || (!dirty && widget.label.isNotEmpty)
-                                    ? null
-                                    : _save,
-                            icon: Icon(
-                                saved ? Icons.check : Icons.save_outlined,
-                                size: 18),
-                            label: Text(saving
-                                ? 'Saving…'
-                                : saved
-                                    ? 'Saved'
-                                    : widget.saveLabel)),
+                        if (!personalAlarm)
+                          FilledButton.tonalIcon(
+                              onPressed: disabled ||
+                                      (!dirty && widget.label.isNotEmpty)
+                                  ? null
+                                  : _save,
+                              icon: Icon(
+                                  saved
+                                      ? Icons.check
+                                      : widget.saveLabel.startsWith('Add')
+                                          ? Icons.add
+                                          : Icons.save_outlined,
+                                  size: 18),
+                              label: Text(saving
+                                  ? 'Saving…'
+                                  : saved
+                                      ? 'Saved'
+                                      : widget.saveLabel)),
                       ]),
                 ])));
   }
@@ -503,9 +561,9 @@ class PreparationPresetRow extends StatefulWidget {
 
 class _PreparationPresetRowState extends State<PreparationPresetRow> {
   late final TextEditingController label, hours, minutes;
-  Timer? timer, savedTimer;
+  Timer? timer;
   String? error;
-  bool dirty = false, saving = false, deleting = false, saved = false;
+  bool dirty = false, saving = false, deleting = false, wheelScrolling = false;
   int revision = 0;
   @override
   void initState() {
@@ -518,8 +576,6 @@ class _PreparationPresetRowState extends State<PreparationPresetRow> {
   @override
   void dispose() {
     timer?.cancel();
-    savedTimer?.cancel();
-    // Flush valid edits when leaving this screen before the debounce expires.
     if (dirty && !deleting) {
       try {
         final text = label.text.trim();
@@ -536,7 +592,7 @@ class _PreparationPresetRowState extends State<PreparationPresetRow> {
                     'saving preparation settings while leaving the screen')));
           });
         }
-      } on FormatException {/* Invalid input is never persisted. */}
+      } on FormatException {/* Keep invalid input out of storage. */}
     }
     label.dispose();
     hours.dispose();
@@ -549,7 +605,6 @@ class _PreparationPresetRowState extends State<PreparationPresetRow> {
     dirty = true;
     setState(() {
       error = null;
-      saved = false;
     });
     timer?.cancel();
     timer = Timer(const Duration(milliseconds: 650), save);
@@ -558,6 +613,10 @@ class _PreparationPresetRowState extends State<PreparationPresetRow> {
   Future<void> save() async {
     timer?.cancel();
     if (!dirty || deleting) return;
+    if (wheelScrolling) {
+      timer = Timer(const Duration(milliseconds: 150), save);
+      return;
+    }
     if (saving) {
       timer = Timer(const Duration(milliseconds: 150), save);
       return;
@@ -574,12 +633,7 @@ class _PreparationPresetRowState extends State<PreparationPresetRow> {
       if (mounted && version == revision) {
         setState(() {
           dirty = false;
-          saved = true;
           error = null;
-        });
-        savedTimer?.cancel();
-        savedTimer = Timer(const Duration(seconds: 2), () {
-          if (mounted) setState(() => saved = false);
         });
       }
     } catch (e) {
@@ -591,54 +645,13 @@ class _PreparationPresetRowState extends State<PreparationPresetRow> {
     }
   }
 
-  Widget field(TextEditingController controller, String hint,
-          {bool numeric = false}) =>
-      TextField(
-        onTapOutside: (_) => FocusManager.instance.primaryFocus?.unfocus(),
-        controller: controller,
-        onChanged: changed,
-        onEditingComplete: () {
-          save();
-          FocusScope.of(context).unfocus();
-        },
-        textAlignVertical: TextAlignVertical.center,
-        textAlign: numeric ? TextAlign.center : TextAlign.start,
-        keyboardType: numeric ? TextInputType.number : TextInputType.text,
-        inputFormatters:
-            numeric ? [FilteringTextInputFormatter.digitsOnly] : null,
-        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500),
-        decoration: InputDecoration(
-            labelText: hint,
-            constraints: BoxConstraints(
-                minHeight: 44,
-                maxHeight:
-                    MediaQuery.textScalerOf(context).scale(1) > 1.3 ? 64 : 44),
-            filled: true,
-            fillColor: Colors.transparent,
-            border: InputBorder.none,
-            enabledBorder: InputBorder.none,
-            floatingLabelBehavior: FloatingLabelBehavior.never,
-            suffixText: numeric ? (hint == 'Hours' ? 'h' : 'm') : null,
-            isDense: true,
-            contentPadding:
-                const EdgeInsets.symmetric(horizontal: 10, vertical: 0)),
-      );
   @override
-  Widget build(BuildContext context) => Dismissible(
+  Widget build(BuildContext context) => SwipeToRevealDelete(
         key: ValueKey('swipe-${widget.key}'),
-        direction: DismissDirection.endToStart,
-        background: Container(
-            alignment: Alignment.centerRight,
-            padding: const EdgeInsets.only(right: 20),
-            decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.errorContainer,
-                borderRadius: BorderRadius.circular(20)),
-            child: const Icon(Icons.delete_outline)),
-        confirmDismiss: (_) async {
+        onDelete: () async {
           timer?.cancel();
           deleting = true;
           try {
-            // Finish any queued edit before deleting, so it cannot restore the row.
             while (saving) {
               await Future<void>.delayed(const Duration(milliseconds: 20));
             }
@@ -647,48 +660,29 @@ class _PreparationPresetRowState extends State<PreparationPresetRow> {
             deleting = false;
             if (mounted) setState(() => error = _reminderError(e));
           }
-          return false;
         },
-        child: Card.outlined(
-            margin: const EdgeInsets.only(top: 8),
-            child: Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      if (MediaQuery.textScalerOf(context).scale(1) > 1.3) ...[
-                        field(label, 'Reminder'),
-                        Row(children: [
-                          Expanded(child: field(hours, 'Hours', numeric: true)),
-                          const SizedBox(width: 12),
-                          Expanded(
-                              child: field(minutes, 'Minutes', numeric: true))
-                        ]),
-                      ] else
-                        Row(children: [
-                          Expanded(flex: 5, child: field(label, 'Reminder')),
-                          const SizedBox(width: 8),
-                          Expanded(
-                              flex: 2,
-                              child: field(hours, 'Hours', numeric: true)),
-                          const SizedBox(width: 8),
-                          Expanded(
-                              flex: 2,
-                              child: field(minutes, 'Minutes', numeric: true)),
-                        ]),
-                      if (saved)
-                        const Align(
-                            alignment: Alignment.centerRight,
-                            child:
-                                Text('Saved', style: TextStyle(fontSize: 11))),
-                      if (error != null)
-                        Padding(
-                            padding: const EdgeInsets.only(top: 6),
-                            child: Text(error!,
-                                style: TextStyle(
-                                    color:
-                                        Theme.of(context).colorScheme.error))),
-                    ]))),
+        child: DurationAlarmCard(
+          label: label,
+          hint: 'Reminder',
+          minutes: (int.tryParse(hours.text) ?? 0) * 60 +
+              (int.tryParse(minutes.text) ?? 0),
+          enabled: !deleting,
+          error: error,
+          onLabelChanged: changed,
+          showAddButton: false,
+          onAdd: null,
+          onScrollingChanged: (active) {
+            wheelScrolling = active;
+            if (!active && dirty) {
+              timer?.cancel();
+              timer = Timer(const Duration(milliseconds: 650), save);
+            }
+          },
+          onChanged: (value) {
+            hours.text = '${value ~/ 60}';
+            minutes.text = '${value % 60}';
+            changed('');
+          },
+        ),
       );
 }
