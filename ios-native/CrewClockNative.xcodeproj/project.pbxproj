@@ -7,47 +7,49 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		0D80377726B39AB52A689163 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D8DE048393F342B4A5E2DADF /* Foundation.framework */; };
-		1154FF9C31D3536E8E909314 /* CrewSurfaceModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 44C38B14084F514076A294B6 /* CrewSurfaceModels.swift */; };
-		1871DE4665B4ACD8D85E77C1 /* Components.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5503B44D6097ABE9DDB86DD0 /* Components.swift */; };
-		1C556DFF024FF0476E27CEE1 /* ImportFlow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 751621A1130C97866023654E /* ImportFlow.swift */; };
-		28647EF99A1B276A8A4962D7 /* RosterParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 527CD37CDA1377F2C3DB3E83 /* RosterParser.swift */; };
-		3C9BD2663A0AF9E391930452 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 6D7B51934D8446E96DC52C7A /* Assets.xcassets */; };
-		634B039939D862AB37109B00 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 303459BC392012EF5DF596FF /* SettingsView.swift */; };
-		680A9FA9FBBEBFF6903034BF /* CrewSurfaceModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 44C38B14084F514076A294B6 /* CrewSurfaceModels.swift */; };
-		7D0E97649B137F39A5CFC6D3 /* BriefingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7317815587D0742587E74A1 /* BriefingView.swift */; };
-		9B99AE95BB3F1B4BCB369580 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 9FAB0530516962534F990918 /* Assets.xcassets */; };
-		A09C5E7BD4031C8B233B3DF9 /* CrewClockWidgets.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 9DF067196582B787281864D0 /* CrewClockWidgets.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
-		A1AA29085B7DABC97B1B6540 /* AlarmsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B5CA4F9E0805819EA313BD10 /* AlarmsView.swift */; };
-		A248AA6F87DD2E666B3D36C6 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4935658A0799B58C2837A41E /* Theme.swift */; };
-		A4738F40DDE4C5081D828FF5 /* CrewClockApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8AB34AD121BEE218528A38A6 /* CrewClockApp.swift */; };
-		AA507999FD88536ED7BBA0A5 /* CrewClockWidgets.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F36E88E1031E57684491C23 /* CrewClockWidgets.swift */; };
-		B789500C4665CD520E18E35E /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D8DE048393F342B4A5E2DADF /* Foundation.framework */; };
-		C4A540BEEE02ACC1EB32BEB3 /* AlarmEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B1319C356D5E58E8B15F4EE /* AlarmEngine.swift */; };
-		C7CE2A9AAAC1EBBE3D678BC0 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC79932548C04E14A6E31D6F /* Models.swift */; };
-		D153BE558BDB93462E3FE22A /* RosterView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 183F2DA0BC78E7EC5F22AF0F /* RosterView.swift */; };
-		F55682FCEEFD88E60F5B8480 /* airport_timezones.json in Resources */ = {isa = PBXBuildFile; fileRef = CEF0F495F68C5902DAF6948C /* airport_timezones.json */; };
-		FBF972C53738732839F7A871 /* Store.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D54BD615461E91BE72D5055 /* Store.swift */; };
+		07B2820F057D1A9804D74039 /* Store.swift in Sources */ = {isa = PBXBuildFile; fileRef = DBD2BE3D2D206CEC254DC579 /* Store.swift */; };
+		0AD4F1DF3ECF4B2D751A3EED /* Components.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4EED9FE8437656404EF82AA9 /* Components.swift */; };
+		18CCE550C13A2A1320497A68 /* RosterView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5698B7702DD16F2CA52B36BE /* RosterView.swift */; };
+		4B943BED76DAD312EBB2DAC3 /* RosterParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A3C6132ADA0BAFD8FF845D0 /* RosterParser.swift */; };
+		5289F1E929D1437AA247A529 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 920B22E14F538F5DF7E7572D /* Foundation.framework */; };
+		558A2514561822136B33DEEF /* AlarmEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1676F3109886E536923D4FC8 /* AlarmEngine.swift */; };
+		6B00536D4DF934B059EDD93F /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B6D6FB9A795D03B0F4A617BD /* SettingsView.swift */; };
+		7515CA2E8E3CFC31CB03A64C /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 9704166C2A1374836C13A20D /* PrivacyInfo.xcprivacy */; };
+		77C5DC8E29D4A31602533887 /* airport_timezones.json in Resources */ = {isa = PBXBuildFile; fileRef = 30D6C7C30909CE9A08A1E990 /* airport_timezones.json */; };
+		889949A05AF2022F99AD3EC3 /* CrewSurfaceModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7AAB7D272DD86678B959B509 /* CrewSurfaceModels.swift */; };
+		91F88A5913E4CD94EF777E7E /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE7C2A5CB67FB6C2AA02DFE5 /* Models.swift */; };
+		A740959FA5EC563C1A25310E /* CrewClockWidgets.swift in Sources */ = {isa = PBXBuildFile; fileRef = 656B61CC45A3FA59871DC546 /* CrewClockWidgets.swift */; };
+		AA6345D28007E1EEB533B294 /* ImportFlow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 44E59AC53AE580C41FC9AE97 /* ImportFlow.swift */; };
+		AAD2730C8439CD0CA6129A8A /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 920B22E14F538F5DF7E7572D /* Foundation.framework */; };
+		AE2B05566D2E0F735F577019 /* CrewClockWidgets.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 933C5BD636CD9C6F2A9043AD /* CrewClockWidgets.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		B02A61D63F92C20B58FE17B0 /* CrewSurfaceModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7AAB7D272DD86678B959B509 /* CrewSurfaceModels.swift */; };
+		B49559590B346D271F947BBD /* CrewClockApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = C056140A5C043A76818CE164 /* CrewClockApp.swift */; };
+		C478FF948604D1119F85CDE6 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 761F403CEFDEBAF12A3E7AD3 /* Assets.xcassets */; };
+		C7FF2B6BAEA3CEAE5B63F203 /* BriefingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 328960B7EBF6E0B1BD6F86D0 /* BriefingView.swift */; };
+		CC32A5231149257D329325F7 /* AlarmsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FED4003DBD20ABD973FB14A1 /* AlarmsView.swift */; };
+		CF210AB4E9DCB8E6CA97E48E /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 48391310C9DBF4D21953122C /* PrivacyInfo.xcprivacy */; };
+		F45D8C4132B7EBBC4B054F22 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D478A6F5CE37685CE55650B /* Theme.swift */; };
+		FF9EAEADD093E7375BD644E0 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 8C533DFD117283B02A00CDDD /* Assets.xcassets */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
-		CE7267CC0C8D4B4F15E03545 /* PBXContainerItemProxy */ = {
+		BBF17A2CB91184055C6EEA40 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
-			containerPortal = 656F9E2B21795E96F1303F4C /* Project object */;
+			containerPortal = 240B6DB03C0A13E2201B07A2 /* Project object */;
 			proxyType = 1;
-			remoteGlobalIDString = 44AE94F94CFB40F60E429FEF;
+			remoteGlobalIDString = B0964E8FF52D852A12196A1A;
 			remoteInfo = CrewClockWidgets;
 		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXCopyFilesBuildPhase section */
-		10834766A4F433A03480E332 /* Embed Foundation Extensions */ = {
+		8656BB918F6DC3E6BD42F70C /* Embed Foundation Extensions */ = {
 			isa = PBXCopyFilesBuildPhase;
 			buildActionMask = 2147483647;
 			dstPath = "";
 			dstSubfolderSpec = 13;
 			files = (
-				A09C5E7BD4031C8B233B3DF9 /* CrewClockWidgets.appex in Embed Foundation Extensions */,
+				AE2B05566D2E0F735F577019 /* CrewClockWidgets.appex in Embed Foundation Extensions */,
 			);
 			name = "Embed Foundation Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -55,130 +57,153 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
-		0B1319C356D5E58E8B15F4EE /* AlarmEngine.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AlarmEngine.swift; sourceTree = "<group>"; };
-		183F2DA0BC78E7EC5F22AF0F /* RosterView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RosterView.swift; sourceTree = "<group>"; };
-		2D54BD615461E91BE72D5055 /* Store.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = Store.swift; sourceTree = "<group>"; };
-		303459BC392012EF5DF596FF /* SettingsView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
-		3478F569273FF78FDA085F7A /* CrewClockNative.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = CrewClockNative.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		44C38B14084F514076A294B6 /* CrewSurfaceModels.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = CrewSurfaceModels.swift; path = ../ios/Shared/CrewSurfaceModels.swift; sourceTree = "<group>"; };
-		48B8268DD7C2CAC3ACACA289 /* Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
-		4935658A0799B58C2837A41E /* Theme.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
-		527CD37CDA1377F2C3DB3E83 /* RosterParser.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RosterParser.swift; sourceTree = "<group>"; };
-		5503B44D6097ABE9DDB86DD0 /* Components.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = Components.swift; sourceTree = "<group>"; };
-		5F36E88E1031E57684491C23 /* CrewClockWidgets.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CrewClockWidgets.swift; sourceTree = "<group>"; };
-		6D7B51934D8446E96DC52C7A /* Assets.xcassets */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
-		751621A1130C97866023654E /* ImportFlow.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ImportFlow.swift; sourceTree = "<group>"; };
-		8AB34AD121BEE218528A38A6 /* CrewClockApp.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CrewClockApp.swift; sourceTree = "<group>"; };
-		8F41AA42F2287D11197876B7 /* CrewClock.entitlements */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.entitlements; path = CrewClock.entitlements; sourceTree = "<group>"; };
-		9DF067196582B787281864D0 /* CrewClockWidgets.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = CrewClockWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
-		9FAB0530516962534F990918 /* Assets.xcassets */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
-		B5CA4F9E0805819EA313BD10 /* AlarmsView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AlarmsView.swift; sourceTree = "<group>"; };
-		B7317815587D0742587E74A1 /* BriefingView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BriefingView.swift; sourceTree = "<group>"; };
-		CEF0F495F68C5902DAF6948C /* airport_timezones.json */ = {isa = PBXFileReference; includeInIndex = 1; name = airport_timezones.json; path = Resources/airport_timezones.json; sourceTree = "<group>"; };
-		D8DE048393F342B4A5E2DADF /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS26.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
-		DC79932548C04E14A6E31D6F /* Models.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
+		1676F3109886E536923D4FC8 /* AlarmEngine.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AlarmEngine.swift; sourceTree = "<group>"; };
+		190FB98AFAE0A7F72E6E1A25 /* CrewClockNative.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = CrewClockNative.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		30D6C7C30909CE9A08A1E990 /* airport_timezones.json */ = {isa = PBXFileReference; includeInIndex = 1; name = airport_timezones.json; path = Resources/airport_timezones.json; sourceTree = "<group>"; };
+		328960B7EBF6E0B1BD6F86D0 /* BriefingView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BriefingView.swift; sourceTree = "<group>"; };
+		44E59AC53AE580C41FC9AE97 /* ImportFlow.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ImportFlow.swift; sourceTree = "<group>"; };
+		48391310C9DBF4D21953122C /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; includeInIndex = 1; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		4EED9FE8437656404EF82AA9 /* Components.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = Components.swift; sourceTree = "<group>"; };
+		5698B7702DD16F2CA52B36BE /* RosterView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RosterView.swift; sourceTree = "<group>"; };
+		656B61CC45A3FA59871DC546 /* CrewClockWidgets.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CrewClockWidgets.swift; sourceTree = "<group>"; };
+		761F403CEFDEBAF12A3E7AD3 /* Assets.xcassets */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		7AAB7D272DD86678B959B509 /* CrewSurfaceModels.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = CrewSurfaceModels.swift; path = Shared/CrewSurfaceModels.swift; sourceTree = "<group>"; };
+		7D478A6F5CE37685CE55650B /* Theme.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
+		8C533DFD117283B02A00CDDD /* Assets.xcassets */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		920B22E14F538F5DF7E7572D /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS26.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
+		933C5BD636CD9C6F2A9043AD /* CrewClockWidgets.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = CrewClockWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		9704166C2A1374836C13A20D /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; includeInIndex = 1; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		9A3C6132ADA0BAFD8FF845D0 /* RosterParser.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RosterParser.swift; sourceTree = "<group>"; };
+		A39B553CD8D3EA987045F293 /* Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		B5785495FA159920BB4C42E7 /* CrewClock.entitlements */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.entitlements; path = CrewClock.entitlements; sourceTree = "<group>"; };
+		B6D6FB9A795D03B0F4A617BD /* SettingsView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		C056140A5C043A76818CE164 /* CrewClockApp.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CrewClockApp.swift; sourceTree = "<group>"; };
+		DBD2BE3D2D206CEC254DC579 /* Store.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = Store.swift; sourceTree = "<group>"; };
+		FE7C2A5CB67FB6C2AA02DFE5 /* Models.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
+		FED4003DBD20ABD973FB14A1 /* AlarmsView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AlarmsView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
-		45AB90B5BD4D5679E770C4D9 /* Frameworks */ = {
+		4AFC79D2678A9B3F55DDC4FE /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				B789500C4665CD520E18E35E /* Foundation.framework in Frameworks */,
+				5289F1E929D1437AA247A529 /* Foundation.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		F43E71CF28DD8192D5CB6C1D /* Frameworks */ = {
+		57475F0EA52600EB8F36B755 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				0D80377726B39AB52A689163 /* Foundation.framework in Frameworks */,
+				AAD2730C8439CD0CA6129A8A /* Foundation.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		13F88CC69D570AFDE822B4F5 = {
+		0B89B60B80360E1A3AD90F4E = {
 			isa = PBXGroup;
 			children = (
-				F34C23EA871E4A952E8A8655 /* Products */,
-				7D2986E69227BCDEEBA46830 /* Frameworks */,
-				44C38B14084F514076A294B6 /* CrewSurfaceModels.swift */,
-				A34D117A34916E7CAFB1BBF0 /* CrewClockNative */,
-				ADF79364430806DAFB612C30 /* CrewClockWidgets */,
+				9D99A1BDFF352211B2F6201C /* Products */,
+				14A11F886C4427BAF2A67D98 /* Frameworks */,
+				7AAB7D272DD86678B959B509 /* CrewSurfaceModels.swift */,
+				65023ECAD346EBEE4D289A0D /* CrewClockNative */,
+				DC452C4CBEE2EA6BE306BC26 /* CrewClockWidgets */,
 			);
 			sourceTree = "<group>";
 		};
-		49277B4F09BFEBCC3711D363 /* iOS */ = {
+		14A11F886C4427BAF2A67D98 /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
-				D8DE048393F342B4A5E2DADF /* Foundation.framework */,
-			);
-			name = iOS;
-			sourceTree = "<group>";
-		};
-		7D2986E69227BCDEEBA46830 /* Frameworks */ = {
-			isa = PBXGroup;
-			children = (
-				49277B4F09BFEBCC3711D363 /* iOS */,
+				3CBB04AAF27096CCE87CCA88 /* iOS */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
 		};
-		A34D117A34916E7CAFB1BBF0 /* CrewClockNative */ = {
+		3CBB04AAF27096CCE87CCA88 /* iOS */ = {
 			isa = PBXGroup;
 			children = (
-				0B1319C356D5E58E8B15F4EE /* AlarmEngine.swift */,
-				B5CA4F9E0805819EA313BD10 /* AlarmsView.swift */,
-				B7317815587D0742587E74A1 /* BriefingView.swift */,
-				5503B44D6097ABE9DDB86DD0 /* Components.swift */,
-				8AB34AD121BEE218528A38A6 /* CrewClockApp.swift */,
-				751621A1130C97866023654E /* ImportFlow.swift */,
-				DC79932548C04E14A6E31D6F /* Models.swift */,
-				527CD37CDA1377F2C3DB3E83 /* RosterParser.swift */,
-				183F2DA0BC78E7EC5F22AF0F /* RosterView.swift */,
-				303459BC392012EF5DF596FF /* SettingsView.swift */,
-				2D54BD615461E91BE72D5055 /* Store.swift */,
-				4935658A0799B58C2837A41E /* Theme.swift */,
-				6D7B51934D8446E96DC52C7A /* Assets.xcassets */,
-				CEF0F495F68C5902DAF6948C /* airport_timezones.json */,
-				48B8268DD7C2CAC3ACACA289 /* Info.plist */,
-				8F41AA42F2287D11197876B7 /* CrewClock.entitlements */,
+				920B22E14F538F5DF7E7572D /* Foundation.framework */,
+			);
+			name = iOS;
+			sourceTree = "<group>";
+		};
+		65023ECAD346EBEE4D289A0D /* CrewClockNative */ = {
+			isa = PBXGroup;
+			children = (
+				1676F3109886E536923D4FC8 /* AlarmEngine.swift */,
+				FED4003DBD20ABD973FB14A1 /* AlarmsView.swift */,
+				328960B7EBF6E0B1BD6F86D0 /* BriefingView.swift */,
+				4EED9FE8437656404EF82AA9 /* Components.swift */,
+				C056140A5C043A76818CE164 /* CrewClockApp.swift */,
+				44E59AC53AE580C41FC9AE97 /* ImportFlow.swift */,
+				FE7C2A5CB67FB6C2AA02DFE5 /* Models.swift */,
+				9A3C6132ADA0BAFD8FF845D0 /* RosterParser.swift */,
+				5698B7702DD16F2CA52B36BE /* RosterView.swift */,
+				B6D6FB9A795D03B0F4A617BD /* SettingsView.swift */,
+				DBD2BE3D2D206CEC254DC579 /* Store.swift */,
+				7D478A6F5CE37685CE55650B /* Theme.swift */,
+				761F403CEFDEBAF12A3E7AD3 /* Assets.xcassets */,
+				30D6C7C30909CE9A08A1E990 /* airport_timezones.json */,
+				48391310C9DBF4D21953122C /* PrivacyInfo.xcprivacy */,
+				A39B553CD8D3EA987045F293 /* Info.plist */,
+				B5785495FA159920BB4C42E7 /* CrewClock.entitlements */,
 			);
 			name = CrewClockNative;
 			path = CrewClockNative;
 			sourceTree = "<group>";
 		};
-		ADF79364430806DAFB612C30 /* CrewClockWidgets */ = {
+		9D99A1BDFF352211B2F6201C /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				5F36E88E1031E57684491C23 /* CrewClockWidgets.swift */,
-				9FAB0530516962534F990918 /* Assets.xcassets */,
-			);
-			name = CrewClockWidgets;
-			path = ../ios/CrewClockWidgets;
-			sourceTree = "<group>";
-		};
-		F34C23EA871E4A952E8A8655 /* Products */ = {
-			isa = PBXGroup;
-			children = (
-				3478F569273FF78FDA085F7A /* CrewClockNative.app */,
-				9DF067196582B787281864D0 /* CrewClockWidgets.appex */,
+				190FB98AFAE0A7F72E6E1A25 /* CrewClockNative.app */,
+				933C5BD636CD9C6F2A9043AD /* CrewClockWidgets.appex */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		DC452C4CBEE2EA6BE306BC26 /* CrewClockWidgets */ = {
+			isa = PBXGroup;
+			children = (
+				656B61CC45A3FA59871DC546 /* CrewClockWidgets.swift */,
+				8C533DFD117283B02A00CDDD /* Assets.xcassets */,
+				9704166C2A1374836C13A20D /* PrivacyInfo.xcprivacy */,
+			);
+			name = CrewClockWidgets;
+			path = CrewClockWidgets;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		44AE94F94CFB40F60E429FEF /* CrewClockWidgets */ = {
+		A3ECCA7125A180090100822A /* CrewClockNative */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 19859CF4EAF1DA5BF10C58E2 /* Build configuration list for PBXNativeTarget "CrewClockWidgets" */;
+			buildConfigurationList = 67F909763368E4257948AF0F /* Build configuration list for PBXNativeTarget "CrewClockNative" */;
 			buildPhases = (
-				85B6EAE64265EE56B0081206 /* Sources */,
-				45AB90B5BD4D5679E770C4D9 /* Frameworks */,
-				0E5B6F2372ED3772CAEB5B51 /* Resources */,
+				9FDA6F7332B8178831C5B51E /* Sources */,
+				4AFC79D2678A9B3F55DDC4FE /* Frameworks */,
+				7320C1318B7327EC48793363 /* Resources */,
+				8656BB918F6DC3E6BD42F70C /* Embed Foundation Extensions */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				6027601A56FB3BC3503DF048 /* PBXTargetDependency */,
+			);
+			name = CrewClockNative;
+			productName = CrewClockNative;
+			productReference = 190FB98AFAE0A7F72E6E1A25 /* CrewClockNative.app */;
+			productType = "com.apple.product-type.application";
+		};
+		B0964E8FF52D852A12196A1A /* CrewClockWidgets */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 5D16BD80D488ED9E1E481199 /* Build configuration list for PBXNativeTarget "CrewClockWidgets" */;
+			buildPhases = (
+				8CA778F2886EABF3082B7C98 /* Sources */,
+				57475F0EA52600EB8F36B755 /* Frameworks */,
+				05BAB0586E2E2EF59600B0B6 /* Resources */,
 			);
 			buildRules = (
 			);
@@ -186,38 +211,19 @@
 			);
 			name = CrewClockWidgets;
 			productName = CrewClockWidgets;
-			productReference = 9DF067196582B787281864D0 /* CrewClockWidgets.appex */;
+			productReference = 933C5BD636CD9C6F2A9043AD /* CrewClockWidgets.appex */;
 			productType = "com.apple.product-type.app-extension";
-		};
-		FBC18002004CA23AF4BD6F40 /* CrewClockNative */ = {
-			isa = PBXNativeTarget;
-			buildConfigurationList = 1B10E1A7C62135D9E35EEEF5 /* Build configuration list for PBXNativeTarget "CrewClockNative" */;
-			buildPhases = (
-				ED063C1FD7B3BD98AFD419DA /* Sources */,
-				F43E71CF28DD8192D5CB6C1D /* Frameworks */,
-				1707B7524CBCF639E4DFF5F9 /* Resources */,
-				10834766A4F433A03480E332 /* Embed Foundation Extensions */,
-			);
-			buildRules = (
-			);
-			dependencies = (
-				DBFCC0C0854E9128493B67F0 /* PBXTargetDependency */,
-			);
-			name = CrewClockNative;
-			productName = CrewClockNative;
-			productReference = 3478F569273FF78FDA085F7A /* CrewClockNative.app */;
-			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
-		656F9E2B21795E96F1303F4C /* Project object */ = {
+		240B6DB03C0A13E2201B07A2 /* Project object */ = {
 			isa = PBXProject;
 			attributes = {
 				LastSwiftUpdateCheck = 1600;
 				LastUpgradeCheck = 1600;
 			};
-			buildConfigurationList = 40FDCA148B96644BAC3A3C1A /* Build configuration list for PBXProject "CrewClockNative" */;
+			buildConfigurationList = 48BB6F168B272FAA09E61C52 /* Build configuration list for PBXProject "CrewClockNative" */;
 			compatibilityVersion = "Xcode 3.2";
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
@@ -225,82 +231,208 @@
 				en,
 				Base,
 			);
-			mainGroup = 13F88CC69D570AFDE822B4F5;
+			mainGroup = 0B89B60B80360E1A3AD90F4E;
 			minimizedProjectReferenceProxies = 0;
 			preferredProjectObjectVersion = 100;
-			productRefGroup = F34C23EA871E4A952E8A8655 /* Products */;
+			productRefGroup = 9D99A1BDFF352211B2F6201C /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				FBC18002004CA23AF4BD6F40 /* CrewClockNative */,
-				44AE94F94CFB40F60E429FEF /* CrewClockWidgets */,
+				A3ECCA7125A180090100822A /* CrewClockNative */,
+				B0964E8FF52D852A12196A1A /* CrewClockWidgets */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
-		0E5B6F2372ED3772CAEB5B51 /* Resources */ = {
+		05BAB0586E2E2EF59600B0B6 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				9B99AE95BB3F1B4BCB369580 /* Assets.xcassets in Resources */,
+				FF9EAEADD093E7375BD644E0 /* Assets.xcassets in Resources */,
+				7515CA2E8E3CFC31CB03A64C /* PrivacyInfo.xcprivacy in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		1707B7524CBCF639E4DFF5F9 /* Resources */ = {
+		7320C1318B7327EC48793363 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				3C9BD2663A0AF9E391930452 /* Assets.xcassets in Resources */,
-				F55682FCEEFD88E60F5B8480 /* airport_timezones.json in Resources */,
+				C478FF948604D1119F85CDE6 /* Assets.xcassets in Resources */,
+				77C5DC8E29D4A31602533887 /* airport_timezones.json in Resources */,
+				CF210AB4E9DCB8E6CA97E48E /* PrivacyInfo.xcprivacy in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
-		85B6EAE64265EE56B0081206 /* Sources */ = {
+		8CA778F2886EABF3082B7C98 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				AA507999FD88536ED7BBA0A5 /* CrewClockWidgets.swift in Sources */,
-				680A9FA9FBBEBFF6903034BF /* CrewSurfaceModels.swift in Sources */,
+				A740959FA5EC563C1A25310E /* CrewClockWidgets.swift in Sources */,
+				889949A05AF2022F99AD3EC3 /* CrewSurfaceModels.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		ED063C1FD7B3BD98AFD419DA /* Sources */ = {
+		9FDA6F7332B8178831C5B51E /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				C4A540BEEE02ACC1EB32BEB3 /* AlarmEngine.swift in Sources */,
-				A1AA29085B7DABC97B1B6540 /* AlarmsView.swift in Sources */,
-				7D0E97649B137F39A5CFC6D3 /* BriefingView.swift in Sources */,
-				1871DE4665B4ACD8D85E77C1 /* Components.swift in Sources */,
-				A4738F40DDE4C5081D828FF5 /* CrewClockApp.swift in Sources */,
-				1C556DFF024FF0476E27CEE1 /* ImportFlow.swift in Sources */,
-				C7CE2A9AAAC1EBBE3D678BC0 /* Models.swift in Sources */,
-				28647EF99A1B276A8A4962D7 /* RosterParser.swift in Sources */,
-				D153BE558BDB93462E3FE22A /* RosterView.swift in Sources */,
-				634B039939D862AB37109B00 /* SettingsView.swift in Sources */,
-				FBF972C53738732839F7A871 /* Store.swift in Sources */,
-				A248AA6F87DD2E666B3D36C6 /* Theme.swift in Sources */,
-				1154FF9C31D3536E8E909314 /* CrewSurfaceModels.swift in Sources */,
+				558A2514561822136B33DEEF /* AlarmEngine.swift in Sources */,
+				CC32A5231149257D329325F7 /* AlarmsView.swift in Sources */,
+				C7FF2B6BAEA3CEAE5B63F203 /* BriefingView.swift in Sources */,
+				0AD4F1DF3ECF4B2D751A3EED /* Components.swift in Sources */,
+				B49559590B346D271F947BBD /* CrewClockApp.swift in Sources */,
+				AA6345D28007E1EEB533B294 /* ImportFlow.swift in Sources */,
+				91F88A5913E4CD94EF777E7E /* Models.swift in Sources */,
+				4B943BED76DAD312EBB2DAC3 /* RosterParser.swift in Sources */,
+				18CCE550C13A2A1320497A68 /* RosterView.swift in Sources */,
+				6B00536D4DF934B059EDD93F /* SettingsView.swift in Sources */,
+				07B2820F057D1A9804D74039 /* Store.swift in Sources */,
+				F45D8C4132B7EBBC4B054F22 /* Theme.swift in Sources */,
+				B02A61D63F92C20B58FE17B0 /* CrewSurfaceModels.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
-		DBFCC0C0854E9128493B67F0 /* PBXTargetDependency */ = {
+		6027601A56FB3BC3503DF048 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			name = CrewClockWidgets;
-			target = 44AE94F94CFB40F60E429FEF /* CrewClockWidgets */;
-			targetProxy = CE7267CC0C8D4B4F15E03545 /* PBXContainerItemProxy */;
+			target = B0964E8FF52D852A12196A1A /* CrewClockWidgets */;
+			targetProxy = BBF17A2CB91184055C6EEA40 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
-		043ACAB89A53C060810DC71F /* Debug */ = {
+		5114C0ED9B116111410B5D10 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_ENTITLEMENTS = CrewClockNative/CrewClock.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 100;
+				DEVELOPMENT_TEAM = A7QB8PT33N;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = CrewClockNative/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = CrewClock;
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = UIInterfaceOrientationPortrait;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
+				MARKETING_VERSION = 2.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.addvalue.crewclock;
+				PRODUCT_NAME = CrewClock;
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+		5CE6DB0774690D7397689FA4 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_ENTITLEMENTS = CrewClockWidgets/CrewClockWidgets.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 100;
+				DEVELOPMENT_TEAM = A7QB8PT33N;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = CrewClockWidgets/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks @executable_path/../../Frameworks";
+				MARKETING_VERSION = 2.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.addvalue.crewclock.widgets;
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		B26CE8CBD86E2BC9C2C83A58 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		E84C4D2A57F80DD29022E6D1 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_ENTITLEMENTS = CrewClockWidgets/CrewClockWidgets.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 100;
+				DEVELOPMENT_TEAM = A7QB8PT33N;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = CrewClockWidgets/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks @executable_path/../../Frameworks";
+				MARKETING_VERSION = 2.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.addvalue.crewclock.widgets;
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+		EE7A47322D56A683D2D17E34 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
@@ -361,7 +493,7 @@
 			};
 			name = Debug;
 		};
-		05A8E90C32C2DAFE9C766C80 /* Release */ = {
+		F7E2104119A92798D2E21EA4 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
@@ -388,162 +520,38 @@
 				VALIDATE_PRODUCT = YES;
 			};
 			name = Release;
-		};
-		B33238D6A9D4B9053A499269 /* Debug */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				CLANG_ENABLE_OBJC_WEAK = NO;
-				CODE_SIGN_ENTITLEMENTS = ../ios/CrewClockWidgets/CrewClockWidgets.entitlements;
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 100;
-				DEVELOPMENT_TEAM = A7QB8PT33N;
-				GENERATE_INFOPLIST_FILE = NO;
-				INFOPLIST_FILE = ../ios/CrewClockWidgets/Info.plist;
-				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
-				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks @executable_path/../../Frameworks";
-				MARKETING_VERSION = 2.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.addvalue.crewclock.widgets;
-				SDKROOT = iphoneos;
-				SKIP_INSTALL = YES;
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = 1;
-			};
-			name = Debug;
-		};
-		BF6F76D52D08D62492754693 /* Release */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				ALWAYS_SEARCH_USER_PATHS = NO;
-				CLANG_ANALYZER_NONNULL = YES;
-				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
-				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
-				CLANG_CXX_LIBRARY = "libc++";
-				CLANG_ENABLE_MODULES = YES;
-				CLANG_ENABLE_OBJC_ARC = YES;
-				CLANG_ENABLE_OBJC_WEAK = YES;
-				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
-				CLANG_WARN_BOOL_CONVERSION = YES;
-				CLANG_WARN_COMMA = YES;
-				CLANG_WARN_CONSTANT_CONVERSION = YES;
-				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
-				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
-				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
-				CLANG_WARN_EMPTY_BODY = YES;
-				CLANG_WARN_ENUM_CONVERSION = YES;
-				CLANG_WARN_INFINITE_RECURSION = YES;
-				CLANG_WARN_INT_CONVERSION = YES;
-				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
-				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
-				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
-				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
-				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
-				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
-				CLANG_WARN_STRICT_PROTOTYPES = YES;
-				CLANG_WARN_SUSPICIOUS_MOVE = YES;
-				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
-				CLANG_WARN_UNREACHABLE_CODE = YES;
-				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
-				COPY_PHASE_STRIP = NO;
-				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
-				ENABLE_NS_ASSERTIONS = NO;
-				ENABLE_STRICT_OBJC_MSGSEND = YES;
-				GCC_C_LANGUAGE_STANDARD = gnu11;
-				GCC_NO_COMMON_BLOCKS = YES;
-				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
-				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
-				GCC_WARN_UNDECLARED_SELECTOR = YES;
-				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
-				GCC_WARN_UNUSED_FUNCTION = YES;
-				GCC_WARN_UNUSED_VARIABLE = YES;
-				MTL_ENABLE_DEBUG_INFO = NO;
-				MTL_FAST_MATH = YES;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SWIFT_COMPILATION_MODE = wholemodule;
-				SWIFT_OPTIMIZATION_LEVEL = "-O";
-				SWIFT_VERSION = 5.0;
-			};
-			name = Release;
-		};
-		BFC8127A26F261292092C39D /* Release */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				CLANG_ENABLE_OBJC_WEAK = NO;
-				CODE_SIGN_ENTITLEMENTS = ../ios/CrewClockWidgets/CrewClockWidgets.entitlements;
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 100;
-				DEVELOPMENT_TEAM = A7QB8PT33N;
-				GENERATE_INFOPLIST_FILE = NO;
-				INFOPLIST_FILE = ../ios/CrewClockWidgets/Info.plist;
-				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
-				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks @executable_path/../../Frameworks";
-				MARKETING_VERSION = 2.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.addvalue.crewclock.widgets;
-				SDKROOT = iphoneos;
-				SKIP_INSTALL = YES;
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = 1;
-				VALIDATE_PRODUCT = YES;
-			};
-			name = Release;
-		};
-		D6053BCFC6CAB2CD0A4663E7 /* Debug */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CLANG_ENABLE_OBJC_WEAK = NO;
-				CODE_SIGN_ENTITLEMENTS = CrewClockNative/CrewClock.entitlements;
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 100;
-				DEVELOPMENT_TEAM = A7QB8PT33N;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = CrewClockNative/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = CrewClock;
-				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
-				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = UIInterfaceOrientationPortrait;
-				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
-				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
-				MARKETING_VERSION = 2.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.addvalue.crewclock;
-				PRODUCT_NAME = CrewClock;
-				SDKROOT = iphoneos;
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = 1;
-			};
-			name = Debug;
 		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		19859CF4EAF1DA5BF10C58E2 /* Build configuration list for PBXNativeTarget "CrewClockWidgets" */ = {
+		48BB6F168B272FAA09E61C52 /* Build configuration list for PBXProject "CrewClockNative" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				BFC8127A26F261292092C39D /* Release */,
-				B33238D6A9D4B9053A499269 /* Debug */,
+				EE7A47322D56A683D2D17E34 /* Debug */,
+				B26CE8CBD86E2BC9C2C83A58 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		1B10E1A7C62135D9E35EEEF5 /* Build configuration list for PBXNativeTarget "CrewClockNative" */ = {
+		5D16BD80D488ED9E1E481199 /* Build configuration list for PBXNativeTarget "CrewClockWidgets" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				05A8E90C32C2DAFE9C766C80 /* Release */,
-				D6053BCFC6CAB2CD0A4663E7 /* Debug */,
+				5CE6DB0774690D7397689FA4 /* Release */,
+				E84C4D2A57F80DD29022E6D1 /* Debug */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		40FDCA148B96644BAC3A3C1A /* Build configuration list for PBXProject "CrewClockNative" */ = {
+		67F909763368E4257948AF0F /* Build configuration list for PBXNativeTarget "CrewClockNative" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				043ACAB89A53C060810DC71F /* Debug */,
-				BF6F76D52D08D62492754693 /* Release */,
+				F7E2104119A92798D2E21EA4 /* Release */,
+				5114C0ED9B116111410B5D10 /* Debug */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
 	};
-	rootObject = 656F9E2B21795E96F1303F4C /* Project object */;
+	rootObject = 240B6DB03C0A13E2201B07A2 /* Project object */;
 }
