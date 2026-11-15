@@ -296,7 +296,7 @@ class _NativeRosterPageState extends State<NativeRosterPage> {
     final arrival = DateTime.tryParse('${f['arrivalUtc']}');
     return Card(
         color: Color.alphaBlend(
-            Theme.of(context).colorScheme.primary.withValues(alpha: .055),
+            Theme.of(context).colorScheme.primary.withValues(alpha: .12),
             Theme.of(context).colorScheme.surface),
         child: Padding(
             padding: const EdgeInsets.all(14),

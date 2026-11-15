@@ -497,7 +497,11 @@ class _CrewClockShellState extends State<CrewClockShell>
           key: const ValueKey('flight-preparation-card'),
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-              color: _colors.surface, borderRadius: BorderRadius.circular(CrewClockTheme.cardRadius)),
+              gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [_colors.primaryContainer, _colors.surface]),
+              borderRadius: BorderRadius.circular(CrewClockTheme.cardRadius)),
           child: IntrinsicHeight(
               child: Row(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -561,10 +565,39 @@ class _CrewClockShellState extends State<CrewClockShell>
                                     fontWeight: FontWeight.w700))
                           ])),
                       const SizedBox(height: 12),
-                      Text(
-                          'Departs ${flight['departureTime']} · Arrives ${flight['arrivalTime']}',
-                          style: TextStyle(
-                              color: _colors.onSurfaceVariant, fontSize: 17)),
+                      Row(children: [
+                        for (final (i, e) in [
+                          ('${flight['from']}', '${flight['departureTime']}'),
+                          ('${flight['to']}', '${flight['arrivalTime']}'),
+                        ].indexed) ...[
+                          if (i == 1)
+                            Expanded(
+                                child: Row(children: [
+                              Expanded(
+                                  child: Divider(
+                                      color: _teal.withValues(alpha: .35))),
+                              Icon(CupertinoIcons.airplane,
+                                  size: 18, color: _teal),
+                              Expanded(
+                                  child: Divider(
+                                      color: _teal.withValues(alpha: .35))),
+                            ])),
+                          Column(
+                              crossAxisAlignment: i == 0
+                                  ? CrossAxisAlignment.start
+                                  : CrossAxisAlignment.end,
+                              children: [
+                                Text(e.$1,
+                                    style: TextStyle(
+                                        color: _colors.onSurface,
+                                        fontSize: 26,
+                                        fontWeight: FontWeight.w800)),
+                                Text(e.$2,
+                                    style: CrewClockTheme.timeSmall
+                                        .copyWith(color: _teal)),
+                              ]),
+                        ],
+                      ]),
                       if (data['demo'] == true)
                         TextButton(
                             onPressed: _busy ? null : () => _act('exitDemo'),

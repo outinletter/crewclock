@@ -77,7 +77,7 @@ void main() {
     expect(hero.contains(badge.bottomRight), isTrue);
     expect(find.text('CrewClock'), findsOneWidget);
     expect(find.text('Next flight'), findsNothing);
-    expect(find.text('DFW'), findsOneWidget);
+    expect(find.text('DFW'), findsNWidgets(2));
     expect(find.text('ICN home'), findsOneWidget);
     expect(find.text('UTC'), findsOneWidget);
     final heights = ['DFW departure', 'ICN home', 'UTC']

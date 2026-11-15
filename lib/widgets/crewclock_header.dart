@@ -12,9 +12,11 @@ class CrewClockHeader extends StatelessWidget implements PreferredSizeWidget {
   Widget build(BuildContext context) => AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle.light,
       child: DecoratedBox(
-          decoration: const BoxDecoration(
+          decoration: BoxDecoration(
               gradient: LinearGradient(
-                  colors: [CrewClockTheme.navy, Color(0xff114e87)])),
+                  colors: Theme.of(context).brightness == Brightness.dark
+                      ? const [CrewClockTheme.navy, Color(0xff114e87)]
+                      : const [Color(0xff2f5ea8), Color(0xff5b94dc)])),
           child: SafeArea(
               bottom: false,
               child: SizedBox(
