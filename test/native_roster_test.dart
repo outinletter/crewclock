@@ -129,6 +129,14 @@ void main() {
     expect(step['status'], 'Scheduled');
     expect((data['flight'] as Map)['departureTime'], '13:55');
     expect((data['clocks'] as List)[2]['time'], '04:55');
+    final ribbon = data['ribbon'] as Map;
+    expect(ribbon['blockMinutes'], 730);
+    // Home (ICN) 02:00–06:00 is 17:00–21:00Z; the flight lands at 17:05Z.
+    expect(ribbon['woclFlightMinutes'], 5);
+    expect((ribbon['axes'] as List).map((a) => a['label']),
+        ['ICN', 'IST', 'UTC']);
+    expect(ribbon['prep'] < ribbon['dep'] && ribbon['dep'] < ribbon['arr'],
+        isTrue);
     expect((data['tasks'] as List).map((t) => t['label']),
         contains('Passport & VISA'));
   });

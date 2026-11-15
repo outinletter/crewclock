@@ -21,7 +21,7 @@ class AppDatabase {
 
     return openDatabase(
       path,
-      version: 2,
+      version: 3,
       onCreate: (db, version) async {
         await _createDB(db, version);
         await db.execute(
@@ -31,6 +31,9 @@ class AppDatabase {
         if (old < 2) {
           await db.execute(
               'CREATE TABLE app_state (key TEXT PRIMARY KEY, value TEXT NOT NULL)');
+        }
+        if (old < 3) {
+          await db.execute('ALTER TABLE alarms ADD COLUMN extra TEXT');
         }
       },
     );
@@ -51,7 +54,8 @@ class AppDatabase {
         depApt   TEXT,
         arrApt   TEXT,
         arrTime  TEXT,
-        savedAt  TEXT NOT NULL
+        savedAt  TEXT NOT NULL,
+        extra    TEXT
       )
     ''');
   }
@@ -80,21 +84,7 @@ class AppDatabase {
     batch.delete('alarms');
 
     for (final a in list) {
-      batch.insert('alarms', {
-        'id': a['id']?.toString() ?? '',
-        'time': a['time']?.toString() ?? '',
-        'dep': a['dep']?.toString(),
-        'lbl': a['lbl']?.toString(),
-        'type': a['type']?.toString(),
-        'armed': _boolToInt(a['armed']),
-        'dism': _boolToInt(a['dism']),
-        'missed': _boolToInt(a['missed']),
-        'fnum': a['fnum']?.toString(),
-        'depApt': a['depApt']?.toString(),
-        'arrApt': a['arrApt']?.toString(),
-        'arrTime': a['arrTime']?.toString(),
-        'savedAt': DateTime.now().toIso8601String(),
-      });
+      batch.insert('alarms', alarmRow(a as Map));
     }
 
     await batch.commit(noResult: true);
@@ -102,7 +92,71 @@ class AppDatabase {
 
   Future<List<Map<String, dynamic>>> getAlarmsState() async {
     final db = await database;
-    return db.query('alarms', orderBy: 'time ASC');
+    return (await db.query('alarms', orderBy: 'time ASC'))
+        .map(alarmFromRow)
+        .toList();
+  }
+
+  static const _alarmColumns = {
+    'id',
+    'time',
+    'dep',
+    'lbl',
+    'type',
+    'armed',
+    'dism',
+    'missed',
+    'fnum',
+    'depApt',
+    'arrApt',
+    'arrTime',
+    'savedAt',
+    'extra'
+  };
+
+  /// Table row for an alarm record. Fields without a column of their own
+  /// (time basis, wall time, zone, timer duration…) are kept as JSON in
+  /// `extra` so they survive a reload.
+  static Map<String, Object?> alarmRow(Map a) {
+    int flag(dynamic v) => v == true || v == 1 ? 1 : 0;
+    final extra = {
+      for (final e in a.entries)
+        if (!_alarmColumns.contains(e.key) && e.value != null)
+          '${e.key}': e.value
+    };
+    return {
+      'id': a['id']?.toString() ?? '',
+      'time': a['time']?.toString() ?? '',
+      'dep': a['dep']?.toString(),
+      'lbl': a['lbl']?.toString(),
+      'type': a['type']?.toString(),
+      'armed': flag(a['armed']),
+      'dism': flag(a['dism']),
+      'missed': flag(a['missed']),
+      'fnum': a['fnum']?.toString(),
+      'depApt': a['depApt']?.toString(),
+      'arrApt': a['arrApt']?.toString(),
+      'arrTime': a['arrTime']?.toString(),
+      'savedAt': DateTime.now().toIso8601String(),
+      'extra': extra.isEmpty ? null : jsonEncode(extra),
+    };
+  }
+
+  /// Inverse of [alarmRow]; column values win over anything in `extra`.
+  static Map<String, dynamic> alarmFromRow(Map row) {
+    Map extra = const {};
+    try {
+      final decoded = jsonDecode('${row['extra'] ?? '{}'}');
+      if (decoded is Map) extra = decoded;
+    } on FormatException {
+      // Unreadable extras are dropped; the alarm itself is still valid.
+    }
+    return {
+      for (final e in extra.entries)
+        if (!_alarmColumns.contains(e.key)) '${e.key}': e.value,
+      for (final e in row.entries)
+        if (e.key != 'extra') '${e.key}': e.value
+    };
   }
 
   Future<void> dismissAlarms(List<String> ids) async {
@@ -125,12 +179,5 @@ class AppDatabase {
       throw FormatException(
           'Invalid alarm data; existing alarms were preserved.', raw);
     }
-  }
-
-  int _boolToInt(dynamic v) {
-    if (v == null) return 0;
-    if (v is bool) return v ? 1 : 0;
-    if (v is int) return v;
-    return 0;
   }
 }

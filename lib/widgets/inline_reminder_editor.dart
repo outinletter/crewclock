@@ -3,7 +3,9 @@ import 'centered_date_time_picker.dart';
 import 'swipe_to_reveal_delete.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'dart:async';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'crewclock_theme.dart';
 import 'package:flutter/services.dart';
 
 String _reminderError(Object error) {
@@ -60,7 +62,7 @@ class HoursMinutesFields extends StatelessWidget {
                     labelText: 'Hours',
                     suffixText: 'h',
                     border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(16),
+                        borderRadius: BorderRadius.circular(CrewClockTheme.cardRadius),
                         borderSide: BorderSide.none)))),
         const SizedBox(width: 12),
         Expanded(
@@ -76,7 +78,7 @@ class HoursMinutesFields extends StatelessWidget {
                     labelText: 'Minutes',
                     suffixText: 'min',
                     border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(16),
+                        borderRadius: BorderRadius.circular(CrewClockTheme.cardRadius),
                         borderSide: BorderSide.none)))),
       ]);
 }
@@ -209,7 +211,7 @@ class _InlineReminderEditorState extends State<InlineReminderEditor> {
         hint: 'Label',
         addTooltip: widget.saveLabel,
         actionIcon:
-            widget.saveLabel.startsWith('Add') ? Icons.add : Icons.check,
+            widget.saveLabel.startsWith('Add') ? CupertinoIcons.add : CupertinoIcons.checkmark,
         minutes: (int.tryParse(hours.text) ?? 0) * 60 +
             (int.tryParse(minutes.text) ?? 0),
         enabled: !disabled,
@@ -246,9 +248,9 @@ class _InlineReminderEditorState extends State<InlineReminderEditor> {
                 contentPadding:
                     const EdgeInsets.symmetric(horizontal: 3, vertical: 12),
                 border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14)))),
+                    borderRadius: BorderRadius.circular(CrewClockTheme.innerRadius)))),
       );
-  Widget _compact(bool disabled) => Card.outlined(
+  Widget _compact(bool disabled) => Card(
         margin: const EdgeInsets.only(top: 4),
         child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
@@ -263,7 +265,7 @@ class _InlineReminderEditorState extends State<InlineReminderEditor> {
                             onPressed: disabled
                                 ? null
                                 : () => setState(() => expanded = false),
-                            icon: const Icon(Icons.keyboard_arrow_up))),
+                            icon: const Icon(CupertinoIcons.chevron_up))),
                   if (widget.heading != null || widget.status != null)
                     Padding(
                         padding: const EdgeInsets.only(bottom: 6),
@@ -324,10 +326,10 @@ class _InlineReminderEditorState extends State<InlineReminderEditor> {
                                     : _save,
                             icon: Icon(
                                 saved
-                                    ? Icons.check
+                                    ? CupertinoIcons.checkmark
                                     : widget.saveLabel.startsWith('Add')
-                                        ? Icons.add
-                                        : Icons.save_outlined,
+                                        ? CupertinoIcons.add
+                                        : CupertinoIcons.floppy_disk,
                                 color: dirty
                                     ? Theme.of(context).colorScheme.primary
                                     : null))),
@@ -341,7 +343,7 @@ class _InlineReminderEditorState extends State<InlineReminderEditor> {
                                   ? null
                                   : () => _perform(widget.onDelete!),
                               icon:
-                                  const Icon(Icons.delete_outline, size: 20))),
+                                  const Icon(CupertinoIcons.delete, size: 20))),
                     if (widget.onCancel != null)
                       SizedBox(
                           width: 44,
@@ -349,7 +351,7 @@ class _InlineReminderEditorState extends State<InlineReminderEditor> {
                           child: IconButton(
                               tooltip: 'Cancel',
                               onPressed: disabled ? null : widget.onCancel,
-                              icon: const Icon(Icons.close))),
+                              icon: const Icon(CupertinoIcons.xmark))),
                   ]),
                   if (error != null)
                     Text(error!,
@@ -365,7 +367,7 @@ class _InlineReminderEditorState extends State<InlineReminderEditor> {
     final personalAlarm = widget.minutesBefore == null;
     if (widget.summary && !expanded) {
       final total = widget.minutesBefore ?? 0;
-      return Card.outlined(
+      return Card(
           margin: const EdgeInsets.only(top: 8),
           child: ListTile(
             contentPadding:
@@ -391,7 +393,7 @@ class _InlineReminderEditorState extends State<InlineReminderEditor> {
     if (widget.repeat) {
       return _repeatEntry(disabled);
     }
-    return Card.outlined(
+    return Card(
         margin: const EdgeInsets.only(top: 6),
         child: Padding(
             padding: const EdgeInsets.all(12),
@@ -418,7 +420,7 @@ class _InlineReminderEditorState extends State<InlineReminderEditor> {
                                   ? 'Reminder label (optional)'
                                   : 'Reminder label',
                           border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(16),
+                              borderRadius: BorderRadius.circular(CrewClockTheme.cardRadius),
                               borderSide: BorderSide.none))),
                   const SizedBox(height: 8),
                   if (widget.minutesBefore != null) ...[
@@ -431,8 +433,11 @@ class _InlineReminderEditorState extends State<InlineReminderEditor> {
                         enabled: !disabled,
                         onChanged: changed),
                   ] else ...[
-                    Row(children: [
-                      TextButton(
+                    Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                      Flexible(
+                          child: TextButton(
                           onPressed: disabled
                               ? null
                               : () {
@@ -448,11 +453,15 @@ class _InlineReminderEditorState extends State<InlineReminderEditor> {
                                   setState(() => pickerRevision++);
                                   changed();
                                 },
-                          child: const Text('Current time')),
-                      const Spacer(),
-                      TextButton(
-                          onPressed: disabled ? null : _save,
-                          child: Text('+ ${widget.saveLabel}')),
+                          child: const FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Text('Current time')))),
+                      Flexible(
+                          child: TextButton(
+                              onPressed: disabled ? null : _save,
+                              child: FittedBox(
+                                  fit: BoxFit.scaleDown,
+                                  child: Text('+ ${widget.saveLabel}')))),
                     ]),
                     SizedBox(
                         height: MediaQuery.textScalerOf(context).scale(1) > 1.3
@@ -519,7 +528,7 @@ class _InlineReminderEditorState extends State<InlineReminderEditor> {
                               onPressed: disabled
                                   ? null
                                   : () => _perform(widget.onDelete!),
-                              icon: const Icon(Icons.delete_outline)),
+                              icon: const Icon(CupertinoIcons.delete)),
                         if (!personalAlarm)
                           FilledButton.tonalIcon(
                               onPressed: disabled ||
@@ -528,10 +537,10 @@ class _InlineReminderEditorState extends State<InlineReminderEditor> {
                                   : _save,
                               icon: Icon(
                                   saved
-                                      ? Icons.check
+                                      ? CupertinoIcons.checkmark
                                       : widget.saveLabel.startsWith('Add')
-                                          ? Icons.add
-                                          : Icons.save_outlined,
+                                          ? CupertinoIcons.add
+                                          : CupertinoIcons.floppy_disk,
                                   size: 18),
                               label: Text(saving
                                   ? 'Saving…'

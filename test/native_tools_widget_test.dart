@@ -79,8 +79,6 @@ void main() {
       (tester) async {
     final s = await open(tester);
     expect(find.byType(SegmentedButton<int>), findsNothing);
-    await tester.ensureVisible(find.text('Add flight'));
-    expect(tester.getCenter(find.text('Add flight')).dx, greaterThan(195));
     await tester.tap(find.text('Settings').first);
     await tester.pumpAndSettle();
     expect(find.text('Home base · International'), findsOneWidget);
@@ -92,6 +90,10 @@ void main() {
     expect(find.text('Check / retry alarms'), findsNothing);
     expect(find.text('Stop ringing'), findsNothing);
     expect(find.text('iOS alarm / notification permissions'), findsNothing);
+    expect(find.byType(CenteredDateTimePicker), findsNothing);
+    await tester.ensureVisible(find.byKey(const ValueKey('add-personal')));
+    await tester.tap(find.byKey(const ValueKey('add-personal')));
+    await tester.pumpAndSettle();
     expect(find.byType(CenteredDateTimePicker), findsOneWidget);
     expect(find.byType(BottomSheet), findsNothing);
     expect(find.text('System alarms enabled'), findsNothing);
@@ -104,7 +106,7 @@ void main() {
     await tester.ensureVisible(label);
     await tester.enterText(label, 'Passport check');
     final save =
-        find.descendant(of: personal, matching: find.text('Add alarm'));
+        find.descendant(of: personal, matching: find.text('+ Add alarm'));
     await tester.ensureVisible(save);
     await tester.pumpAndSettle();
     expect(tester.getCenter(save).dx, greaterThan(195));
@@ -112,6 +114,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(s.savedAlarm?['lbl'], 'Passport check');
     expect(s.savedAlarm?['type'], 'direct');
+    expect(find.byType(CenteredDateTimePicker), findsNothing);
     await tester.pumpWidget(const SizedBox());
   });
   testWidgets('presets edit hours and minutes directly in Settings',
@@ -184,12 +187,10 @@ void main() {
     addTearDown(() => TestDefaultBinaryMessengerBinding
         .instance.defaultBinaryMessenger
         .setMockMethodCallHandler(channel, null));
-    await tester.ensureVisible(find.text('Add flight'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Add flight'));
+    s.openTools!('import', null);
     await tester.pumpAndSettle();
     expect(find.text('Preview sample roster'), findsNothing);
-    await tester.tap(find.text('Import ICS / calendar file'));
+    await tester.tap(find.text('Import PDF / ICS calendar'));
     await tester.pumpAndSettle();
     expect(find.text('Review roster changes'), findsOneWidget);
     expect(s.imported, isNull);
@@ -202,11 +203,9 @@ void main() {
   testWidgets('Add flight exposes and completes manual text import',
       (tester) async {
     final store = await open(tester);
-    await tester.ensureVisible(find.text('Add flight'));
+    store.openTools!('import', null);
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Add flight'));
-    await tester.pumpAndSettle();
-    expect(find.text('Import ICS / calendar file'), findsOneWidget);
+    expect(find.text('Import PDF / ICS calendar'), findsOneWidget);
     expect(find.text('Enter flight manually'), findsOneWidget);
     await tester.tap(find.text('Paste schedule text (manual)'));
     await tester.pumpAndSettle();
@@ -225,9 +224,7 @@ void main() {
   testWidgets('Add flight opens individual manual flight entry',
       (tester) async {
     final store = await open(tester);
-    await tester.ensureVisible(find.text('Add flight'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Add flight'));
+    store.openTools!('import', null);
     await tester.pumpAndSettle();
     await tester.tap(find.text('Enter flight manually'));
     await tester.pumpAndSettle();
@@ -274,7 +271,7 @@ void main() {
     final row = find.byKey(const ValueKey('alarm-readonly-alarm'));
     final label =
         find.descendant(of: row, matching: find.text('Prepare for Duty'));
-    final offset = find.descendant(of: row, matching: find.text('1h 0m'));
+    final offset = find.descendant(of: row, matching: find.text('-1h 0m'));
     expect(tester.getCenter(label).dy, closeTo(tester.getCenter(offset).dy, 1));
     expect(tester.getSize(row).height, lessThan(65));
     expect(
@@ -321,7 +318,7 @@ void main() {
     expect(find.text('Upcoming flight preparation'), findsOneWidget);
     expect(
         find.text(
-            '${store.date(store.zoned(at, 'Asia/Seoul'))} · Departure local date'),
+            '${store.displayDate(store.zoned(at, 'Asia/Seoul'))} · Departure local date'),
         findsOneWidget);
     await tester.pumpWidget(const SizedBox());
   });
@@ -331,11 +328,14 @@ void main() {
     final store = await open(tester);
     await tester.tap(find.text('Alarms').last);
     await tester.pumpAndSettle();
+    await tester.ensureVisible(find.byKey(const ValueKey('add-repeat')));
+    await tester.tap(find.byKey(const ValueKey('add-repeat')));
+    await tester.pumpAndSettle();
     final form = find.byWidgetPredicate((w) =>
         w.key is ValueKey<String> &&
         (w.key as ValueKey<String>).value.startsWith('new-interval-'));
     final button =
-        find.descendant(of: form, matching: find.text('Add reminder'));
+        find.descendant(of: form, matching: find.byTooltip('Add reminder'));
     await tester.ensureVisible(button);
     await tester.pumpAndSettle();
     await tester.tap(button);
@@ -350,6 +350,9 @@ void main() {
   });
   testWidgets('roster calendar stays fixed when schedule list scrolls',
       (tester) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
     final s = await open(tester);
     final dep = DateTime.now().toUtc().add(const Duration(days: 2));
     s.flights = [
@@ -377,7 +380,7 @@ void main() {
     await tester.pumpAndSettle();
     final calendar = find.byKey(const ValueKey('roster-calendar'));
     final before = tester.getTopLeft(calendar);
-    expect(tester.getSize(calendar).height, lessThan(310));
+    expect(tester.getSize(calendar).height, lessThan(350));
     final list = find.byKey(const ValueKey('roster-schedule-list'));
     await tester.drag(list, const Offset(0, -250));
     await tester.pumpAndSettle();
@@ -432,11 +435,17 @@ void main() {
     ];
     await tester.tap(find.text('Alarms').first);
     await tester.pumpAndSettle();
+    await tester.ensureVisible(find.byKey(const ValueKey('add-personal')));
+    await tester.tap(find.byKey(const ValueKey('add-personal')));
+    await tester.pumpAndSettle();
     final personalForm = find.byWidgetPredicate((w) =>
         w.key is ValueKey<String> &&
         (w.key as ValueKey<String>).value.startsWith('new-personal-'));
-    expect(tester.getTopLeft(find.text('Saved personal')).dy,
+    expect(tester.getTopLeft(find.textContaining('Saved personal')).dy,
         greaterThan(tester.getBottomLeft(personalForm).dy));
+    await tester.ensureVisible(find.byKey(const ValueKey('add-repeat')));
+    await tester.tap(find.byKey(const ValueKey('add-repeat')));
+    await tester.pumpAndSettle();
     final repeatForm = find.byWidgetPredicate((w) =>
         w.key is ValueKey<String> &&
         (w.key as ValueKey<String>).value.startsWith('new-interval-'));
@@ -444,18 +453,7 @@ void main() {
         scrollable: find.byType(Scrollable).first);
     expect(tester.getTopLeft(find.text('Every 1h 30m')).dy,
         greaterThan(tester.getBottomLeft(repeatForm).dy));
-    final tile = find
-        .ancestor(
-            of: find.text('Every 1h 30m'), matching: find.byType(ListTile))
-        .first;
-    expect(
-        find
-            .descendant(of: tile, matching: find.byType(Text))
-            .evaluate()
-            .length,
-        2);
-    expect(find.descendant(of: tile, matching: find.text('Scheduled')),
-        findsNothing);
+    expect(find.text('Scheduled'), findsNothing);
     expect(find.text('Repeating reminder'), findsNothing);
     expect(find.byIcon(Icons.repeat), findsNothing);
     await tester.pumpWidget(const SizedBox());

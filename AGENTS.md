@@ -34,3 +34,7 @@ Token Optimization Rules
 
 &#x20; - test procedure
 
+\- Run tests and static analysis only when the user explicitly requests them.
+
+\- If tests or static analysis are not requested, do not run them and clearly report that they were skipped.
+

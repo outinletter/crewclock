@@ -1,32 +1,31 @@
-# Native flight briefing — local iOS validation
+# CrewClock 1.0.6 (30) — native iOS conversion
 
-The first tab now renders flight preparation with Flutter widgets: flight selection,
-departure countdown, departure-airport/home-base/UTC clocks, next preparation,
-reservation statuses, personal checklist, saved pickup notes and PDF sharing.
-Roster import and alarm configuration remain in the existing WebView. Shared roster,
-time-zone and preparation storage logic is reused; this is a hybrid application.
-The duplicate briefing is hidden inside the native shell. Android project files,
-Android-only Dart code and direct dependencies, duplicate web assets and PWA assets
-were removed from the iOS-only project. Plugins use CocoaPods consistently;
-Swift Package Manager is disabled in the project configuration.
-Existing preparation records and home-base settings are reused.
+All application screens are Flutter widgets. The WebView dependency, HTML application,
+JavaScript bridge, browser tests and web application assets have been removed. The
+public privacy/support pages remain hosted for App Store metadata and are not bundled.
 
-Reviewer walkthrough:
-1. Launch into Next flight. With no roster, choose Explore flight briefing.
-2. Inspect the clearly marked fictional demo; it never schedules alarms.
-3. Exit demo, choose Import roster, then Preview sample roster and confirm registration.
-4. Return to Next flight. Choose a flight; compare airport, home-base and UTC dates.
-5. Check a preparation item, save a pickup note, and share the briefing PDF.
-6. Choose Review flight alarms to open the selected flight in Roster & alarms.
+CrewClock briefing includes departure/home-base/UTC clocks, countdown, flight selection,
+preparation checklist/notes and native PDF sharing. Its reminder list displays the
+flight/date header, departure-airport local times and each pre-departure offset.
+Swipe horizontally or use the bottom tabs to navigate to the native Roster & alarms
+screen with calendar, native calendar/text import preview, manual flight editing,
+personal and repeating alarms, home-base presets, privacy, sound and appearance settings.
+Existing AlarmKit integration is retained; permission-denied and notification-only
+states must not be represented as reserved system alarms.
 
-Privacy: no photo-library access is requested. Schedule-image text is copied by the
-user with Photos Live Text and pasted into the app. The unused photo permission
-purpose string was removed. Alarm permission remains contextual to scheduling.
+Upgrade handling preserves the SQLite alarms table, creates a native state table and
+reads historical local storage directly without a WebView. Historical WebKit files are
+left intact. Real-device migration remains a required acceptance check.
 
-Validation: automated widget/bridge checks cover startup readiness, time-zone
-presentation, flight selection and alarm navigation; JavaScript contract checks cover
-UTC date rollover, checklist/note persistence and stale-flight protection.
-Pending manual release checks: lock-screen alarm sound, Stop/Snooze/rearm, permission
-denial, reservation capacity, VoiceOver, iPad layout and real crew TestFlight feedback.
-No beta feedback or full device acceptance testing is claimed. No App Store submission
-is made by this change. Native presentation alone does not guarantee 4.3(b) acceptance.
+Reviewer path: CrewClock briefing → Explore flight briefing (clearly fictional; no alarms)
+→ Exit demo → Import roster → Preview sample roster → inspect times → confirm alarms.
+Inspect preparation times, check Passport & VISA, save a pickup note, share a PDF,
+then swipe to Roster & alarms to edit alarms and inspect reservation statuses.
+
+Before submission verify real-device data migration, locked-device sound, Stop/Snooze
+and repeating rearm, denied permissions, reservation capacity, VoiceOver and iPad
+layout. Gather actual crew TestFlight feedback and update screenshots from this build.
+No feedback, approval guarantee or App Store submission is claimed by this document.
+
+Inline UX: common CrewClock icon/title, visible hours-and-minutes reminder editors,
+editable presets directly in Settings, and native date/time pickers.

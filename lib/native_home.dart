@@ -1,4 +1,5 @@
 import 'widgets/preparation_task_row.dart';
+import 'widgets/native_glass_control.dart';
 import 'widgets/width_aware_title.dart';
 import 'widgets/flight_schedule_summary.dart';
 import 'dart:async';
@@ -6,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'widgets/crewclock_header.dart';
 import 'widgets/crewclock_theme.dart';
+import 'widgets/duty_ribbon.dart';
 
 class FlightBriefingController extends ChangeNotifier {
   Future<Map<String, dynamic>> Function(String?)? _load;
@@ -170,7 +172,7 @@ class _CrewClockShellState extends State<CrewClockShell>
       key: const ValueKey('preparation-flight-list'),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-          color: _colors.surface, borderRadius: BorderRadius.circular(18)),
+          color: _colors.surface, borderRadius: BorderRadius.circular(CrewClockTheme.cardRadius)),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         FlightScheduleSummary(
             date: '${flight['dateBadge'] ?? ''}',
@@ -237,13 +239,9 @@ class _CrewClockShellState extends State<CrewClockShell>
                                     alignment: Alignment.centerLeft,
                                     child: Text(
                                         '${step['clock'] ?? step['time']}(${data['timeSuffix'] ?? 'L'})',
-                                        style: TextStyle(
-                                            color: _colors.primary,
-                                            fontSize: 17,
-                                            fontFeatures: const [
-                                              FontFeature.tabularFigures()
-                                            ],
-                                            fontWeight: FontWeight.w700)))),
+                                        style: CrewClockTheme.timeSmall
+                                            .copyWith(
+                                                color: _colors.primary)))),
                             const SizedBox(width: 10),
                             Expanded(
                                 child: Tooltip(
@@ -264,7 +262,7 @@ class _CrewClockShellState extends State<CrewClockShell>
                               const SizedBox(width: 4),
                               Tooltip(
                                   message: '${step['status']}',
-                                  child: Icon(Icons.info_outline,
+                                  child: Icon(CupertinoIcons.info,
                                       size: 16,
                                       color: CrewClockTheme.statusColor(
                                           '${step['status']}',
@@ -296,7 +294,7 @@ class _CrewClockShellState extends State<CrewClockShell>
         padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(
           color: accent ? _teal : _colors.surface,
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(CrewClockTheme.innerRadius),
         ),
         child: DefaultTextStyle.merge(
           style:
@@ -316,10 +314,7 @@ class _CrewClockShellState extends State<CrewClockShell>
                     '${clock['time']} (${clock['zone'] == 'UTC' ? 'Z' : 'L'})',
                     maxLines: 1,
                     softWrap: false,
-                    style: const TextStyle(
-                        fontSize: 24,
-                        fontFeatures: [FontFeature.tabularFigures()],
-                        fontWeight: FontWeight.w700))),
+                    style: CrewClockTheme.timeLarge)),
           ]),
         ),
       );
@@ -373,7 +368,7 @@ class _CrewClockShellState extends State<CrewClockShell>
                           IconButton(
                               tooltip: 'Close flight list',
                               onPressed: () => Navigator.pop(sheetContext),
-                              icon: const Icon(Icons.close)),
+                              icon: const Icon(CupertinoIcons.xmark)),
                         ])),
                     Expanded(
                         child: ListView.separated(
@@ -388,7 +383,7 @@ class _CrewClockShellState extends State<CrewClockShell>
                               ? _colors.primaryContainer
                               : _colors.surfaceContainerLow,
                           shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(18),
+                              borderRadius: BorderRadius.circular(CrewClockTheme.cardRadius),
                               side: BorderSide(
                                   color:
                                       selected ? _teal : _colors.outlineVariant,
@@ -402,7 +397,7 @@ class _CrewClockShellState extends State<CrewClockShell>
                                 backgroundColor: selected
                                     ? _teal
                                     : _colors.surfaceContainerHighest,
-                                child: Icon(Icons.flight_takeoff,
+                                child: Icon(CupertinoIcons.airplane,
                                     color: selected
                                         ? Colors.white
                                         : _colors.onSurfaceVariant)),
@@ -418,8 +413,8 @@ class _CrewClockShellState extends State<CrewClockShell>
                                     '${f['date'] ?? f['label']}${selected ? ' · Selected' : ''}')),
                             trailing: Icon(
                                 selected
-                                    ? Icons.check_circle
-                                    : Icons.chevron_right,
+                                    ? CupertinoIcons.checkmark_circle_fill
+                                    : CupertinoIcons.chevron_right,
                                 color: selected
                                     ? _teal
                                     : _colors.onSurfaceVariant),
@@ -441,14 +436,12 @@ class _CrewClockShellState extends State<CrewClockShell>
     await _refresh();
   }
 
-  Widget _section(List<Widget> children, Color tone) => Container(
+  Widget _section(List<Widget> children) => Container(
         margin: const EdgeInsets.only(bottom: 12),
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-            color:
-                Color.alphaBlend(tone.withValues(alpha: .065), _colors.surface),
-            border: Border.all(color: _colors.outlineVariant),
-            borderRadius: BorderRadius.circular(18)),
+            color: _colors.surface,
+            borderRadius: BorderRadius.circular(CrewClockTheme.cardRadius)),
         child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch, children: children),
       );
@@ -458,44 +451,53 @@ class _CrewClockShellState extends State<CrewClockShell>
     final choices = data['flights'] as List;
     final clocks = List<dynamic>.from(data['clocks'] as List);
     final tasks = data['tasks'] as List;
-    final departure = DateTime.parse(flight['departure'] as String);
-    final minutes =
-        (departure.difference(DateTime.now()).inSeconds / 60).ceil();
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       if (choices.isNotEmpty) ...[
         _title('Flight'),
-        OutlinedButton(
-          key: const ValueKey('choose-flight'),
-          style: OutlinedButton.styleFrom(
-            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            side: BorderSide(color: _colors.outlineVariant),
-            foregroundColor: _colors.onSurface,
-          ),
-          onPressed: _busy
-              ? null
-              : () => _chooseFlight(choices, data['key'] as String),
-          child: Row(children: [
-            Icon(Icons.flight_takeoff, color: _teal),
-            const SizedBox(width: 12),
-            Expanded(
-                child: Text(
-                    '${choices.firstWhere((f) => f['key'] == data['key'])['label']}',
-                    style: const TextStyle(fontSize: 16),
-                    textAlign: TextAlign.left,
-                    maxLines: 2)),
-            const SizedBox(width: 8),
-            const Icon(Icons.unfold_more),
-          ]),
-        ),
+        NativeGlassControl(
+            kind: 'flight',
+            height: 56,
+            label:
+                '${choices.firstWhere((f) => f['key'] == data['key'])['label']}',
+            enabled: !_busy,
+            onActivate: (_) => _chooseFlight(choices, data['key'] as String),
+            fallback: OutlinedButton(
+              key: const ValueKey('choose-flight'),
+              style: OutlinedButton.styleFrom(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(CrewClockTheme.cardRadius)),
+                side: BorderSide(color: _colors.outlineVariant),
+                foregroundColor: _colors.onSurface,
+              ),
+              onPressed: _busy
+                  ? null
+                  : () => _chooseFlight(choices, data['key'] as String),
+              child: Row(children: [
+                Icon(CupertinoIcons.airplane, color: _teal),
+                const SizedBox(width: 12),
+                Expanded(
+                    child: Text(
+                        '${choices.firstWhere((f) => f['key'] == data['key'])['label']}',
+                        style: const TextStyle(fontSize: 16),
+                        textAlign: TextAlign.left,
+                        maxLines: 2)),
+                const SizedBox(width: 8),
+                const Icon(CupertinoIcons.chevron_up_chevron_down),
+              ]),
+            )),
       ],
       const SizedBox(height: 12),
+      if (data['ribbon'] is Map) ...[
+        DutyRibbon(data: data['ribbon'] as Map, dark: data['dark'] == true),
+        const SizedBox(height: 12),
+      ],
       Container(
           key: const ValueKey('flight-preparation-card'),
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-              color: _colors.surface, borderRadius: BorderRadius.circular(18)),
+              color: _colors.surface, borderRadius: BorderRadius.circular(CrewClockTheme.cardRadius)),
           child: IntrinsicHeight(
               child: Row(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -599,7 +601,7 @@ class _CrewClockShellState extends State<CrewClockShell>
         Text(
             'Same departure instant across the displayed time zones. Flight reminders stay on ${flight['from']} local time when you travel.'),
         const SizedBox(height: 16),
-      ], const Color(0xff5aaca4)),
+      ]),
       _timeline(data),
       const SizedBox(height: 12),
       _section([
@@ -610,7 +612,7 @@ class _CrewClockShellState extends State<CrewClockShell>
                   ? 'Finish editing preparation'
                   : 'Edit preparation',
               onPressed: () => setState(() => _editingTasks = !_editingTasks),
-              icon: Icon(_editingTasks ? Icons.check : Icons.edit_outlined)),
+              icon: Icon(_editingTasks ? CupertinoIcons.checkmark : CupertinoIcons.pencil)),
         ]),
         Text(
             '${tasks.where((t) => t['checkedAt'] != null).length} / ${tasks.length} checked'),
@@ -658,7 +660,7 @@ class _CrewClockShellState extends State<CrewClockShell>
             decoration: InputDecoration(
                 labelText: 'New preparation item',
                 border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(CrewClockTheme.cardRadius),
                     borderSide: BorderSide.none))),
         Align(
             alignment: Alignment.centerRight,
@@ -667,7 +669,7 @@ class _CrewClockShellState extends State<CrewClockShell>
                     ? null
                     : () => _act('add', _newTask.text),
                 child: const Text('Add item'))),
-      ], const Color(0xff9293cd)),
+      ]),
       const Text(
           'Personal organization only. Use your airline’s official operational procedures and roster.'),
     ]);
@@ -707,11 +709,23 @@ class _CrewClockShellState extends State<CrewClockShell>
             ]),
       ));
 
-  BottomNavigationBarItem _tabItem(IconData icon, String label) =>
-      BottomNavigationBarItem(
-        icon: Icon(icon),
-        label: label,
-        activeIcon: Icon(icon,
+  BottomNavigationBarItem _tabItem(IconData icon, String label) {
+    Widget content(Icon tabIcon, {bool selected = false}) => Column(
+          children: [
+            Expanded(child: Center(child: tabIcon)),
+            Text(
+              label,
+              style: selected
+                  ? const TextStyle(fontWeight: FontWeight.w600)
+                  : null,
+            ),
+          ],
+        );
+
+    return BottomNavigationBarItem(
+      icon: content(Icon(icon)),
+      activeIcon: content(
+        Icon(icon,
             key: ValueKey('selected-tab-$label'),
             color: _teal,
             shadows: [
@@ -720,7 +734,10 @@ class _CrewClockShellState extends State<CrewClockShell>
               Shadow(color: _teal, offset: const Offset(0, .3)),
               Shadow(color: _teal, offset: const Offset(0, -.3)),
             ]),
-      );
+        selected: true,
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -739,21 +756,31 @@ class _CrewClockShellState extends State<CrewClockShell>
                     ][_tab],
                     actions: [
                       if (_tab == 0)
-                        TextButton.icon(
-                          key: const ValueKey('briefing-add-roster'),
-                          style: TextButton.styleFrom(
-                            foregroundColor: Colors.white,
-                            disabledForegroundColor: Colors.white38,
-                            minimumSize: const Size(0, 44),
-                            padding: const EdgeInsets.symmetric(horizontal: 4),
-                          ),
-                          onPressed: _busy || !widget.briefing.ready
-                              ? null
-                              : () => _act('import'),
-                          icon: const Icon(Icons.add, size: 18),
-                          label: const Text('Add Roster',
-                              style: TextStyle(fontSize: 13)),
-                        ),
+                        SizedBox(
+                            width: 132,
+                            child: NativeGlassControl(
+                                kind: 'add',
+                                height: 40,
+                                label: 'Add Roster',
+                                onDarkHeader: true,
+                                enabled: !_busy && widget.briefing.ready,
+                                onActivate: (_) => _act('import'),
+                                fallback: TextButton.icon(
+                                  key: const ValueKey('briefing-add-roster'),
+                                  style: TextButton.styleFrom(
+                                    foregroundColor: Colors.white,
+                                    disabledForegroundColor: Colors.white38,
+                                    minimumSize: const Size(0, 44),
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 4),
+                                  ),
+                                  onPressed: _busy || !widget.briefing.ready
+                                      ? null
+                                      : () => _act('import'),
+                                  icon: const Icon(CupertinoIcons.add, size: 18),
+                                  label: const Text('Add Roster',
+                                      style: TextStyle(fontSize: 13)),
+                                ))),
                       ...?widget.headerActions?.call(_tab),
                     ]),
                 body: Column(children: [
@@ -785,29 +812,50 @@ class _CrewClockShellState extends State<CrewClockShell>
                     ],
                   )),
                 ]),
-                bottomNavigationBar: DecoratedBox(
-                    decoration: BoxDecoration(
-                        color: _colors.surface,
-                        border: Border(
-                            top: BorderSide(color: _colors.outlineVariant))),
-                    child: Padding(
-                        padding: const EdgeInsets.only(top: 8),
-                        child: CupertinoTabBar(
-                            backgroundColor: _colors.surface,
-                            border: const Border(),
-                            height: 52,
-                            currentIndex: _tab,
-                            activeColor: _teal,
-                            inactiveColor: _colors.onSurfaceVariant,
-                            onTap: _showTab,
-                            items: [
-                              _tabItem(CupertinoIcons.airplane, 'Briefing'),
-                              _tabItem(CupertinoIcons.calendar, 'Roster'),
-                              if (widget.alarms != null)
-                                _tabItem(CupertinoIcons.alarm, 'Alarms'),
-                              if (widget.settings != null)
-                                _tabItem(CupertinoIcons.settings, 'Settings'),
-                            ]))),
+                bottomNavigationBar: Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+                  child: SafeArea(
+                    top: false,
+                    child: NativeGlassControl(
+                      kind: 'tabs',
+                      height: 64,
+                      labels: [
+                        'Briefing',
+                        'Roster',
+                        if (widget.alarms != null) 'Alarms',
+                        if (widget.settings != null) 'Settings',
+                      ],
+                      selected: _tab,
+                      onActivate: _showTab,
+                      fallback: DecoratedBox(
+                          decoration: BoxDecoration(
+                              color: _colors.surface,
+                              border: Border(
+                                  top: BorderSide(
+                                      color: _colors.outlineVariant))),
+                          child: Padding(
+                              padding: const EdgeInsets.only(top: 8),
+                              child: CupertinoTabBar(
+                                  backgroundColor: _colors.surface,
+                                  border: const Border(),
+                                  height: 52,
+                                  currentIndex: _tab,
+                                  activeColor: _teal,
+                                  inactiveColor: _colors.onSurfaceVariant,
+                                  onTap: _showTab,
+                                  items: [
+                                    _tabItem(
+                                        CupertinoIcons.airplane, 'Briefing'),
+                                    _tabItem(CupertinoIcons.calendar, 'Roster'),
+                                    if (widget.alarms != null)
+                                      _tabItem(CupertinoIcons.alarm, 'Alarms'),
+                                    if (widget.settings != null)
+                                      _tabItem(
+                                          CupertinoIcons.settings, 'Settings'),
+                                  ]))),
+                    ),
+                  ),
+                ),
               )),
     );
   }

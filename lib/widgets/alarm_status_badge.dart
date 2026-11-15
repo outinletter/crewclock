@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'crewclock_theme.dart';
 
@@ -12,7 +13,7 @@ class AlarmStatusBadge extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(top: 4),
       child: Row(mainAxisSize: MainAxisSize.min, children: [
-        Icon(success ? Icons.check_circle_outline : Icons.info_outline,
+        Icon(success ? CupertinoIcons.checkmark_circle : CupertinoIcons.info,
             size: 14, color: color),
         const SizedBox(width: 4),
         Flexible(

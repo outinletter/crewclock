@@ -103,6 +103,14 @@ struct CrewNextAlarmWidget: Widget {
   }
 }
 struct CrewNextAlarmActivity: Widget {
+  private func appIcon(size: CGFloat, cornerRadius: CGFloat) -> some View {
+    Image("WidgetAppIcon")
+      .resizable()
+      .scaledToFit()
+      .frame(width: size, height: size)
+      .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+  }
+
   private func offsetText(_ state: CrewNextAlarmAttributes.ContentState) -> String {
     guard let departure = state.flightDeparture else { return state.label }
     let total = max(0, Int((departure.timeIntervalSince(state.date) / 60).rounded()))
@@ -110,28 +118,58 @@ struct CrewNextAlarmActivity: Widget {
   }
   var body: some WidgetConfiguration {
     ActivityConfiguration(for: CrewNextAlarmAttributes.self) { context in
-      VStack(alignment: .leading, spacing: 5) {
-        HStack(spacing: 6) {
-          Image(systemName: "airplane").foregroundStyle(Color(red: 0.12, green: 0.40, blue: 0.67))
-          Text("\(String((context.state.departureDate ?? "").suffix(5)).replacingOccurrences(of: "-", with: "/")) · \(context.state.departureTime ?? "—") \(context.state.departureAirport ?? "—") → \(context.state.arrivalAirport ?? "—") \(context.state.arrivalTime ?? "—")")
-            .font(.headline).lineLimit(1).minimumScaleFactor(0.68)
+      HStack(alignment: .center, spacing: 10) {
+        appIcon(size: 38, cornerRadius: 9)
+
+        VStack(alignment: .leading, spacing: 3) {
+          HStack {
+            Text("CrewClock")
+              .font(.system(size: 14, weight: .semibold))
+              .foregroundStyle(.primary)
+            Spacer()
+          }
+
+          HStack(spacing: 4) {
+            Image(systemName: "airplane")
+              .font(.system(size: 12, weight: .semibold))
+              .foregroundStyle(Color.blue)
+            Text("\(String((context.state.departureDate ?? "").suffix(5)).replacingOccurrences(of: "-", with: "/")) · \(context.state.departureTime ?? "—") \(context.state.departureAirport ?? "—") → \(context.state.arrivalAirport ?? "—") \(context.state.arrivalTime ?? "—")")
+              .font(.system(size: 13, weight: .medium))
+              .lineLimit(1)
+              .minimumScaleFactor(0.7)
+          }
+          .foregroundStyle(.primary)
+
+          HStack(spacing: 4) {
+            Text("\(context.state.label) · \(CrewSurfaceAlarm.format(context.state.date, zone: context.state.zone, pattern: "HH:mm")) · -")
+            CrewRemainingTime(date: context.state.date)
+          }
+          .font(.system(size: 13, weight: .regular))
+          .foregroundStyle(.secondary)
+          .monospacedDigit()
+          .lineLimit(1)
+          .minimumScaleFactor(0.7)
         }
-        HStack(spacing: 4) {
-          Text("\(context.state.label) · \(CrewSurfaceAlarm.format(context.state.date, zone: context.state.zone, pattern: "HH:mm")) · -")
-          CrewRemainingTime(date: context.state.date)
-        }.font(.subheadline.weight(.semibold)).monospacedDigit().lineLimit(1).minimumScaleFactor(0.65)
-      }.foregroundStyle(Color(red: 0.06, green: 0.18, blue: 0.31))
-        .environment(\.timeZone, TimeZone(identifier: context.state.zone) ?? TimeZone(secondsFromGMT: 0)!).padding()
-        .activityBackgroundTint(Color(red: 0.76, green: 0.87, blue: 0.97))
-        .activitySystemActionForegroundColor(Color(red: 0.12, green: 0.40, blue: 0.67))
+      }
+      .padding(.vertical, 10)
+      .padding(.horizontal, 12)
+      .environment(\.timeZone, TimeZone(identifier: context.state.zone) ?? TimeZone(secondsFromGMT: 0)!)
+      .activityBackgroundTint(Color.black.opacity(0.35))
+      .activitySystemActionForegroundColor(Color.blue)
     } dynamicIsland: { context in
       DynamicIsland {
-        DynamicIslandExpandedRegion(.leading) { Image(systemName: "alarm.fill") }
+        DynamicIslandExpandedRegion(.leading) {
+          appIcon(size: 30, cornerRadius: 7)
+        }
         DynamicIslandExpandedRegion(.trailing) { Text(CrewSurfaceAlarm.format(context.state.date, zone: context.state.zone, pattern: "HH:mm")).environment(\.timeZone, TimeZone(identifier: context.state.zone) ?? TimeZone(secondsFromGMT: 0)!) }
         DynamicIslandExpandedRegion(.bottom) { Text(context.state.label).lineLimit(1) }
-      } compactLeading: { Image(systemName: "alarm.fill") }
+      } compactLeading: {
+        appIcon(size: 18, cornerRadius: 4)
+      }
         compactTrailing: { Text(CrewSurfaceAlarm.format(context.state.date, zone: context.state.zone, pattern: "HH:mm")).environment(\.timeZone, TimeZone(identifier: context.state.zone) ?? TimeZone(secondsFromGMT: 0)!).font(.caption2) }
-        minimal: { Image(systemName: "alarm.fill") }
+        minimal: {
+          appIcon(size: 18, cornerRadius: 4)
+        }
         .widgetURL(URL(string: "crewclock://alarms"))
         .keylineTint(Color(red: 0.65, green: 0.81, blue: 0.96))
     }

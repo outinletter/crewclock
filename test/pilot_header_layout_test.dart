@@ -22,7 +22,6 @@ void main() {
               headerActions: (_) => const [])));
       await tester.pumpAndSettle();
       final header = find.byType(CrewClockHeader),
-          brand = find.text('CrewClock'),
           chooser = find.byKey(const ValueKey('choose-flight'));
       expect(tester.getTopLeft(chooser).dy,
           greaterThanOrEqualTo(tester.getBottomLeft(header).dy));

@@ -1,4 +1,6 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'crewclock_theme.dart';
 
 class SwipeToRevealDelete extends StatefulWidget {
   const SwipeToRevealDelete(
@@ -14,7 +16,7 @@ class _SwipeToRevealDeleteState extends State<SwipeToRevealDelete> {
   double drag = 0;
   @override
   Widget build(BuildContext context) => ClipRRect(
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(CrewClockTheme.cardRadius),
         child: Stack(children: [
           if (open)
             Positioned.fill(
@@ -46,7 +48,7 @@ class _SwipeToRevealDeleteState extends State<SwipeToRevealDelete> {
                                       }
                                     }
                                   },
-                            icon: const Icon(Icons.delete_outline))))),
+                            icon: const Icon(CupertinoIcons.delete))))),
           GestureDetector(
             onHorizontalDragStart: (_) => drag = 0,
             onHorizontalDragUpdate: (details) => drag += details.delta.dx,

@@ -1,6 +1,5 @@
 import 'package:crewclock/widgets/centered_date_time_picker.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/cupertino.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:crewclock/widgets/inline_reminder_editor.dart';
 
@@ -69,16 +68,21 @@ void main() {
                   time: '13:55',
                   zone: timed ? 'Asia/Seoul' : null,
                   onSave: (_, __, ___, ____) async {}))));
-      final button = find.widgetWithText(FilledButton, 'Save changes');
       final fields = timed
           ? find.byType(CenteredDateTimePicker)
           : find.widgetWithText(TextField, 'Hours');
-      expect(tester.getTopLeft(button).dy - tester.getBottomLeft(fields).dy,
-          greaterThanOrEqualTo(14));
       if (timed) {
+        // Personal alarms save from the row above the compact roller.
+        final button = find.text('+ Save changes');
+        expect(tester.getBottomLeft(button).dy,
+            lessThanOrEqualTo(tester.getTopLeft(fields).dy));
         final picker = tester.widget<CenteredDateTimePicker>(fields);
         expect(picker.itemExtent, 28);
-        expect(tester.getSize(fields).height, 112);
+        expect(tester.getSize(fields).height, 44);
+      } else {
+        final button = find.text('Save changes');
+        expect(tester.getTopLeft(button).dy - tester.getBottomLeft(fields).dy,
+            greaterThanOrEqualTo(14));
       }
       expect(tester.takeException(), isNull);
     }
@@ -99,17 +103,17 @@ void main() {
                   savedLabel = label;
                   savedMinutes = minutes;
                 }))));
-    await tester.tap(find.text('Save changes'));
+    await tester.tap(find.byTooltip('Save changes'));
     await tester.pumpAndSettle();
     expect(savedLabel, 'Repeating reminder');
     expect(savedMinutes, 90);
-    savedMinutes = null;
-    await tester.enterText(find.widgetWithText(TextField, 'Hours'), '0');
-    await tester.enterText(find.widgetWithText(TextField, 'Minutes'), '0');
-    await tester.tap(find.text('Save changes'));
-    await tester.pumpAndSettle();
-    expect(savedMinutes, isNull);
-    expect(find.textContaining('at least 1 minute'), findsOneWidget);
+    // The rollers cannot be typed into; the minimum is enforced on read.
+    expect(
+        () => HoursMinutesFields.read(
+            TextEditingController(text: '0'), TextEditingController(text: '0'),
+            minimum: 1),
+        throwsA(isA<FormatException>().having(
+            (e) => e.message, 'message', contains('1 minute'))));
     await tester.pumpWidget(const SizedBox());
   });
   testWidgets(
@@ -124,7 +128,7 @@ void main() {
                 date: '2099-11-02',
                 time: '13:55',
                 onSave: (label, _, __, ___) async => saved = label))));
-    await tester.tap(find.text('Save changes'));
+    await tester.tap(find.text('+ Save changes'));
     await tester.pumpAndSettle();
     expect(saved, 'Personal alarm');
     saved = null;

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'crewclock_theme.dart';
 
 class FlightScheduleSummary extends StatelessWidget {
   const FlightScheduleSummary(
@@ -19,7 +20,7 @@ class FlightScheduleSummary extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
         decoration: BoxDecoration(
             color: colors.primaryContainer,
-            borderRadius: BorderRadius.circular(12)),
+            borderRadius: BorderRadius.circular(CrewClockTheme.innerRadius)),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           LayoutBuilder(builder: (context, constraints) {
             final accessible = MediaQuery.textScalerOf(context).scale(1) > 1.3;

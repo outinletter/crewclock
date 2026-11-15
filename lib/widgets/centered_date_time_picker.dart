@@ -55,13 +55,19 @@ class _CenteredDateTimePickerState extends State<CenteredDateTimePicker> {
           flex: 2,
           child: Semantics(
               label: label,
-              child: CupertinoPicker(
-                  scrollController: controller,
-                  itemExtent: widget.itemExtent,
-                  looping: true,
-                  onSelectedItemChanged: selected,
-                  children: List.generate(
-                      count, (i) => text(i.toString().padLeft(2, '0'))))));
+              child: Center(
+                child: SizedBox(
+                  height: widget.itemExtent,
+                  child: CupertinoPicker(
+                    scrollController: controller,
+                    itemExtent: widget.itemExtent,
+                    looping: true,
+                    onSelectedItemChanged: selected,
+                    children: List.generate(
+                        count, (i) => text(i.toString().padLeft(2, '0'))),
+                  ),
+                ),
+              )));
   @override
   Widget build(BuildContext context) => Center(
       child: SizedBox(

@@ -29,6 +29,10 @@ import PDFKit
 
   func didInitializeImplicitFlutterEngine(_ engineBridge: FlutterImplicitEngineBridge) {
     GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
+    if let glassRegistrar = engineBridge.pluginRegistry.registrar(forPlugin: "CrewClockGlass") {
+      glassRegistrar.register(CrewGlassFactory(messenger: glassRegistrar.messenger()),
+                              withId: "crewclock/glass")
+    }
     let channel = FlutterMethodChannel(name: "crewclock/native_alarm",
       binaryMessenger: engineBridge.applicationRegistrar.messenger())
     alarmDismissObserver = NotificationCenter.default.addObserver(
@@ -782,4 +786,122 @@ private func recognizeRosterCalendar(_ image: CGImage) throws -> String {
     output.append(contentsOf: cell.compactMap { $0.topCandidates(1).first?.string })
   }
   return output.joined(separator: "\n")
+}
+
+// Native system material keeps Flutter navigation and actions connected.
+final class CrewGlassFactory: NSObject, FlutterPlatformViewFactory {
+  private let messenger: FlutterBinaryMessenger
+  init(messenger: FlutterBinaryMessenger) {
+    self.messenger = messenger
+    super.init()
+  }
+  func createArgsCodec() -> FlutterMessageCodec & NSObjectProtocol {
+    FlutterStandardMessageCodec.sharedInstance()
+  }
+  func create(withFrame frame: CGRect, viewIdentifier viewId: Int64,
+              arguments args: Any?) -> FlutterPlatformView {
+    CrewGlassControl(frame: frame, id: viewId,
+                     configuration: args as? [String: Any] ?? [:], messenger: messenger)
+  }
+}
+
+final class CrewGlassControl: NSObject, FlutterPlatformView {
+  private let root: UIVisualEffectView
+  private let stack = UIStackView()
+  private let channel: FlutterMethodChannel
+  private var configuration: [String: Any]
+  init(frame: CGRect, id: Int64, configuration: [String: Any],
+       messenger: FlutterBinaryMessenger) {
+    self.configuration = configuration
+    if #available(iOS 26.0, *) {
+      let glass = UIGlassEffect(style: .regular)
+      glass.isInteractive = true
+      root = UIVisualEffectView(effect: glass)
+    } else {
+      root = UIVisualEffectView(effect: UIBlurEffect(style: .systemMaterial))
+    }
+    channel = FlutterMethodChannel(name: "crewclock/glass/\(id)", binaryMessenger: messenger)
+    super.init()
+    root.frame = frame
+    root.layer.cornerCurve = .continuous
+    root.clipsToBounds = true
+    stack.axis = .horizontal
+    stack.distribution = .fillEqually
+    stack.translatesAutoresizingMaskIntoConstraints = false
+    root.contentView.addSubview(stack)
+    NSLayoutConstraint.activate([
+      stack.leadingAnchor.constraint(equalTo: root.contentView.leadingAnchor, constant: 8),
+      stack.trailingAnchor.constraint(equalTo: root.contentView.trailingAnchor, constant: -8),
+      stack.topAnchor.constraint(equalTo: root.contentView.topAnchor, constant: 2),
+      stack.bottomAnchor.constraint(equalTo: root.contentView.bottomAnchor, constant: -2)
+    ])
+    channel.setMethodCallHandler { [weak self] call, result in
+      guard call.method == "update", let values = call.arguments as? [String: Any] else {
+        result(FlutterMethodNotImplemented)
+        return
+      }
+      self?.configuration = values
+      self?.update()
+      result(nil)
+    }
+    update()
+  }
+  func view() -> UIView { root }
+  private func update() {
+    let kind = configuration["kind"] as? String ?? "button"
+    let tabs = kind == "tabs"
+    let header = configuration["header"] as? Bool ?? false
+    let dark = configuration["dark"] as? Bool ?? false
+    let enabled = configuration["enabled"] as? Bool ?? true
+    let selected = configuration["selected"] as? Int ?? 0
+    root.overrideUserInterfaceStyle = (dark || header) ? .dark : .light
+    root.layer.cornerRadius = tabs ? 30 : 20
+    stack.distribution = tabs ? .fillEqually : .fill
+    stack.arrangedSubviews.forEach { $0.removeFromSuperview() }
+    let labels = tabs ? (configuration["labels"] as? [String] ?? [])
+      : [configuration["label"] as? String ?? ""]
+    let tabSymbols = ["Briefing": "airplane", "Roster": "calendar",
+                      "Alarms": "alarm", "Settings": "gearshape"]
+    let symbols = tabs ? labels.map { tabSymbols[$0] ?? "circle" }
+      : [kind == "flight" ? "airplane.departure" : "plus"]
+    for (index, label) in labels.enumerated() {
+      let active = tabs && index == selected
+      var style = UIButton.Configuration.plain()
+      style.title = label
+      let symbol = symbols.indices.contains(index) ? symbols[index] : "circle"
+      style.image = UIImage(systemName: symbol,
+                            withConfiguration: UIImage.SymbolConfiguration(
+                              pointSize: tabs ? 21 : 17, weight: active ? .semibold : .regular))
+      style.imagePlacement = tabs ? .top : .leading
+      style.imagePadding = tabs ? 3 : 8
+      style.contentInsets = NSDirectionalEdgeInsets(top: 4, leading: 4, bottom: 4, trailing: 4)
+      style.baseForegroundColor = header ? .white
+        : (active ? UIColor.systemBlue : (tabs ? UIColor.secondaryLabel : UIColor.label))
+      style.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { attributes in
+        var attributes = attributes
+        attributes.font = UIFont.systemFont(ofSize: tabs ? 11 : (kind == "flight" ? 15 : 13),
+                                             weight: active ? .semibold : .regular)
+        return attributes
+      }
+      let button = UIButton(configuration: style)
+      button.isEnabled = enabled
+      button.titleLabel?.numberOfLines = 1
+      button.titleLabel?.adjustsFontSizeToFitWidth = true
+      button.titleLabel?.minimumScaleFactor = 0.7
+      button.accessibilityLabel = label
+      if active { button.accessibilityTraits.insert(.selected) }
+      button.addAction(UIAction { [weak self] _ in
+        self?.channel.invokeMethod("activate", arguments: index)
+      }, for: .touchUpInside)
+      stack.addArrangedSubview(button)
+    }
+    if kind == "flight" {
+      let chevrons = UIImageView(image: UIImage(systemName: "chevron.up.chevron.down"))
+      chevrons.tintColor = .secondaryLabel
+      chevrons.contentMode = .scaleAspectFit
+      chevrons.isAccessibilityElement = false
+      chevrons.widthAnchor.constraint(equalToConstant: 16).isActive = true
+      stack.addArrangedSubview(chevrons)
+    }
+  }
 }

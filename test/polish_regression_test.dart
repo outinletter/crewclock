@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:crewclock/services/crewclock_store.dart';
 import 'package:crewclock/widgets/crewclock_theme.dart';
 import 'package:crewclock/widgets/inline_reminder_editor.dart';
@@ -76,8 +77,11 @@ void main() {
                     minutesBefore: 270,
                     onSave: (_, minutes, __, ___) async => saved = minutes,
                     onDelete: () async {})))));
-    final minutes = find.byKey(const ValueKey('preset-minutes'));
-    await tester.enterText(minutes, '15');
+    tester
+        .widget<CupertinoPicker>(find.byType(CupertinoPicker).at(1))
+        .scrollController!
+        .jumpToItem(15);
+    await tester.pumpAndSettle();
     await tester.pump(const Duration(milliseconds: 700));
     await tester.pumpAndSettle();
     expect(saved, 255);

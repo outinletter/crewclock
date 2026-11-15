@@ -20,6 +20,7 @@ class DurationWheels extends StatefulWidget {
 const int maxDurationHours = 24;
 
 class _DurationWheelsState extends State<DurationWheels> {
+  static const _itemExtent = 32.0;
   late final FixedExtentScrollController hours, minutes;
   late int h, m;
   int scrolls = 0;
@@ -70,7 +71,7 @@ class _DurationWheelsState extends State<DurationWheels> {
                 label: unit == 'h' ? 'Hours' : 'Minutes',
                 child: CupertinoPicker(
                     scrollController: controller,
-                    itemExtent: 20,
+                    itemExtent: _itemExtent,
                     onSelectedItemChanged: select,
                     children: List.generate(
                         count,
@@ -110,7 +111,7 @@ class _DurationWheelsState extends State<DurationWheels> {
                   opacity: widget.enabled ? 1 : .45,
                   child: SizedBox(
                       width: 140,
-                      height: 32,
+                      height: _itemExtent,
                       child: Row(children: [
                         wheel(hours, maxDurationHours + 1, 'h', (n) {
                           h = n;
@@ -137,7 +138,7 @@ class DurationAlarmCard extends StatelessWidget {
       this.onLabelChanged,
       this.showAddButton = true,
       this.addTooltip,
-      this.actionIcon = Icons.add,
+      this.actionIcon = CupertinoIcons.add,
       this.onScrollingChanged});
   final TextEditingController label;
   final String hint;
@@ -152,9 +153,7 @@ class DurationAlarmCard extends StatelessWidget {
   final ValueChanged<bool>? onScrollingChanged;
   final String? error;
   @override
-  Widget build(BuildContext context) => Card.outlined(
-      color: Color.alphaBlend(const Color(0xff9293cd).withValues(alpha: .065),
-          Theme.of(context).colorScheme.surface),
+  Widget build(BuildContext context) => Card(
       child: Padding(
           padding: const EdgeInsets.all(8),
           child:

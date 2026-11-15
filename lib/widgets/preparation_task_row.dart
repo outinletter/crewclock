@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 class PreparationTaskRow extends StatefulWidget {
@@ -37,8 +38,8 @@ class _PreparationTaskRowState extends State<PreparationTaskRow> {
       Tooltip(message: widget.checkedText == null ? 'Preparation complete' : 'Checked ${widget.checkedText}', child: Checkbox(value: widget.checked, onChanged: widget.onToggle == null ? null : (_) => widget.onToggle!())),
       Expanded(child: widget.editing ? TextField(controller: controller, maxLength: 100, textAlignVertical: TextAlignVertical.center, onChanged: (_) { pending?.cancel(); pending = Timer(const Duration(milliseconds: 650), save); }, onSubmitted: (_) => save(), onTapOutside: (_) { FocusManager.instance.primaryFocus?.unfocus(); save(); }, decoration: const InputDecoration(isDense: true, counterText: '', contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8))) : Tooltip(message: widget.label, child: Text(widget.label, maxLines: MediaQuery.textScalerOf(context).scale(1) > 1.3 ? 2 : 1, overflow: TextOverflow.ellipsis))),
       if (widget.editing) ...[
-        Padding(padding: const EdgeInsets.symmetric(horizontal: 6), child: Semantics(label: 'Hold to reorder', child: const Icon(Icons.drag_handle, size: 20))),
-        IconButton(tooltip: 'Delete preparation item', onPressed: widget.onDelete, icon: const Icon(Icons.remove_circle_outline, size: 20)),
+        Padding(padding: const EdgeInsets.symmetric(horizontal: 6), child: Semantics(label: 'Hold to reorder', child: const Icon(CupertinoIcons.line_horizontal_3, size: 20))),
+        IconButton(tooltip: 'Delete preparation item', onPressed: widget.onDelete, icon: const Icon(CupertinoIcons.minus_circle, size: 20)),
       ],
     ]),
   ));

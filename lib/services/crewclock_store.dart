@@ -927,6 +927,7 @@ class CrewClockStore extends ChangeNotifier {
         clockBox('UTC', 'UTC')
       ],
       'next': upcoming.firstOrNull,
+      'ribbon': dutyRibbon(f, steps),
       'steps': steps,
       'tasks': maps(state['tasks'])
           .map((t) => {
@@ -937,6 +938,207 @@ class CrewClockStore extends ChangeNotifier {
               })
           .toList(),
       'note': state['note'] ?? ''
+    };
+  }
+
+  /// Splits the time between [after] minutes past departure and [before]
+  /// minutes ahead of arrival into equal rest periods. Changeovers are rounded
+  /// to five minutes.
+  static List<List<DateTime>> restPeriods(DateTime dep, DateTime arr,
+      {required int periods, required int after, required int before}) {
+    DateTime five(DateTime t, {required bool up}) {
+      final minutes = t.minute + (up && t.second > 0 ? 1 : 0);
+      return DateTime.utc(t.year, t.month, t.day, t.hour,
+          up ? (minutes / 5).ceil() * 5 : minutes ~/ 5 * 5);
+    }
+
+    final start = five(dep.toUtc().add(Duration(minutes: after)), up: true);
+    final end =
+        five(arr.toUtc().subtract(Duration(minutes: before)), up: false);
+    final total = end.difference(start).inMinutes;
+    if (periods < 2 || periods > 4) {
+      throw const FormatException('Choose 2 to 4 rest periods.');
+    }
+    if (total < periods * 20) {
+      throw const FormatException(
+          'Not enough flight time for these rest periods.');
+    }
+    DateTime edge(int i) {
+      if (i == 0) return start;
+      if (i == periods) return end;
+      final raw = start.add(Duration(seconds: total * 60 * i ~/ periods));
+      final minute = (raw.minute + raw.second / 60) / 5;
+      return DateTime.utc(
+          raw.year, raw.month, raw.day, raw.hour, minute.round() * 5);
+    }
+
+    return [
+      for (var i = 0; i < periods; i++) [edge(i), edge(i + 1)]
+    ];
+  }
+
+  static const restDefaults = {
+    'periods': 3,
+    'after': 30,
+    'before': 60,
+    'mine': 0,
+    'delay': 0,
+    'all': false
+  };
+
+  /// Flights that have not landed yet and include an arrival time.
+  List<Map<String, dynamic>> restFlights() {
+    final now = DateTime.now();
+    return sortedFlights()
+        .where((f) =>
+            DateTime.tryParse('${f['arrivalUtc']}')?.isAfter(now) == true)
+        .toList();
+  }
+
+  String _restPrefix(Map f) => 'rest_${departure(f).millisecondsSinceEpoch}_';
+  Map<String, dynamic> restConfig(Map f) => {
+        ...restDefaults,
+        ...((settings['restPlans'] as Map?)?[key(f)] as Map? ?? {})
+      };
+  List<Map<String, dynamic>> restAlarms(Map f) =>
+      alarms.where((a) => '${a['id']}'.startsWith(_restPrefix(f))).toList();
+
+  /// Rest periods and the alarms they would create for [config].
+  ({List<List<DateTime>> periods, List<Map<String, dynamic>> alarms}) restPlan(
+      Map f, Map config) {
+    final delay = Duration(minutes: (config['delay'] as num).toInt());
+    final count = (config['periods'] as num).toInt();
+    final mine = (config['mine'] as num).toInt().clamp(0, count - 1);
+    final periods = restPeriods(departure(f).add(delay),
+        DateTime.parse('${f['arrivalUtc']}').add(delay),
+        periods: count,
+        after: (config['after'] as num).toInt(),
+        before: (config['before'] as num).toInt());
+    final marks = <DateTime, String>{};
+    if (config['all'] == true) {
+      for (var i = 0; i < count; i++) {
+        marks[periods[i][0]] = 'Rest ${i + 1}/$count starts';
+      }
+      marks[periods.last[1]] = 'Rest $count/$count ends';
+    }
+    marks[periods[mine][0]] = 'My rest starts (${mine + 1}/$count)';
+    marks[periods[mine][1]] = 'My rest ends (${mine + 1}/$count)';
+    final now = DateTime.now();
+    final times = marks.keys.where((t) => t.isAfter(now)).toList()..sort();
+    return (
+      periods: periods,
+      alarms: [
+        for (final t in times)
+          {
+            'id': '${_restPrefix(f)}${t.millisecondsSinceEpoch ~/ 60000}',
+            'lbl': '${f['flight']} · ${marks[t]}',
+            'time': t.toIso8601String(),
+            'type': 'timer',
+            'armed': true,
+            'dism': false,
+            'missed': false
+          }
+      ]
+    );
+  }
+
+  /// Replaces this flight's rest alarms; `null` removes the plan.
+  Future<void> saveRestPlan(Map f, Map<String, dynamic>? config) =>
+      change(() async {
+        final next = config == null ? null : restPlan(f, config).alarms;
+        if (next != null && next.isEmpty) {
+          throw const FormatException('All rest changeovers have passed.');
+        }
+        final prefix = _restPrefix(f);
+        alarms.removeWhere((a) => '${a['id']}'.startsWith(prefix));
+        alarms.addAll(next ?? []);
+        final plans =
+            Map<String, dynamic>.from(settings['restPlans'] as Map? ?? {});
+        final live = flights.map(key).toSet();
+        plans.removeWhere((k, _) => !live.contains(k));
+        if (config == null) {
+          plans.remove(key(f));
+        } else {
+          plans[key(f)] = config;
+        }
+        settings['restPlans'] = plans;
+        await _saveAlarms(request: config != null);
+      });
+
+  /// Geometry for the briefing duty ribbon. Positions are fractions (0–1) of
+  /// the displayed window so the widget needs no time-zone data. The WOCL band
+  /// is home-base 02:00–06:00, shown for reference only.
+  Map<String, dynamic> dutyRibbon(Map f, List<Map> steps) {
+    final dep = departure(f);
+    final arrival = DateTime.tryParse('${f['arrivalUtc']}')?.toUtc();
+    final hasArrival = arrival != null && arrival.isAfter(dep);
+    var first = dep.subtract(const Duration(hours: 1));
+    for (final s in steps) {
+      final at = DateTime.parse(s['at'] as String).toUtc();
+      if (at.isBefore(first)) first = at;
+    }
+    final start = first.subtract(const Duration(minutes: 30));
+    final end = (hasArrival ? arrival : dep.add(const Duration(hours: 2)))
+        .add(const Duration(minutes: 30));
+    final total = end.difference(start).inSeconds;
+    double at(DateTime t) =>
+        (t.difference(start).inSeconds / total).clamp(0.0, 1.0);
+    final hours = total / 3600;
+    final every = [1, 2, 3, 4, 6, 12].firstWhere((n) => hours / n <= 7,
+        orElse: () => 24);
+    final axes = <Map<String, dynamic>>[];
+    final seen = <String>{};
+    void axis(String label, String? zone) {
+      if (zone == null || !seen.add(zone)) return;
+      final z = zoned(start, zone);
+      var t = start.add(Duration(
+          minutes: (60 - z.minute) % 60, seconds: -z.second));
+      final ticks = <Map<String, dynamic>>[];
+      while (!t.isAfter(end)) {
+        final hour = zoned(t, zone).hour;
+        if (hour % every == 0) ticks.add({'x': at(t), 'text': two(hour)});
+        t = t.add(const Duration(hours: 1));
+      }
+      axes.add({'label': label, 'ticks': ticks});
+    }
+
+    axis('${f['depApt']}', airportZone('${f['depApt']}'));
+    axis('${f['arrApt']}', airportZone('${f['arrApt']}'));
+    axis(home, airportZone(home));
+    axis('UTC', 'UTC');
+    final homeZone = airportZone(home);
+    final wocl = <List<double>>[];
+    var woclFlight = 0;
+    if (homeZone != null) {
+      final location = tz.getLocation(homeZone);
+      final day = tz.TZDateTime.from(start, location);
+      for (var i = -1; i <= end.difference(start).inDays + 1; i++) {
+        final from =
+            tz.TZDateTime(location, day.year, day.month, day.day + i, 2);
+        final to = tz.TZDateTime(location, day.year, day.month, day.day + i, 6);
+        if (!to.isAfter(start) || !from.isBefore(end)) continue;
+        wocl.add([at(from), at(to)]);
+        if (hasArrival) {
+          final a = from.isAfter(dep) ? from : dep;
+          final b = to.isBefore(arrival) ? to : arrival;
+          if (b.isAfter(a)) woclFlight += b.difference(a).inMinutes;
+        }
+      }
+    }
+    final now = DateTime.now().toUtc();
+    return {
+      'dep': at(dep),
+      'arr': hasArrival ? at(arrival) : null,
+      'prep': at(first),
+      'steps': [
+        for (final s in steps) at(DateTime.parse(s['at'] as String).toUtc())
+      ],
+      'axes': axes,
+      'wocl': wocl,
+      'home': home,
+      'woclFlightMinutes': hasArrival ? woclFlight : null,
+      'blockMinutes': hasArrival ? arrival.difference(dep).inMinutes : null,
+      'now': now.isAfter(start) && now.isBefore(end) ? at(now) : null
     };
   }
 

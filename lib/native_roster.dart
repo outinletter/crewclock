@@ -1,7 +1,11 @@
 import 'widgets/width_aware_title.dart';
+import 'widgets/native_glass_control.dart';
 import 'widgets/alarm_time_visuals.dart';
 import 'widgets/relative_alarm_editor.dart';
+import 'widgets/rest_planner.dart';
+import 'widgets/ios_controls.dart';
 import 'widgets/flight_schedule_summary.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'services/crewclock_store.dart';
@@ -21,9 +25,9 @@ class _NativeRosterPageState extends State<NativeRosterPage> {
   CrewClockStore get store => widget.store;
   int get _tab => widget.section;
   bool _followUpcoming = true;
-  String get _personalZone => store.personalZone;
   final Map<String, List<String>> _editingPresetOrder = {};
   late String _personalId, _intervalId;
+  String? _openForm;
   DateTime _day = DateUtils.dateOnly(DateTime.now());
   @override
   void initState() {
@@ -130,25 +134,25 @@ class _NativeRosterPageState extends State<NativeRosterPage> {
                           style: TextStyle(
                               fontSize: 24, fontWeight: FontWeight.bold)),
                       ListTile(
-                          leading: const Icon(Icons.calendar_month),
+                          leading: const Icon(CupertinoIcons.calendar),
                           title: const Text('Import PDF / ICS calendar'),
                           subtitle: const Text(
                               'PDF / ICS / ICAL / text · stays on this device'),
                           onTap: () => Navigator.pop(c, 'file')),
                       ListTile(
-                          leading: const Icon(Icons.image_outlined),
+                          leading: const Icon(CupertinoIcons.photo),
                           title: const Text('Import roster image'),
                           subtitle: const Text(
                               'Read a full monthly calendar · review before saving'),
                           onTap: () => Navigator.pop(c, 'image')),
                       ListTile(
-                          leading: const Icon(Icons.content_paste),
+                          leading: const Icon(CupertinoIcons.doc_on_clipboard),
                           title: const Text('Paste schedule text (manual)'),
                           subtitle: const Text(
                               'Paste calendar content or dated flight lines'),
                           onTap: () => Navigator.pop(c, 'text')),
                       ListTile(
-                          leading: const Icon(Icons.edit_calendar),
+                          leading: const Icon(CupertinoIcons.calendar_badge_plus),
                           title: const Text('Enter flight manually'),
                           onTap: () => Navigator.pop(c, 'manual')),
                     ])))));
@@ -210,7 +214,7 @@ class _NativeRosterPageState extends State<NativeRosterPage> {
                                     children: flights
                                         .map((f) => ListTile(
                                             leading: const Icon(
-                                                Icons.flight_takeoff),
+                                                CupertinoIcons.airplane),
                                             title: Text(
                                                 '${store.importChange(f)} · ${store.flightLabel(f)}'),
                                             subtitle: Text(
@@ -231,34 +235,40 @@ class _NativeRosterPageState extends State<NativeRosterPage> {
   }
 
   Widget _rosterClock(List<Map<String, dynamic>> flights) {
-    final times = [
-      for (final f in flights)
-        for (final a in store.flightAlarms(f))
-          store.zoned(DateTime.parse(a['time']), store.displayZone(f['depApt']))
-    ];
+    final times = <DateTime>[];
+    final armedTimes = <DateTime>[];
+    for (final flight in flights) {
+      final zone = store.displayZone(flight['depApt']);
+      for (final alarm in store.flightAlarms(flight)) {
+        final time = store.zoned(DateTime.parse(alarm['time']), zone);
+        times.add(time);
+        if (store.flag(alarm['armed']) &&
+            !store.flag(alarm['dism']) &&
+            !store.flag(alarm['missed'])) {
+          armedTimes.add(time);
+        }
+      }
+    }
     void move(int delta) => setState(() {
           _followUpcoming = false;
           _day = _day.add(Duration(days: delta));
         });
     return Card(
+        key: const ValueKey('roster-calendar'),
         child: Column(children: [
       Row(children: [
         IconButton(
             tooltip: 'Previous day',
             onPressed: () => move(-1),
-            icon: const Icon(Icons.chevron_left)),
+            icon: const Icon(CupertinoIcons.chevron_left)),
         Expanded(
             child: TextButton(
                 onPressed: () async {
-                  final date = await showDatePicker(
-                      context: context,
-                      initialDate: _day,
-                      firstDate: DateTime(2000),
-                      lastDate: DateTime(2100));
+                  final date = await showIosDatePicker(context, initial: _day);
                   if (date != null && mounted) {
                     setState(() {
                       _followUpcoming = false;
-                      _day = date;
+                      _day = DateUtils.dateOnly(date);
                     });
                   }
                 },
@@ -268,18 +278,15 @@ class _NativeRosterPageState extends State<NativeRosterPage> {
         IconButton(
             tooltip: 'Next day',
             onPressed: () => move(1),
-            icon: const Icon(Icons.chevron_right)),
+            icon: const Icon(CupertinoIcons.chevron_right)),
       ]),
-      if (times.isNotEmpty)
-        AlarmTimeDial(
-            times: times,
-            caption: 'First alarm',
-            hourCycle: 12,
-            emphasizeNumbers: true)
-      else
-        const Padding(
-            padding: EdgeInsets.all(16),
-            child: Text('No flight alarms on this day')),
+      AlarmTimeDial(
+          times: times,
+          armedTimes: armedTimes,
+          date: _day,
+          caption: 'First alarm',
+          hourCycle: 12,
+          emphasizeNumbers: true),
     ]));
   }
 
@@ -288,7 +295,8 @@ class _NativeRosterPageState extends State<NativeRosterPage> {
         store.zoned(store.departure(f), store.displayZone(f['depApt']));
     final arrival = DateTime.tryParse('${f['arrivalUtc']}');
     return Card(
-        color: Color.alphaBlend(const Color(0xff679bcf).withValues(alpha: .055),
+        color: Color.alphaBlend(
+            Theme.of(context).colorScheme.primary.withValues(alpha: .055),
             Theme.of(context).colorScheme.surface),
         child: Padding(
             padding: const EdgeInsets.all(14),
@@ -331,7 +339,7 @@ class _NativeRosterPageState extends State<NativeRosterPage> {
     Widget content;
     if (flight == null) {
       final isTimer = store.flag(a['elapsedAlarm']) || '${a['lbl']}' == 'Timer';
-      content = Card.outlined(
+      content = Card(
           child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               child: Row(children: [
@@ -340,9 +348,7 @@ class _NativeRosterPageState extends State<NativeRosterPage> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                       Text('${store.clock(local)} (${store.timeSuffix})',
-                          style: TextStyle(
-                              fontSize: 24,
-                              fontWeight: FontWeight.w700,
+                          style: CrewClockTheme.timeLarge.copyWith(
                               color: Theme.of(context).colorScheme.primary)),
                       Text(
                           '${store.displayDate(local)}${[
@@ -360,7 +366,7 @@ class _NativeRosterPageState extends State<NativeRosterPage> {
                                 (a['durationMinutes'] as num?)?.toInt() ?? 60,
                             enabled: !store.flag(a['dism'])),
                     ])),
-                PopupMenuButton<String>(
+                IosMenuButton<String>(
                     tooltip: 'Alarm actions',
                     onSelected: (value) async {
                       if (value == 'edit') await _alarm(alarm: a);
@@ -368,15 +374,15 @@ class _NativeRosterPageState extends State<NativeRosterPage> {
                         await _run(() => store.deleteAlarm(a));
                       }
                     },
-                    itemBuilder: (_) => const [
-                          PopupMenuItem(value: 'edit', child: Text('Edit')),
-                          PopupMenuItem(value: 'delete', child: Text('Delete'))
-                        ]),
+                    items: const [
+                      IosMenuItem('edit', 'Edit'),
+                      IosMenuItem('delete', 'Delete', destructive: true)
+                    ]),
               ])));
     } else {
       final offset = store.departure(flight).difference(at).inMinutes;
       final status = store.status(a);
-      content = Card.outlined(
+      content = Card(
           key: ValueKey('alarm-${a['id']}'),
           margin: const EdgeInsets.only(top: 8),
           child: Semantics(
@@ -386,11 +392,8 @@ class _NativeRosterPageState extends State<NativeRosterPage> {
                     const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                 child: Row(children: [
                   Text('${store.clock(local)}(${store.timeSuffix})',
-                      style: TextStyle(
-                          color: Theme.of(context).colorScheme.primary,
-                          fontSize: 17,
-                          fontFeatures: const [FontFeature.tabularFigures()],
-                          fontWeight: FontWeight.w700)),
+                      style: CrewClockTheme.timeSmall.copyWith(
+                          color: Theme.of(context).colorScheme.primary)),
                   const SizedBox(width: 10),
                   Expanded(
                       child: Tooltip(
@@ -410,7 +413,7 @@ class _NativeRosterPageState extends State<NativeRosterPage> {
                     const SizedBox(width: 4),
                     Tooltip(
                         message: status,
-                        child: Icon(Icons.info_outline,
+                        child: Icon(CupertinoIcons.info,
                             size: 16,
                             color: CrewClockTheme.statusColor(status,
                                 dark: Theme.of(context).brightness ==
@@ -475,8 +478,8 @@ class _NativeRosterPageState extends State<NativeRosterPage> {
                       Card(
                           child: ListTile(
                               leading: Icon(duty['category'] == 'Off / leave'
-                                  ? Icons.weekend_outlined
-                                  : Icons.event_note),
+                                  ? CupertinoIcons.bed_double
+                                  : CupertinoIcons.doc_text),
                               title: Text('${duty['category']}'),
                               subtitle: Text('${duty['label']}'))),
                     ...selected.map(_flightCard),
@@ -520,24 +523,26 @@ class _NativeRosterPageState extends State<NativeRosterPage> {
         : '${a['label']} · $every';
   }
 
-  Widget _alarms() => ListView(
-          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-          padding: const EdgeInsets.fromLTRB(12, 4, 12, 40),
-          children: [
+  Widget _alarms() {
+    final localZone = store.deviceZone;
+    final initialAlarm =
+        store.zoned(DateTime.now().add(const Duration(hours: 1)), localZone);
+    return ListView(
+        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+        padding: const EdgeInsets.fromLTRB(12, 4, 12, 40),
+        children: [
+          RestPlanner(store: store),
+          _formHeading('Personal alarms', 'personal', 'personal alarm'),
+          if (_openForm == 'personal')
             InlineReminderEditor(
                 key: ValueKey('new-personal-$_personalId'),
                 saveLabel: 'Add alarm',
                 label: '',
-                date: store.date(store.zoned(
-                    DateTime.now().add(const Duration(hours: 1)),
-                    _personalZone)),
-                time: store.clock(store.zoned(
-                    DateTime.now().add(const Duration(hours: 1)),
-                    _personalZone)),
-                zone: _personalZone,
+                date: store.date(initialAlarm),
+                time: store.clock(initialAlarm),
+                zone: localZone,
                 onSave: (label, _, date, time) async {
-                  final at =
-                      store.parser.localInstant(date!, time!, _personalZone);
+                  final at = store.parser.localInstant(date!, time!, localZone);
                   if (!at.isAfter(DateTime.now())) {
                     throw const FormatException(
                         'Choose a future reminder time.');
@@ -550,26 +555,36 @@ class _NativeRosterPageState extends State<NativeRosterPage> {
                     'armed': true,
                     'dism': false,
                     'missed': false,
-                    'timeBasis': 'home',
+                    'timeBasis': 'device',
                     'wallDate': date,
                     'wallTime': time,
-                    'zone': _personalZone
+                    'zone': localZone
                   });
-                  if (mounted) setState(() => _personalId = store.id());
+                  if (mounted) {
+                    setState(() {
+                      _personalId = store.id();
+                      _openForm = null;
+                    });
+                  }
                 }),
-            for (final a in store.alarms.where((a) =>
-                a['type'] == 'direct' &&
-                !store.flag(a['elapsedAlarm']) &&
-                '${a['lbl']}' != 'Timer'))
-              _alarmRow(a),
-            _heading('Timer'),
-            RelativeAlarmEditor(onAdd: store.addRelativeAlarm),
-            for (final a in store.alarms.where((a) =>
-                a['type'] == 'timer' ||
-                store.flag(a['elapsedAlarm']) ||
-                '${a['lbl']}' == 'Timer'))
-              _alarmRow(a),
-            _heading('Create repeating reminder'),
+          for (final a in store.alarms.where((a) =>
+              a['type'] == 'direct' &&
+              !store.flag(a['elapsedAlarm']) &&
+              '${a['lbl']}' != 'Timer'))
+            _alarmRow(a),
+          _formHeading('Timers', 'timer', 'timer'),
+          if (_openForm == 'timer')
+            RelativeAlarmEditor(onAdd: (label, minutes) async {
+              await store.addRelativeAlarm(label, minutes);
+              if (mounted) setState(() => _openForm = null);
+            }),
+          for (final a in store.alarms.where((a) =>
+              a['type'] == 'timer' ||
+              store.flag(a['elapsedAlarm']) ||
+              '${a['lbl']}' == 'Timer'))
+            _alarmRow(a),
+          _formHeading('Repeating reminders', 'repeat', 'repeating reminder'),
+          if (_openForm == 'repeat') ...[
             const Text(
                 'After Stop, the next reminder is scheduled for the selected interval.'),
             InlineReminderEditor(
@@ -594,105 +609,131 @@ class _NativeRosterPageState extends State<NativeRosterPage> {
                     }
                   ]);
                   if (mounted) {
-                    setState(() => _intervalId = 'interval_${store.id()}');
+                    setState(() {
+                      _intervalId = 'interval_${store.id()}';
+                      _openForm = null;
+                    });
                   }
                 }),
-            if (store.intervals.isNotEmpty)
-              _heading('Saved repeating reminders'),
-            for (final a in store.intervals)
-              Card.outlined(
-                  child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 8),
-                      child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.center,
-                          children: [
-                            Expanded(
-                                child: Column(
-                                    mainAxisSize: MainAxisSize.min,
+          ],
+          for (final a in store.intervals)
+            Card(
+                child: Padding(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          Expanded(
+                              child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                Text(
+                                    (store.intervalNext(a) ??
+                                            (a['enabled'] == false
+                                                ? 'Paused'
+                                                : 'No upcoming alarm reserved'))
+                                        .replaceFirst('Next: ', ''),
+                                    style: TextStyle(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.w700,
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .primary)),
+                                Column(
                                     crossAxisAlignment:
                                         CrossAxisAlignment.start,
                                     children: [
-                                  Text(
-                                      (store.intervalNext(a) ??
-                                              (a['enabled'] == false
-                                                  ? 'Paused'
-                                                  : 'No upcoming alarm reserved'))
-                                          .replaceFirst('Next: ', ''),
-                                      style: TextStyle(
-                                          fontSize: 18,
-                                          fontWeight: FontWeight.w700,
-                                          color: Theme.of(context)
-                                              .colorScheme
-                                              .primary)),
-                                  Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(_intervalTitle(a),
-                                            style: Theme.of(context)
-                                                .textTheme
-                                                .bodySmall),
-                                        IntervalCountdown(
-                                            next: _intervalDate(a),
-                                            minutes:
-                                                (a['minutes'] as num).toInt(),
-                                            enabled: a['enabled'] == true),
-                                      ]),
-                                ])),
-                            Row(mainAxisSize: MainAxisSize.min, children: [
-                              _alarmSwitch(
-                                  value: a['enabled'] == true,
-                                  onChanged: store.busy
-                                      ? null
-                                      : (value) => _run(() =>
-                                          store.saveIntervals(store.intervals
-                                              .map((x) => x['id'] == a['id']
-                                                  ? {
-                                                      ...x,
-                                                      'enabled': value,
-                                                      'anchor': DateTime.now()
-                                                          .millisecondsSinceEpoch
-                                                    }
-                                                  : x)
-                                              .toList()))),
-                              PopupMenuButton<String>(
-                                  tooltip: 'Repeating reminder actions',
-                                  onSelected: (value) async {
-                                    if (value == 'delete') {
+                                      Text(_intervalTitle(a),
+                                          style: Theme.of(context)
+                                              .textTheme
+                                              .bodySmall),
+                                      IntervalCountdown(
+                                          next: _intervalDate(a),
+                                          minutes:
+                                              (a['minutes'] as num).toInt(),
+                                          enabled: a['enabled'] == true),
+                                    ]),
+                              ])),
+                          Row(mainAxisSize: MainAxisSize.min, children: [
+                            _alarmSwitch(
+                                value: a['enabled'] == true,
+                                onChanged: store.busy
+                                    ? null
+                                    : (value) => _run(() => store.saveIntervals(
+                                        store.intervals
+                                            .map((x) => x['id'] == a['id']
+                                                ? {
+                                                    ...x,
+                                                    'enabled': value,
+                                                    'anchor': DateTime.now()
+                                                        .millisecondsSinceEpoch
+                                                  }
+                                                : x)
+                                            .toList()))),
+                            IosMenuButton<String>(
+                                tooltip: 'Repeating reminder actions',
+                                onSelected: (value) async {
+                                  if (value == 'delete') {
+                                    await _run(() => store.saveIntervals(store
+                                        .intervals
+                                        .where((x) => x['id'] != a['id'])
+                                        .toList()));
+                                  }
+                                  if (value == 'edit' && mounted) {
+                                    final next = await showModalBottomSheet<
+                                            Map<String, dynamic>>(
+                                        context: context,
+                                        isScrollControlled: true,
+                                        showDragHandle: true,
+                                        builder: (_) => IntervalEditor(
+                                            store: store, record: a));
+                                    if (next != null) {
                                       await _run(() => store.saveIntervals(store
                                           .intervals
-                                          .where((x) => x['id'] != a['id'])
+                                          .map((x) =>
+                                              x['id'] == a['id'] ? next : x)
                                           .toList()));
                                     }
-                                    if (value == 'edit' && mounted) {
-                                      final next = await showModalBottomSheet<
-                                              Map<String, dynamic>>(
-                                          context: context,
-                                          isScrollControlled: true,
-                                          showDragHandle: true,
-                                          builder: (_) => IntervalEditor(
-                                              store: store, record: a));
-                                      if (next != null) {
-                                        await _run(() => store.saveIntervals(
-                                            store.intervals
-                                                .map((x) => x['id'] == a['id']
-                                                    ? next
-                                                    : x)
-                                                .toList()));
-                                      }
-                                    }
-                                  },
-                                  itemBuilder: (_) => const [
-                                        PopupMenuItem(
-                                            value: 'edit', child: Text('Edit')),
-                                        PopupMenuItem(
-                                            value: 'delete',
-                                            child: Text('Delete'))
-                                      ]),
-                            ])
-                          ]))),
-          ]);
+                                  }
+                                },
+                                items: const [
+                                  IosMenuItem('edit', 'Edit'),
+                                  IosMenuItem('delete', 'Delete',
+                                      destructive: true)
+                                ]),
+                          ])
+                        ]))),
+        ]);
+  }
+
+  /// Section title with a button that reveals that section's entry form in
+  /// place; only one form is open at a time.
+  Widget _formHeading(String title, String form, String noun) {
+    final open = _openForm == form;
+    return Padding(
+        padding: const EdgeInsets.only(top: 12),
+        child: Row(children: [
+          Expanded(
+              child: WidthAwareTitle(title,
+                  style: const TextStyle(
+                      fontSize: 20, fontWeight: FontWeight.bold))),
+          IconButton(
+              key: ValueKey('add-$form'),
+              tooltip: open ? 'Close' : 'New $noun',
+              onPressed: () {
+                FocusManager.instance.primaryFocus?.unfocus();
+                setState(() => _openForm = open ? null : form);
+              },
+              icon: Icon(open
+                  ? CupertinoIcons.xmark_circle_fill
+                  : CupertinoIcons.plus_circle_fill),
+              iconSize: 28,
+              color: Theme.of(context).colorScheme.primary),
+        ]));
+  }
+
   Widget _heading(String text, {bool minor = false}) => Padding(
       padding: EdgeInsets.only(top: minor ? 12 : 20, bottom: 8),
       child: WidthAwareTitle(text,
@@ -740,24 +781,13 @@ class _NativeRosterPageState extends State<NativeRosterPage> {
   }
 
   Future<void> _clearRoster() async {
-    final confirmed = await showDialog<bool>(
-        context: context,
-        builder: (c) => AlertDialog(
-              title: const Text('Delete all roster?'),
-              content: Text(
-                  'Delete all ${store.flights.length} flights, their flight alarms and preparation lists? Personal alarms, repeating reminders and settings will be kept. This cannot be undone.'),
-              actions: [
-                TextButton(
-                    onPressed: () => Navigator.pop(c, false),
-                    child: const Text('Cancel')),
-                TextButton(
-                    style: TextButton.styleFrom(
-                        foregroundColor: Theme.of(c).colorScheme.error),
-                    onPressed: () => Navigator.pop(c, true),
-                    child: const Text('Delete all'))
-              ],
-            ));
-    if (confirmed == true && mounted) {
+    final confirmed = await confirmIos(context,
+        title: 'Delete all roster?',
+        message:
+            'Delete all ${store.flights.length} flights, their flight alarms and preparation lists? Personal alarms, repeating reminders and settings will be kept. This cannot be undone.',
+        confirm: 'Delete all',
+        destructive: true);
+    if (confirmed && mounted) {
       await _run(() async {
         await store.clearRoster();
         if (mounted) _message('Roster deleted');
@@ -770,13 +800,13 @@ class _NativeRosterPageState extends State<NativeRosterPage> {
           padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
           children: [
             _heading('Appearance & sound'),
-            Card.outlined(
+            Card(
                 child: Row(children: [
               Expanded(
                   child: ListTile(
                       leading: Icon(store.dark
-                          ? Icons.light_mode_outlined
-                          : Icons.dark_mode_outlined),
+                          ? CupertinoIcons.sun_max
+                          : CupertinoIcons.moon),
                       title: const Text('Appearance'),
                       subtitle: Text(store.dark ? 'Dark' : 'Light'),
                       onTap: store.busy
@@ -785,7 +815,7 @@ class _NativeRosterPageState extends State<NativeRosterPage> {
                               {...store.settings, 'dark': !store.dark})))),
               Expanded(
                   child: ListTile(
-                      leading: const Icon(Icons.volume_up_outlined),
+                      leading: const Icon(CupertinoIcons.speaker_2),
                       title: const Text('Alarm sound'),
                       subtitle: const Text('Choose sound'),
                       onTap: store.busy
@@ -796,7 +826,7 @@ class _NativeRosterPageState extends State<NativeRosterPage> {
                                 }
                               })))
             ])),
-            Card.outlined(
+            Card(
                 child: SwitchListTile.adaptive(
                     title: const Text('Live Activity'),
                     subtitle:
@@ -861,13 +891,13 @@ class _NativeRosterPageState extends State<NativeRosterPage> {
                                   }
                                 ]
                               }),
-                      icon: const Icon(Icons.add),
+                      icon: const Icon(CupertinoIcons.add),
                       label: const Text('Add preparation preset'))),
             ],
             _heading('Reset roster data'),
-            Card.outlined(
+            Card(
                 child: ListTile(
-              leading: Icon(Icons.delete_sweep_outlined,
+              leading: Icon(CupertinoIcons.trash,
                   color: Theme.of(context).colorScheme.error),
               title: Text('Delete all roster',
                   style: TextStyle(color: Theme.of(context).colorScheme.error)),
@@ -881,14 +911,14 @@ class _NativeRosterPageState extends State<NativeRosterPage> {
                 'Schedules and preparation notes stay on this device. Paste text using iPhone Live Text, or import a calendar file. No photo-library access is requested.'),
             ListTile(
                 title: const Text('Privacy policy'),
-                trailing: const Icon(Icons.open_in_new),
+                trailing: const Icon(CupertinoIcons.arrow_up_right_square),
                 onTap: () => launchUrl(
                     Uri.parse(
                         'https://outinletter.github.io/crewclock/privacy.html'),
                     mode: LaunchMode.externalApplication)),
             ListTile(
                 title: const Text('Support'),
-                trailing: const Icon(Icons.open_in_new),
+                trailing: const Icon(CupertinoIcons.arrow_up_right_square),
                 onTap: () => launchUrl(
                     Uri.parse(
                         'https://outinletter.github.io/crewclock/support.html'),
@@ -967,7 +997,7 @@ class _TextRosterEditorState extends State<TextRosterEditor> {
                         maxLines: 8,
                         decoration: InputDecoration(
                             border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(16),
+                                borderRadius: BorderRadius.circular(CrewClockTheme.cardRadius),
                                 borderSide: BorderSide.none),
                             labelText: 'Roster text')),
                     const SizedBox(height: 16),
@@ -1029,24 +1059,20 @@ class _FlightEditorState extends State<FlightEditor> {
   Future<void> _pickDateTime(String key) async {
     if (key.toLowerCase().contains('date')) {
       final initial = DateTime.tryParse(fields[key]!.text) ?? DateTime.now();
-      final chosen = await showDatePicker(
-          context: context,
-          initialDate: initial,
-          firstDate: DateTime(2000),
-          lastDate: DateTime(2100));
+      final chosen = await showIosDatePicker(context, initial: initial);
       if (chosen != null && mounted) {
         setState(() => fields[key]!.text = store.date(chosen));
       }
     } else {
       final parts = fields[key]!.text.split(':');
-      final chosen = await showTimePicker(
-          context: context,
-          initialTime: TimeOfDay(
-              hour: int.tryParse(parts.first) ?? 12,
-              minute: parts.length > 1 ? int.tryParse(parts[1]) ?? 0 : 0),
-          builder: (c, child) => MediaQuery(
-              data: MediaQuery.of(c).copyWith(alwaysUse24HourFormat: true),
-              child: child!));
+      final chosen = await showIosDatePicker(context,
+          initial: DateTime(
+              2000,
+              1,
+              1,
+              int.tryParse(parts.first) ?? 12,
+              parts.length > 1 ? int.tryParse(parts[1]) ?? 0 : 0),
+          mode: CupertinoDatePickerMode.time);
       if (chosen != null && mounted) {
         setState(() => fields[key]!.text =
             '${store.two(chosen.hour)}:${store.two(chosen.minute)}');
@@ -1072,9 +1098,9 @@ class _FlightEditorState extends State<FlightEditor> {
               decoration: InputDecoration(
                   labelText: label,
                   suffixIcon: ['date', 'arrDate'].contains(key)
-                      ? const Icon(Icons.calendar_month)
+                      ? const Icon(CupertinoIcons.calendar)
                       : ['time', 'arrTime'].contains(key)
-                          ? const Icon(Icons.schedule)
+                          ? const Icon(CupertinoIcons.clock)
                           : null,
                   border: const OutlineInputBorder()),
               validator: (v) =>
@@ -1310,7 +1336,7 @@ class _InlineHomeBaseEditorState extends State<InlineHomeBaseEditor> {
   }
 
   @override
-  Widget build(BuildContext context) => Card.outlined(
+  Widget build(BuildContext context) => Card(
       child: Padding(
           padding: const EdgeInsets.all(14),
           child:
@@ -1338,7 +1364,7 @@ class _InlineHomeBaseEditorState extends State<InlineHomeBaseEditor> {
                           hintText: widget.domestic ? 'GMP, CJU' : 'ICN, PUS',
                           counterText: '',
                           border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(16),
+                              borderRadius: BorderRadius.circular(CrewClockTheme.cardRadius),
                               borderSide: BorderSide.none)))),
               const SizedBox(width: 12),
               if (dirty)
@@ -1394,40 +1420,33 @@ class NativePageActions extends StatelessWidget {
       {super.key, required this.store, required this.section});
   final CrewClockStore store;
   final int section;
-  Future<void> _run(
-      BuildContext context, Future<void> Function() action) async {
-    try {
-      await action();
-    } catch (e) {
-      if (context.mounted) {
-        final messenger = ScaffoldMessenger.of(context);
-        messenger.hideCurrentMaterialBanner();
-        messenger
-            .showMaterialBanner(MaterialBanner(content: Text('$e'), actions: [
-          TextButton(
-              onPressed: messenger.hideCurrentMaterialBanner,
-              child: const Text('Close'))
-        ]));
-      }
-    }
-  }
-
   @override
   Widget build(BuildContext context) => AnimatedBuilder(
       animation: store,
       builder: (context, _) => Row(mainAxisSize: MainAxisSize.min, children: [
             if (section == 0)
-              TextButton.icon(
-                  style: TextButton.styleFrom(
-                      foregroundColor: Colors.white,
-                      disabledForegroundColor: Colors.white38,
-                      minimumSize: const Size(0, 44),
-                      padding: const EdgeInsets.symmetric(horizontal: 4)),
-                  label:
-                      const Text('Add Roster', style: TextStyle(fontSize: 13)),
-                  onPressed: store.busy
-                      ? null
-                      : () => store.openTools?.call('import', null),
-                  icon: const Icon(Icons.add, size: 18)),
+              SizedBox(
+                width: 132,
+                child: NativeGlassControl(
+                  kind: 'add',
+                  height: 40,
+                  label: 'Add Roster',
+                  onDarkHeader: true,
+                  enabled: !store.busy,
+                  onActivate: (_) => store.openTools?.call('import', null),
+                  fallback: TextButton.icon(
+                      style: TextButton.styleFrom(
+                          foregroundColor: Colors.white,
+                          disabledForegroundColor: Colors.white38,
+                          minimumSize: const Size(0, 44),
+                          padding: const EdgeInsets.symmetric(horizontal: 4)),
+                      label: const Text('Add Roster',
+                          style: TextStyle(fontSize: 13)),
+                      onPressed: store.busy
+                          ? null
+                          : () => store.openTools?.call('import', null),
+                      icon: const Icon(CupertinoIcons.add, size: 18)),
+                ),
+              ),
           ]));
 }
