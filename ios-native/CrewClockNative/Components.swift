@@ -368,7 +368,7 @@ struct FlightEditorSheet: View {
         _to = State(initialValue: existing?.to ?? "")
         let dep = existing?.departure ?? Date().addingTimeInterval(2 * 86400)
         _departure = State(initialValue: dep)
-        _hasArrival = State(initialValue: existing?.arrival != nil)
+        _hasArrival = State(initialValue: existing == nil ? true : existing?.arrival != nil)
         _arrival = State(initialValue: existing?.arrival ?? dep.addingTimeInterval(3 * 3600))
     }
 

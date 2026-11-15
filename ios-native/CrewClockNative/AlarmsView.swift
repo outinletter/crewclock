@@ -3,6 +3,15 @@ import SwiftUI
 struct AlarmsView: View {
     @Environment(AppStore.self) private var store
     @State private var sheet: SheetKind?
+    @State private var editingReminder: ReminderTarget?
+
+    struct ReminderTarget: Identifiable {
+        let flight: Flight
+        let alarm: AlarmRecord
+        var id: String { alarm.id }
+    }
+
+    private var upcomingFlights: [Flight] { store.sortedFlights.filter { $0.departure > Date() }.prefix(6).map { $0 } }
 
     enum SheetKind: Identifiable {
         case personal(AlarmRecord?), timer, interval(IntervalReminder?)
@@ -40,6 +49,15 @@ struct AlarmsView: View {
                 Section { RestPlannerCard().cardRow() }
 
                 Section {
+                    ForEach(upcomingFlights) { f in
+                        ForEach(store.flightAlarms(f)) { a in flightAlarmRow(a, f) }
+                    }
+                    if upcomingFlights.isEmpty { emptyRow("No upcoming flights. Add your roster to see its alarms.") }
+                } header: {
+                    Text("Flight alarms").font(.title3.weight(.bold)).foregroundStyle(Color.ccInk).textCase(nil)
+                }
+
+                Section {
                     ForEach(personal) { a in personalRow(a) }
                     if personal.isEmpty { emptyRow("No personal alarms. Tap + to set a time.") }
                 } header: {
@@ -69,6 +87,7 @@ struct AlarmsView: View {
             .refreshable { await store.refresh() }
             .navigationTitle("Alarms")
             .toolbarTitleDisplayMode(.inlineLarge)
+            .sheet(item: $editingReminder) { t in ReminderSheet(flight: t.flight, existing: t.alarm) }
             .sheet(item: $sheet) { kind in
                 switch kind {
                 case .personal(let a): PersonalAlarmSheet(existing: a)
@@ -96,6 +115,35 @@ struct AlarmsView: View {
     }
 
     private func delete(_ id: String) { Task { await store.run { try await store.deleteAlarm(id) } } }
+
+    private func flightAlarmRow(_ a: AlarmRecord, _ f: Flight) -> some View {
+        let status = store.status(a)
+        return HStack {
+            Button { editingReminder = ReminderTarget(flight: f, alarm: a) } label: {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(Fmt.time(a.time, zone: store.shown(f.from)) + " (\(store.suffix))")
+                        .font(.system(size: 24, weight: .semibold).monospacedDigit())
+                        .foregroundStyle(a.active ? Color.ccBlue : Color.ccMuted)
+                    Text("\(a.label) · \(f.number) \(f.from) → \(f.to) · \(Fmt.badge(f.departure, zone: store.zone(f.from)))")
+                        .font(.footnote).foregroundStyle(Color.ccMuted).lineLimit(1)
+                    if !["Scheduled", "Paused", "Done"].contains(status) {
+                        Text(status).font(.caption).foregroundStyle(.orange)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .buttonStyle(.plain)
+            Toggle("Armed", isOn: Binding(get: { a.armed }, set: { on in
+                Task { await store.run { try await store.toggleAlarm(a.id, armed: on) } }
+            }))
+            .labelsHidden()
+        }
+        .opacity(!a.dismissed && a.time < Date() ? 0.5 : 1)
+        .plainRow()
+        .swipeActions(edge: .trailing) {
+            Button(role: .destructive) { delete(a.id) } label: { Label("Delete", systemImage: "trash") }
+        }
+    }
 
     private func personalRow(_ a: AlarmRecord) -> some View {
         let zone = a.zone ?? store.deviceZone
@@ -195,6 +243,7 @@ struct RestPlannerCard: View {
     @State private var draft: RestConfig?
     @State private var error: String?
     @State private var saving = false
+    @State private var addingArrival: Flight?
 
     var body: some View {
         let flights = store.restFlights
@@ -206,10 +255,16 @@ struct RestPlannerCard: View {
                     SectionLabel("In-flight rest", color: .ccMint)
                     Text("Add a flight with an arrival time to split its rest periods.")
                         .font(.subheadline).foregroundStyle(Color.ccMuted)
+                    if let missing = store.sortedFlights.first(where: { $0.arrival == nil && $0.departure > Date() }) {
+                        Button { addingArrival = missing } label: {
+                            Label("Add arrival time to \(missing.number) \(missing.from) → \(missing.to)", systemImage: "clock.badge.plus")
+                        }
+                    }
                 }
             }
             .buttonStyle(.borderless)
         }
+        .sheet(item: $addingArrival) { f in FlightEditorSheet(existing: f, home: store.home) }
     }
 
     private func config(_ f: Flight) -> RestConfig {
