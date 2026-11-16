@@ -29,7 +29,7 @@ app.build_configurations.each do |c|
   s['DEVELOPMENT_TEAM'] = team
   s['CODE_SIGN_STYLE'] = 'Automatic'
   s['MARKETING_VERSION'] = '1.0.6'
-  s['CURRENT_PROJECT_VERSION'] = '101'
+  s['CURRENT_PROJECT_VERSION'] = '102'
   s['IPHONEOS_DEPLOYMENT_TARGET'] = '26.0'
   s['SWIFT_VERSION'] = '5.0'
 end
@@ -48,7 +48,7 @@ widget.build_configurations.each do |c|
   s['DEVELOPMENT_TEAM'] = team
   s['CODE_SIGN_STYLE'] = 'Automatic'
   s['MARKETING_VERSION'] = '1.0.6'
-  s['CURRENT_PROJECT_VERSION'] = '101'
+  s['CURRENT_PROJECT_VERSION'] = '102'
   s['IPHONEOS_DEPLOYMENT_TARGET'] = '26.0'
   s['SWIFT_VERSION'] = '5.0'
   s['SKIP_INSTALL'] = 'YES'
