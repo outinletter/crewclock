@@ -182,6 +182,10 @@ final class AppStore {
         intervals = AlarmEngine.loadIntervals()
         alarmAllowed = AlarmEngine.authorized || AlarmEngine.undetermined
         statuses = AlarmEngine.statuses(sources: alarms.map(\.id) + intervals.map(\.id))
+        let now = Date()
+        let stale = alarms.count
+        alarms.removeAll { $0.kind == .personal && $0.time < now && statuses[$0.id]?.state != "alerting" }
+        if alarms.count != stale { persist() }
         await publishSurfaces()
     }
 

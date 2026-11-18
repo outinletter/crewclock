@@ -11,7 +11,6 @@ struct AlarmsView: View {
         var id: String { alarm.id }
     }
 
-    private var upcomingFlights: [Flight] { store.sortedFlights.filter { $0.departure > Date() }.prefix(6).map { $0 } }
 
     enum SheetKind: Identifiable {
         case personal(AlarmRecord?), timer, interval(IntervalReminder?)
@@ -47,15 +46,6 @@ struct AlarmsView: View {
                     }
                 }
                 Section { RestPlannerCard().cardRow() }
-
-                Section {
-                    ForEach(upcomingFlights) { f in
-                        ForEach(store.flightAlarms(f)) { a in flightAlarmRow(a, f) }
-                    }
-                    if upcomingFlights.isEmpty { emptyRow("No upcoming flights. Add your roster to see its alarms.") }
-                } header: {
-                    Text("Flight alarms").font(.title3.weight(.bold)).foregroundStyle(Color.ccInk).textCase(nil)
-                }
 
                 Section {
                     ForEach(personal) { a in personalRow(a) }
@@ -115,35 +105,6 @@ struct AlarmsView: View {
     }
 
     private func delete(_ id: String) { Task { await store.run { try await store.deleteAlarm(id) } } }
-
-    private func flightAlarmRow(_ a: AlarmRecord, _ f: Flight) -> some View {
-        let status = store.status(a)
-        return HStack {
-            Button { editingReminder = ReminderTarget(flight: f, alarm: a) } label: {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(Fmt.time(a.time, zone: store.shown(f.from)) + " (\(store.suffix))")
-                        .font(.system(size: 24, weight: .semibold).monospacedDigit())
-                        .foregroundStyle(a.active ? Color.ccBlue : Color.ccMuted)
-                    Text("\(a.label) · \(f.number) \(f.from) → \(f.to) · \(Fmt.badge(f.departure, zone: store.zone(f.from)))")
-                        .font(.footnote).foregroundStyle(Color.ccMuted).lineLimit(1)
-                    if !["Scheduled", "Paused", "Done"].contains(status) {
-                        Text(status).font(.caption).foregroundStyle(.orange)
-                    }
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-            }
-            .buttonStyle(.plain)
-            Toggle("Armed", isOn: Binding(get: { a.armed }, set: { on in
-                Task { await store.run { try await store.toggleAlarm(a.id, armed: on) } }
-            }))
-            .labelsHidden()
-        }
-        .opacity(!a.dismissed && a.time < Date() ? 0.5 : 1)
-        .plainRow()
-        .swipeActions(edge: .trailing) {
-            Button(role: .destructive) { delete(a.id) } label: { Label("Delete", systemImage: "trash") }
-        }
-    }
 
     private func personalRow(_ a: AlarmRecord) -> some View {
         let zone = a.zone ?? store.deviceZone
@@ -396,7 +357,9 @@ struct RestPlannerCard: View {
                 .font(.subheadline.weight(.semibold).monospacedDigit()).foregroundStyle(Color.ccInk)
         }
         .padding(.horizontal, 10).padding(.vertical, 8)
-        .background(mine ? Color.ccMintSoft : Color.clear, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .background(LinearGradient(colors: mine ? [Color.ccMint.opacity(0.34), .ccMintSoft, .ccCard] : [Color.ccBlue.opacity(0.34), .ccBlueSoft, .ccCard],
+                                   startPoint: .topLeading, endPoint: .bottomTrailing),
+                    in: RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 
     private func segments(_ label: String, values: [Int], selection: Int, onChange: @escaping (Int) -> Void) -> some View {

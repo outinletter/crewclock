@@ -169,7 +169,7 @@ struct BriefingView: View {
         }
         .padding(18)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(LinearGradient(colors: [.ccBlueSoft, .ccCard], startPoint: .topLeading, endPoint: .bottomTrailing),
+        .background(LinearGradient(colors: [Color.ccBlue.opacity(0.34), .ccBlueSoft, .ccCard], startPoint: .topLeading, endPoint: .bottomTrailing),
                     in: RoundedRectangle(cornerRadius: 24, style: .continuous))
     }
 

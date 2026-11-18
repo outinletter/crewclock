@@ -14,7 +14,7 @@
             buildForAnalyzing = "YES">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "AFEC1782BA76D76109D95BAF"
+               BlueprintIdentifier = "6EE6D493C9C974E15B0BE601"
                BuildableName = "CrewClockNative.app"
                BlueprintName = "CrewClockNative"
                ReferencedContainer = "container:CrewClockNative.xcodeproj">
@@ -30,7 +30,7 @@
       <MacroExpansion>
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "AFEC1782BA76D76109D95BAF"
+            BlueprintIdentifier = "6EE6D493C9C974E15B0BE601"
             BuildableName = "CrewClockNative.app"
             BlueprintName = "CrewClockNative"
             ReferencedContainer = "container:CrewClockNative.xcodeproj">
@@ -53,7 +53,7 @@
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "AFEC1782BA76D76109D95BAF"
+            BlueprintIdentifier = "6EE6D493C9C974E15B0BE601"
             BuildableName = "CrewClockNative.app"
             BlueprintName = "CrewClockNative"
             ReferencedContainer = "container:CrewClockNative.xcodeproj">
@@ -70,7 +70,7 @@
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "AFEC1782BA76D76109D95BAF"
+            BlueprintIdentifier = "6EE6D493C9C974E15B0BE601"
             BuildableName = "CrewClockNative.app"
             BlueprintName = "CrewClockNative"
             ReferencedContainer = "container:CrewClockNative.xcodeproj">

@@ -6,7 +6,6 @@
 - 타깃: `CrewClockNative`(앱, `com.addvalue.crewclock`), `CrewClockWidgets`(위젯·Live Activity 확장)
 - 위젯 소스는 `CrewClockWidgets/`, 앱·위젯 공용 모델은 `Shared/`에 있다. `CrewClockWatch/`는 아직 타깃에 넣지 않은 Watch 소스다.
 - 프로젝트 파일은 `tools/generate_project.rb`로 생성한다(폴더 동기화 그룹 아님). 새 Swift 파일을 추가하면 `ruby tools/generate_project.rb`를 다시 실행한다.
-- 이 Mac(macOS 15)에서는 iOS 26 시뮬레이터가 동작하지 않는다. 실제 기기로 확인한다.
 
 ```bash
 xcodebuild -project CrewClockNative.xcodeproj -scheme CrewClockNative \

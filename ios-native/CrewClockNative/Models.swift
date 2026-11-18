@@ -68,7 +68,7 @@ struct Duty: Codable, Identifiable, Hashable {
 }
 
 struct RestConfig: Codable, Equatable {
-    var periods = 3
+    var periods = 2
     var after = 30
     var before = 60
     var mine = 0
