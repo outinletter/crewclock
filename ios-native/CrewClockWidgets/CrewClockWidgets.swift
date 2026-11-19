@@ -118,23 +118,23 @@ struct CrewNextAlarmActivity: Widget {
   }
   var body: some WidgetConfiguration {
     ActivityConfiguration(for: CrewNextAlarmAttributes.self) { context in
-      HStack(alignment: .center, spacing: 10) {
-        appIcon(size: 38, cornerRadius: 9)
+      HStack(alignment: .center, spacing: 12) {
+        appIcon(size: 45, cornerRadius: 10)
 
         VStack(alignment: .leading, spacing: 3) {
           HStack {
             Text("CrewClock")
-              .font(.system(size: 14, weight: .semibold))
+              .font(.system(size: 15, weight: .semibold))
               .foregroundStyle(.primary)
             Spacer()
           }
 
           HStack(spacing: 4) {
             Image(systemName: "airplane")
-              .font(.system(size: 12, weight: .semibold))
+              .font(.system(size: 15, weight: .semibold))
               .foregroundStyle(Color.blue)
             Text("\(String((context.state.departureDate ?? "").suffix(5)).replacingOccurrences(of: "-", with: "/")) · \(context.state.departureTime ?? "—") \(context.state.departureAirport ?? "—") → \(context.state.arrivalAirport ?? "—") \(context.state.arrivalTime ?? "—")")
-              .font(.system(size: 13, weight: .medium))
+              .font(.system(size: 17, weight: .semibold))
               .lineLimit(1)
               .minimumScaleFactor(0.7)
           }
@@ -144,7 +144,7 @@ struct CrewNextAlarmActivity: Widget {
             Text("\(context.state.label) · \(CrewSurfaceAlarm.format(context.state.date, zone: context.state.zone, pattern: "HH:mm")) · -")
             CrewRemainingTime(date: context.state.date)
           }
-          .font(.system(size: 13, weight: .regular))
+          .font(.system(size: 15, weight: .medium))
           .foregroundStyle(.primary.opacity(0.82))
           .monospacedDigit()
           .lineLimit(1)
