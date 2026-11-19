@@ -145,7 +145,7 @@ struct CrewNextAlarmActivity: Widget {
             CrewRemainingTime(date: context.state.date)
           }
           .font(.system(size: 13, weight: .regular))
-          .foregroundStyle(.secondary)
+          .foregroundStyle(.primary.opacity(0.82))
           .monospacedDigit()
           .lineLimit(1)
           .minimumScaleFactor(0.7)
@@ -154,7 +154,7 @@ struct CrewNextAlarmActivity: Widget {
       .padding(.vertical, 10)
       .padding(.horizontal, 12)
       .environment(\.timeZone, TimeZone(identifier: context.state.zone) ?? TimeZone(secondsFromGMT: 0)!)
-      .activityBackgroundTint(Color.black.opacity(0.35))
+      .activityBackgroundTint(Color(white: 0.16, opacity: 0.72))
       .activitySystemActionForegroundColor(Color.blue)
     } dynamicIsland: { context in
       DynamicIsland {
